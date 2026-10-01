@@ -2,8 +2,24 @@
 import {adminUI, bindAdmin, isAdminTab} from './admin-settings.js';
 import {auditUI, bindAudit} from './audit.js';
 function updatesUI(state, escape) {
-  const release = state.release;
-  return `<section class="settings-sheet"><div class="sheet-heading"><h2>Application updates</h2><p>Check published GitHub releases for this installation.</p></div><div class="setting-row"><span><strong>${release ? `Installed version ${escape(release.installed)}` : 'Release status'}</strong><small>${state.releaseLoading ? 'Checking GitHub…' : release ? (release.available ? `Version ${escape(release.latest)} is available.` : release.latest ? 'You’re running the latest stable release.' : 'No stable release has been published yet.') : 'Check for a newer stable version.'}</small></span><button class="primary" data-check-release ${state.releaseLoading ? 'disabled' : ''}>${state.releaseLoading ? 'Checking…' : 'Check for updates'}</button></div>${state.releaseError ? `<p class="form-error" role="alert">${escape(state.releaseError)}</p>` : ''}${release?.latest ? `<div class="sheet-heading"><a href="${escape(release.url)}" target="_blank" rel="noopener noreferrer">View release notes</a><p>A server administrator applies updates using the command below. The updater verifies the download and backs up the database before replacing the application.</p><pre class="update-command">${escape(release.updateCommand)}</pre></div>` : ''}</section>`;
+  const release = state.release,
+    agent = state.updateAgent,
+    st = agent?.status;
+  const busy = st && ['requested', 'running'].includes(st.state);
+  const progress = st
+    ? `<div class="update-progress ${escape(st.state)}" role="status" aria-live="polite"><strong>${{requested: 'Update requested', running: 'Updating', succeeded: 'Update finished', failed: 'Update failed'}[st.state] || 'Update'}${st.version ? ' · ' + escape(st.version) : ''}</strong><p>${escape(state.restarting ? 'The application is restarting with the new version…' : st.message || '')}</p>${busy ? '<span class="update-bar" aria-hidden="true"></span>' : ''}</div>`
+    : '';
+  const install =
+    release?.available && agent?.agent
+      ? `<div class="setting-row"><span><strong>Install version ${escape(release.latest)}</strong><small>The server downloads and verifies the release, backs up the database, then restarts. The page reloads by itself when the new version is running.</small></span><button class="primary" data-install-update ${busy || agent.pending ? 'disabled' : ''}>${busy ? 'Updating…' : `Install ${escape(release.latest)}`}</button></div>`
+      : '';
+  const setup =
+    agent && !agent.agent
+      ? `<div class="sheet-heading"><h2>Enable the update button</h2><p>Run this once on the server. It installs a small system service that installs releases when an administrator asks here; the application itself never gets access to Docker.</p><pre class="update-command">sudo /opt/facilities/bin/facilities-update --install-agent</pre></div>`
+      : agent?.stalled
+        ? `<div class="sheet-heading"><p class="form-error">The server has not picked up the update request. Run <code>sudo /opt/facilities/bin/facilities-update --install-agent</code> on the server, or install with the command below.</p></div>`
+        : '';
+  return `<section class="settings-sheet"><div class="sheet-heading"><h2>Application updates</h2><p>Check published GitHub releases and install them from here.</p></div><div class="setting-row"><span><strong>${release ? `Installed version ${escape(release.installed)}` : 'Release status'}</strong><small>${state.releaseLoading ? 'Checking GitHub…' : release ? (release.available ? `Version ${escape(release.latest)} is available.` : release.latest ? 'You’re running the latest stable release.' : 'No stable release has been published yet.') : 'Check for a newer stable version.'}</small></span><button class="${install ? 'secondary' : 'primary'}" data-check-release ${state.releaseLoading ? 'disabled' : ''}>${state.releaseLoading ? 'Checking…' : 'Check for updates'}</button></div>${state.releaseError ? `<p class="form-error" role="alert">${escape(state.releaseError)}</p>` : ''}${install}${progress}${setup}${release?.latest ? `<div class="sheet-heading"><a href="${escape(release.url)}" target="_blank" rel="noopener noreferrer">View release notes</a><p>You can also update from the server with the command below.</p><pre class="update-command">${escape(release.updateCommand)}</pre></div>` : ''}</section>`;
 }
 export const requestTypes = {
   maintenance: {label: 'Maintenance', icon: 'work', description: 'Repairs, upkeep, and facilities support.'},
@@ -157,6 +173,55 @@ export function bindSettings(state, api, refresh, render, toast, openOrder) {
         render();
       }),
   );
+  if (state.settingsTab === 'updates' && !state.updateAgent && !state.updateAgentLoading) {
+    state.updateAgentLoading = true;
+    api('/admin/update')
+      .then(r => (state.updateAgent = r))
+      .catch(e => (state.updateAgent = {agent: false, reason: e.message}))
+      .finally(() => {
+        state.updateAgentLoading = false;
+        render();
+      });
+  }
+  // While an update runs, poll its status and the server's version; reload once the new version answers.
+  const watchUpdate = () => {
+    if (state.updateTimer) return;
+    const startVersion = state.release?.installed;
+    state.updateTimer = setInterval(async () => {
+      try {
+        const health = await fetch('/health', {cache: 'no-store'}).then(r => r.json());
+        if (startVersion && health.version !== startVersion) {
+          clearInterval(state.updateTimer);
+          toast(`Updated to ${health.version}. Reloading…`);
+          setTimeout(() => location.reload(), 1200);
+          return;
+        }
+        state.restarting = false;
+        state.updateAgent = await api('/admin/update');
+        if (['succeeded', 'failed'].includes(state.updateAgent.status?.state)) {
+          clearInterval(state.updateTimer);
+          state.updateTimer = null;
+        }
+      } catch {
+        state.restarting = true;
+      }
+      if (state.settingsTab === 'updates' && state.page === 'settings') render();
+    }, 3000);
+  };
+  if (['requested', 'running'].includes(state.updateAgent?.status?.state)) watchUpdate();
+  const install = document.querySelector('[data-install-update]');
+  if (install)
+    install.onclick = async () => {
+      install.disabled = true;
+      try {
+        state.updateAgent = await api('/admin/update', {method: 'POST', body: JSON.stringify({version: 'latest'})});
+        render();
+        watchUpdate();
+      } catch (e) {
+        toast(e.message);
+        install.disabled = false;
+      }
+    };
   const check = document.querySelector('[data-check-release]');
   if (check)
     check.onclick = async () => {

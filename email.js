@@ -58,7 +58,7 @@ export async function queueNotificationEmail(db, user, order, message) {
     userId: user.id,
     to: user.email,
     subject: `${ticket}${title} · ${message}`,
-    body: `${message}\n\nRequest: ${ticket}${title}\nOpen it in {{ORG}}: {{APP_URL}}/#order=${encodeURIComponent(order.id)}\n\nYou can change which updates you receive by email under Notifications → Preferences.`,
+    body: `${message}\n\nRequest: ${ticket}${title}\nOpen it in {{ORG}}: {{APP_URL}}/tickets/${row?.number ? `WO-${String(row.number).padStart(4, '0')}` : encodeURIComponent(order.id)}\n\nYou can change which updates you receive by email under Notifications → Preferences.`,
   });
 }
 

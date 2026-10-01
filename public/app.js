@@ -28,7 +28,7 @@ import {
   bindCancel,
 } from './ui.js';
 import {hooks} from './hooks.js';
-import {orderEditor} from './order.js';
+import {orderEditor, ticketPage} from './order.js';
 import {locationFields, bindLocation, requestTiming, bindTiming} from './forms.js';
 import {recordsPage, bindRecords, recordEditor} from './records.js';
 import {inventoryPage, bindInventory, partEditor} from './inventory.js';
@@ -43,6 +43,34 @@ const reportLink = (() => {
   return {building: p.get('building') || '', asset: p.get('asset') || '', space: p.get('space') || ''};
 })();
 const requesterView = () => !can('requests.view_all');
+const ticketPath = path => path.match(/^\/tickets\/([^/]+)$/)?.[1];
+if (ticketPath(location.pathname)) {
+  state.page = 'ticket';
+  state.ticketRef = decodeURIComponent(ticketPath(location.pathname));
+}
+function openTicket(ref) {
+  if (state.page !== 'ticket') state.returnPage = {page: state.page, filter: state.filter, search: state.search};
+  state.page = 'ticket';
+  state.ticketRef = String(ref);
+  history.pushState({ticket: state.ticketRef}, '', '/tickets/' + encodeURIComponent(state.ticketRef));
+  render();
+  scrollTo(0, 0);
+}
+function leaveTicket() {
+  const back = state.returnPage || {page: 'dashboard', filter: 'All', search: ''};
+  state.returnPage = null;
+  Object.assign(state, back);
+  history.pushState({page: back.page}, '', '/');
+  render();
+}
+addEventListener('popstate', () => {
+  const ref = ticketPath(location.pathname);
+  if (ref) {
+    state.page = 'ticket';
+    state.ticketRef = decodeURIComponent(ref);
+  } else if (state.page === 'ticket') Object.assign(state, state.returnPage || {page: 'dashboard'});
+  if (state.me?.user) render();
+});
 
 async function refresh() {
   state.me = await api('/me');
@@ -51,6 +79,8 @@ async function refresh() {
   render();
 }
 hooks.refresh = refresh;
+hooks.openTicket = openTicket;
+hooks.leaveTicket = leaveTicket;
 hooks.render = render;
 hooks.openOrder = id => orderEditor(id);
 hooks.reloadOrders = () => loadOrders(true);
@@ -96,6 +126,7 @@ function navGroups() {
 }
 
 function go(page, filter = 'All') {
+  if (location.pathname !== '/') history.pushState({page}, '', '/');
   state.page = page;
   state.filter = filter;
   state.search = '';
@@ -107,19 +138,19 @@ function render() {
   document.title = (me.branding?.name || 'Facilities') + ' · Work order pad';
   if (!me.user) {
     $('#app').innerHTML =
-      `<main class="login"><div class="login-ticket">${reportLink ? '<p class="login-context">Sign in to report a problem. The location from the label is kept.</p>' : ''}<div class="login-head"><span class="brand-mark">${icon(me.branding?.icon || 'building')}</span><span class="brand-name">${escape(me.branding?.name || 'Facilities')}</span><span class="ticket-no">WO-0000</span></div><div class="login-body"><h1>${escape(me.branding?.welcome || 'Your facilities. One connected workspace.')}</h1><p>Maintenance, schedules, equipment and the places your organization depends on, kept on one shared pad.</p><a class="login-link" href="/auth/login${reportLink ? '?return=' + encodeURIComponent(location.pathname + location.search) : ''}">${me.mode === 'demo' ? 'Enter demo workspace' : 'Sign in with your organization'} ${icon('arrow')}</a></div><div class="login-foot"><span>${me.mode === 'demo' ? 'Local demo · Illustrative records · Administrator access' : escape(me.organization) + ' · Secure organization sign-in'}</span></div></div></main>`;
+      `<main class="login"><div class="login-ticket">${reportLink ? '<p class="login-context">Sign in to report a problem. The location from the label is kept.</p>' : ''}<div class="login-head"><span class="brand-mark">${icon(me.branding?.icon || 'building')}</span><span class="brand-name">${escape(me.branding?.name || 'Facilities')}</span><span class="ticket-no">WO-0000</span></div><div class="login-body"><h1>${escape(me.branding?.welcome || 'Your facilities. One connected workspace.')}</h1><p>Maintenance, schedules, equipment and the places your organization depends on, kept on one shared pad.</p><a class="login-link" href="/auth/login${location.pathname !== '/' ? '?return=' + encodeURIComponent(location.pathname + location.search) : ''}">${me.mode === 'demo' ? 'Enter demo workspace' : 'Sign in with your organization'} ${icon('arrow')}</a></div><div class="login-foot"><span>${me.mode === 'demo' ? 'Local demo · Illustrative records · Administrator access' : escape(me.organization) + ' · Secure organization sign-in'}</span></div></div></main>`;
     return;
   }
   const d = state.data;
   if (!d) return;
   const groups = navGroups();
   const navs = groups.flatMap(([, items]) => items);
-  if (!navs.some(n => n[0] === state.page)) {
+  if (state.page !== 'ticket' && !navs.some(n => n[0] === state.page)) {
     state.page = 'dashboard';
     state.filter = 'All';
     state.search = '';
   }
-  const title = navs.find(x => x[0] === state.page)?.[2] || 'Overview';
+  const title = state.page === 'ticket' ? 'Ticket' : navs.find(x => x[0] === state.page)?.[2] || 'Overview';
   const initials = me.user.name
     .split(' ')
     .map(x => x[0])
@@ -140,8 +171,15 @@ function render() {
     ? [['dashboard', 'home', 'Requests']]
     : [['dashboard', 'home', 'Today'], ...(enabledTypes().length ? [['orders', 'work', 'Requests']] : [])];
   $('#app').innerHTML =
-    `<div class="shell"><aside class="rail"><div class="brand"><span class="brand-mark">${icon(me.branding?.icon || 'building')}</span><span class="brand-name">${escape(me.branding?.name || 'Facilities')}<small>${escape(me.organization)}</small></span></div><nav id="workspace-nav" aria-label="Main navigation">${groups.map(([label, items]) => `<section class="nav-group"><h2 class="nav-tab">${label}</h2>${items.map(navButton).join('')}</section>`).join('')}</nav><div class="rail-foot"><div class="user-line"><span class="avatar">${escape(initials)}</span><div><strong>${escape(me.user.name)}</strong><small>${escape(me.user.role_name || me.user.role)}</small></div></div><button class="logout" id="logout">Sign out</button></div></aside><main class="workspace"><header class="topbar"><span class="crumb"><span class="brand-mark small">${icon(me.branding?.icon || 'building')}</span><span class="crumb-path">${escape(me.branding?.name || 'Facilities')} <span aria-hidden="true">/</span></span> <strong>${title}</strong></span><div class="top-right"><span class="top-date">${new Date().toLocaleDateString(undefined, {weekday: 'long', month: 'long', day: 'numeric'})}</span><button class="notification-button" data-page="notifications" aria-label="Open notifications">${icon('bell')}${unread ? `<span>${unread}</span>` : ''}</button></div></header><div class="content">${me.mode === 'demo' ? '<div class="notice demo-notice">Demo workspace — these records are illustrative. SSO and an empty database are used in the production deployment.</div>' : ''}${pageContent()}</div></main><div class="dock">${dock.map(([p, i, t]) => `<button data-page="${p}" class="${state.page === p ? 'active' : ''}">${icon(i)}<span>${t}</span></button>`).join('')}${enabledTypes().length ? `<button class="dock-new" data-create="order" aria-label="New request">${icon('plus')}<span>New</span></button>` : ''}<button data-page="notifications" class="${state.page === 'notifications' ? 'active' : ''}">${icon('bell')}<span>Inbox</span>${unread ? `<span class="count">${unread}</span>` : ''}</button><button id="nav-toggle" type="button" aria-controls="workspace-nav" aria-expanded="false">${icon('menu')}<span>Menu</span></button></div></div>`;
-  $$('[data-page]').forEach(b => (b.onclick = () => go(b.dataset.page)));
+    `<div class="shell"><aside class="rail"><div class="brand"><span class="brand-mark">${icon(me.branding?.icon || 'building')}</span><span class="brand-name">${escape(me.branding?.name || 'Facilities')}<small>${escape(me.organization)}</small></span></div><nav id="workspace-nav" aria-label="Main navigation">${groups.map(([label, items]) => `<section class="nav-group"><h2 class="nav-tab">${label}</h2>${items.map(navButton).join('')}</section>`).join('')}</nav><div class="rail-foot"><div class="user-line"><span class="avatar">${escape(initials)}</span><div><strong>${escape(me.user.name)}</strong><small>${escape(me.user.role_name || me.user.role)}</small></div></div><button class="logout" id="logout">Sign out</button></div></aside><main class="workspace"><header class="topbar"><span class="crumb"><span class="brand-mark small">${icon(me.branding?.icon || 'building')}</span><span class="crumb-path">${escape(me.branding?.name || 'Facilities')} <span aria-hidden="true">/</span></span> <strong>${title}</strong></span><div class="top-right"><span class="top-date">${new Date().toLocaleDateString(undefined, {weekday: 'long', month: 'long', day: 'numeric'})}</span><button class="notification-button" id="bell" type="button" aria-haspopup="true" aria-controls="notif-pop" aria-expanded="${state.notifOpen ? 'true' : 'false'}" aria-label="Open notifications${unread ? `, ${unread} unread` : ''}">${icon('bell')}${unread ? `<span>${unread}</span>` : ''}</button>${state.notifOpen ? notifPanel() : ''}</div></header><div class="content">${me.mode === 'demo' ? '<div class="notice demo-notice">Demo workspace — these records are illustrative. SSO and an empty database are used in the production deployment.</div>' : ''}${pageContent()}</div></main><div class="dock">${dock.map(([p, i, t]) => `<button data-page="${p}" class="${state.page === p ? 'active' : ''}">${icon(i)}<span>${t}</span></button>`).join('')}${enabledTypes().length ? `<button class="dock-new" data-create="order" aria-label="New request">${icon('plus')}<span>New</span></button>` : ''}<button data-page="notifications" class="${state.page === 'notifications' ? 'active' : ''}">${icon('bell')}<span>Inbox</span>${unread ? `<span class="count">${unread}</span>` : ''}</button><button id="nav-toggle" type="button" aria-controls="workspace-nav" aria-expanded="false">${icon('menu')}<span>Menu</span></button></div></div>`;
+  $$('[data-page]').forEach(
+    b =>
+      (b.onclick = () => {
+        state.notifOpen = false;
+        go(b.dataset.page);
+      }),
+  );
+  bindNotifPanel();
   $$('[data-goto]').forEach(b => (b.onclick = () => go(b.dataset.goto, b.dataset.filter)));
   $$('[data-create]').forEach(
     b =>
@@ -188,6 +226,7 @@ function render() {
   };
   labelTables();
   if ($('#quick-form')) bindQuickForm();
+  if ($('#ticket-page')) ticketPage(state.ticketRef);
   if ($('#order-table')) loadOrders(false);
 }
 
@@ -247,9 +286,77 @@ function bindQuickForm() {
   });
 }
 
+// The bell opens a dropdown of recent updates; the Notifications page keeps the full inbox and preferences.
+function notifPanel() {
+  const notes = state.data.notifications.slice(0, 8);
+  const unread = state.data.notifications.some(n => !n.read_at);
+  return `<div class="notif-pop" id="notif-pop" role="dialog" aria-label="Recent notifications"><div class="notif-head"><strong>Notifications</strong>${unread ? '<button type="button" class="quiet-button" data-notif-read-all>Mark all as read</button>' : ''}</div>${
+    notes.length
+      ? `<ul class="notif-list">${notes
+          .map(
+            n =>
+              `<li class="${n.read_at ? '' : 'unread'}"><button type="button" data-notif="${escape(n.id)}" data-notif-order="${escape(n.order_id)}"><span class="notif-title">${escape(n.title)}</span><span class="notif-message">${escape(n.message)}</span><small>${requestTypes[n.request_type]?.label || ''} · ${new Date(n.created_at).toLocaleString(undefined, {timeZone: state.me.timezone, month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit'})}</small></button></li>`,
+          )
+          .join('')}</ul>`
+      : `<div class="empty">You’re all caught up.</div>`
+  }<button type="button" class="notif-all" data-notif-page>All notifications and preferences ${icon('arrow')}</button></div>`;
+}
+function bindNotifPanel() {
+  const bell = $('#bell');
+  if (!bell) return;
+  bell.onclick = e => {
+    e.stopPropagation();
+    state.notifOpen = !state.notifOpen;
+    render();
+    if (state.notifOpen) $('#notif-pop [data-notif], #notif-pop [data-notif-page]')?.focus();
+  };
+  const pop = $('#notif-pop');
+  if (!pop) return;
+  pop.onclick = e => e.stopPropagation();
+  $$('[data-notif]').forEach(
+    b =>
+      (b.onclick = async () => {
+        state.notifOpen = false;
+        try {
+          await api('/notifications/read', {method: 'POST', body: JSON.stringify({id: b.dataset.notif})});
+          state.data.notifications = state.data.notifications.map(n =>
+            n.id === b.dataset.notif ? {...n, read_at: new Date().toISOString()} : n,
+          );
+        } catch {
+          /* opening the ticket matters more than the read mark */
+        }
+        openTicket(b.dataset.notifOrder);
+      }),
+  );
+  const all = $('[data-notif-read-all]');
+  if (all)
+    all.onclick = async () => {
+      all.disabled = true;
+      try {
+        await api('/notifications/read', {method: 'POST', body: JSON.stringify({})});
+        await refresh();
+      } catch (e) {
+        toast(e.message);
+      }
+    };
+  $('[data-notif-page]').onclick = () => {
+    state.notifOpen = false;
+    go('notifications');
+  };
+}
+const closeNotif = () => {
+  if (!state.notifOpen) return;
+  state.notifOpen = false;
+  render();
+  $('#bell')?.focus();
+};
+document.addEventListener('click', () => closeNotif());
+
 function pageContent() {
   const d = state.data,
     s = d.summary;
+  if (state.page === 'ticket')
+    return '<div id="ticket-page" class="ticket-page"><div class="empty">Loading ticket…</div></div>';
   if (state.page === 'settings') return settingsUI(state, escape, icon, heading);
   if (state.page === 'notifications') return notificationsUI(state, escape, icon, heading);
   if (['buildings', 'assets', 'maintenance'].includes(state.page)) return recordsPage(state.page);
@@ -574,7 +681,7 @@ setInterval(async () => {
     document.hidden ||
     $('#editor').open ||
     ['INPUT', 'SELECT', 'TEXTAREA'].includes(document.activeElement?.tagName) ||
-    ['settings', 'notifications', 'reports', 'inventory'].includes(state.page) ||
+    ['settings', 'notifications', 'reports', 'inventory', 'ticket'].includes(state.page) ||
     state.list?.rows?.length > pageSize
   )
     return;
@@ -586,6 +693,7 @@ setInterval(async () => {
 }, 30000);
 
 document.addEventListener('keydown', e => {
+  if (e.key === 'Escape' && state.notifOpen) closeNotif();
   if (e.key === 'Escape' && $('.rail.menu-open')) {
     $('.rail').classList.remove('menu-open');
     document.body.classList.remove('menu-locked');

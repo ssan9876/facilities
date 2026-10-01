@@ -99,7 +99,7 @@ export async function createApp(env = process.env, dbOverride, options = {}) {
   app.use('/api', writes);
   const uploadLimiter = limiter('UPLOADS', 30, req => req.user?.id || req.ip);
   setupSettings(app, db);
-  setupReleases(app, env);
+  setupReleases(app, env, db);
   setupAdministration(app, db, env);
   setupAudit(app, db);
   const email = setupEmail(app, db, env, {logger, workspaceSettings, transport: options.transport});

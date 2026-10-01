@@ -143,9 +143,19 @@ test('request details, deletion, comment ownership and history', async () => {
     assert.equal((await call(`/api/orders/${id}/comments/${comment}`, 'DELETE')).status, 404);
     await as('tech');
     assert.equal(
-      (await call('/api/orders/' + id, 'PATCH', {title: 'Tech rename'})).status,
+      (await call('/api/orders/' + id, 'PATCH', {title: 'Tech rename', description: 'Seal replaced'})).status,
+      200,
+      'the assignee can rewrite the text',
+    );
+    assert.equal(
+      (await call('/api/orders/' + id, 'PATCH', {priority: 'Low'})).status,
       403,
-      'technicians update status, not details',
+      'but not priority, place or dates',
+    );
+    assert.equal(
+      (await call('/api/orders/' + id, 'PATCH', {title: 'Sneaky', building_id: 'b2'})).status,
+      403,
+      'mixed text and place edits are refused',
     );
     assert.equal((await call('/api/orders/' + id, 'DELETE')).status, 403);
     await as('demo-admin');
@@ -155,8 +165,11 @@ test('request details, deletion, comment ownership and history', async () => {
       'managers can remove comments',
     );
     const history = (await call(`/api/orders/${id}/history`)).body;
-    const update = history.find(h => h.action === 'order.update' && h.details?.title);
-    assert.deepEqual(update.details.title, ['Sticky door', 'Sticky front door']);
+    const titles = history.filter(h => h.action === 'order.update' && h.details?.title).map(h => h.details.title);
+    assert.deepEqual(titles, [
+      ['Sticky front door', 'Tech rename'],
+      ['Sticky door', 'Sticky front door'],
+    ]);
     assert.ok(history.some(h => h.action === 'comment.delete'));
     assert.equal((await call('/api/orders/' + id, 'DELETE')).status, 200);
     assert.equal((await call('/api/orders/' + id)).status, 404);

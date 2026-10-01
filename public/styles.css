@@ -2831,3 +2831,238 @@ dialog#editor[data-kind='ticket']::before {
     animation: none !important;
   }
 }
+
+/* In-app update progress */
+.update-progress {
+  margin: 0 26px 18px;
+  padding: 14px 16px;
+  border: 1px solid var(--rule-strong);
+  border-radius: 3px;
+  position: relative;
+  overflow: hidden;
+}
+.update-progress strong {
+  display: block;
+  font-size: 14px;
+  margin-bottom: 4px;
+}
+.update-progress.failed {
+  border-color: var(--stamp);
+}
+.update-progress.failed strong {
+  color: var(--stamp);
+}
+.update-progress.succeeded strong {
+  color: var(--done);
+}
+.update-bar {
+  position: absolute;
+  left: 0;
+  bottom: 0;
+  height: 3px;
+  width: 30%;
+  background: var(--carbon);
+  animation: update-run 1.4s cubic-bezier(0.45, 0, 0.55, 1) infinite;
+}
+@keyframes update-run {
+  from {
+    transform: translateX(-100%);
+  }
+  to {
+    transform: translateX(340%);
+  }
+}
+
+/* Ticket pages: each ticket is a sheet on the desk with its own address. */
+.ticket-page {
+  max-width: 900px;
+}
+.ticket-bar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+.ticket-bar .quiet-button .icon {
+  width: 16px;
+  height: 16px;
+}
+.ticket-sheet {
+  position: relative;
+  background: var(--paper);
+  border: 1px solid var(--ink);
+  border-radius: 2px;
+}
+.ticket-sheet::before {
+  content: '';
+  position: absolute;
+  inset: 0 auto 0 -1px;
+  width: 9px;
+  background: radial-gradient(circle at 0 50%, var(--desk) 3.5px, transparent 4px) 0 0 / 9px 14px repeat-y;
+  pointer-events: none;
+}
+.ticket-head {
+  display: flex;
+  align-items: baseline;
+  gap: 16px;
+  padding: 18px 26px 16px;
+  border-bottom: 1px solid var(--ink);
+}
+.ticket-sheet[data-copy='technician'] .ticket-head {
+  background: color-mix(in srgb, var(--canary) 22%, var(--paper));
+}
+.ticket-sheet[data-copy='office'] .ticket-head {
+  background: color-mix(in srgb, var(--pink) 22%, var(--paper));
+}
+.ticket-head .ticket-no {
+  font-size: 26px;
+  padding-right: 16px;
+  border-right: 1px solid var(--rule);
+}
+.ticket-head h1 {
+  font-size: 24px;
+  line-height: 1.2;
+  font-weight: 750;
+  overflow-wrap: anywhere;
+  text-wrap: balance;
+}
+.ticket-body {
+  padding: 22px 26px 30px;
+}
+
+/* Notifications dropdown */
+.top-right {
+  position: relative;
+}
+.notif-pop {
+  position: absolute;
+  top: calc(100% + 10px);
+  right: 0;
+  width: 380px;
+  max-height: min(70vh, 560px);
+  display: flex;
+  flex-direction: column;
+  background: var(--paper);
+  border: 1px solid var(--ink);
+  border-radius: 3px;
+  box-shadow: 0 18px 40px -12px rgb(20 24 32 / 0.35);
+  z-index: 60;
+  color: var(--ink);
+  animation: notif-in 0.16s cubic-bezier(0.16, 1, 0.3, 1);
+}
+@keyframes notif-in {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+}
+.notif-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px 14px;
+  border-bottom: 1px solid var(--ink);
+}
+.notif-head strong {
+  font-size: 12px;
+  font-weight: 750;
+  font-stretch: var(--condensed);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+.notif-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  overflow-y: auto;
+}
+.notif-list li {
+  border-bottom: 1px solid var(--row);
+}
+.notif-list button {
+  display: grid;
+  gap: 2px;
+  width: 100%;
+  text-align: left;
+  border: 0;
+  background: transparent;
+  padding: 11px 14px;
+}
+.notif-list li.unread button {
+  background: var(--carbon-wash);
+}
+.notif-list button:hover {
+  background: var(--desk);
+}
+.notif-title {
+  font-weight: 700;
+  font-size: 14px;
+  overflow-wrap: anywhere;
+}
+.notif-list li.unread .notif-title::before {
+  content: '';
+  display: inline-block;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--carbon);
+  margin-right: 7px;
+  vertical-align: 2px;
+}
+.notif-message {
+  font-size: 13px;
+  color: var(--ink-2);
+}
+.notif-list small {
+  font-size: 12px;
+  color: var(--ink-3);
+}
+.notif-all {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  border: 0;
+  border-top: 1px solid var(--rule);
+  background: transparent;
+  color: var(--carbon);
+  font-weight: 650;
+  font-size: 13px;
+  padding: 11px;
+}
+.notif-all:hover {
+  background: var(--desk);
+}
+.notif-all .icon {
+  width: 15px;
+  height: 15px;
+}
+@media (max-width: 760px) {
+  .notif-pop {
+    position: fixed;
+    top: 56px;
+    left: 8px;
+    right: 8px;
+    width: auto;
+    max-height: calc(100dvh - 140px);
+  }
+  .ticket-head {
+    flex-wrap: wrap;
+    gap: 6px 12px;
+    padding: 14px 16px;
+  }
+  .ticket-head .ticket-no {
+    font-size: 20px;
+  }
+  .ticket-head h1 {
+    font-size: 19px;
+    flex-basis: 100%;
+  }
+  .ticket-body {
+    padding: 16px 16px 24px;
+  }
+  .ticket-bar .copy-label {
+    margin-left: auto;
+  }
+}

@@ -51,16 +51,24 @@ const assert = require('node:assert/strict');
   await page.getByRole('button', {name: 'Create request', exact: true}).click();
   await page.locator('#editor').waitFor({state: 'hidden'});
   await page.locator('.order-title').filter({hasText: orderTitle}).waitFor();
+  // Tickets open as their own page with an address; Back returns to the list.
   await page.locator('.order-title').filter({hasText: orderTitle}).click();
+  await page.getByRole('heading', {name: orderTitle, exact: true}).waitFor();
+  assert.match(new URL(page.url()).pathname, /^\/tickets\/WO-\d{4}$/, 'each ticket has its own URL');
+  const ticketUrl = page.url();
+  await page.getByRole('button', {name: 'Stamp In progress', exact: true}).click();
+  await page.locator('#ticket-page .lc-stamp.in-progress').waitFor();
   await page.locator('[name=status]').selectOption('Completed');
   await page.getByRole('button', {name: 'Save changes', exact: true}).click();
-  await page.locator('#editor').waitFor({state: 'hidden'});
-  await page.locator('nav').getByRole('button', {name: 'All requests', exact: true}).click();
-  await page.locator('.order-title').filter({hasText: orderTitle}).click();
+  await page.locator('#ticket-page .lc-stamp.completed').waitFor();
+  await page.goBack();
+  await page.locator('.order-title').first().waitFor();
+  await page.goto(ticketUrl);
+  await page.getByRole('heading', {name: orderTitle, exact: true}).waitFor();
   await page.getByLabel('Add a comment').fill('Browser verification completed.');
   await page.getByRole('button', {name: 'Post comment', exact: true}).click();
   await page.getByText('Browser verification completed.', {exact: true}).waitFor();
-  await page.getByRole('button', {name: 'Close dialog'}).click();
+  await page.getByRole('button', {name: 'Back', exact: true}).click();
   for (const name of ['Assets', 'Buildings', 'Preventive maintenance', 'Settings', 'Overview']) {
     await page.getByRole('button', {name, exact: true}).click();
   }
@@ -280,7 +288,16 @@ const assert = require('node:assert/strict');
   await page.getByRole('button', {name: 'Activity', exact: true}).click();
   await page.locator('.history-list').getByText('Attached leak-photo.png', {exact: false}).waitFor();
   await page.screenshot({path: '.impeccable/review/order-detail-desktop.png', fullPage: true});
-  await page.getByRole('button', {name: 'Close dialog'}).click();
+  await page.getByRole('button', {name: 'Back', exact: true}).click();
+  await page
+    .getByRole('button', {name: /^Notifications/})
+    .first()
+    .waitFor();
+  await page.locator('#bell').click();
+  await page.locator('#notif-pop').waitFor();
+  await page.screenshot({path: '.impeccable/review/notifications-dropdown.png'});
+  await page.keyboard.press('Escape');
+  await page.locator('#notif-pop').waitFor({state: 'detached'});
   // Inventory, reports and audit pages.
   await page.locator('nav').getByRole('button', {name: 'Inventory', exact: true}).click();
   await page.getByText('12', {exact: true}).first().waitFor();

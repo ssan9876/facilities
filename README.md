@@ -5,13 +5,13 @@ A working first version of an FMX-inspired facilities-management application, bu
 ## Included
 
 - Overview with live counts, search and status filters; the request register is paged and filtered on the server
-- Work orders: create, edit details, assign, change status, reopen, delete, comment (authors edit/delete their comments)
+- Work orders: create, edit details, assign, change status, reopen, delete, comment (authors edit/delete their comments); each ticket has its own page at `/tickets/WO-0042`, and the assignee can edit its title and description
 - Photo and file attachments on requests (JPEG, PNG, GIF, WebP, HEIC, PDF, text, CSV, Word, Excel)
 - Activity history on every request and an organization-wide audit log with CSV export
 - Separate Maintenance, Schedule and Technology request queues
 - Admin-only request-type switches: hide disabled types and preserve their records
 - Schedule requests with start/end times in the organization's timezone, optional space reservations, conflict checks and manager approval
-- In-app notification inbox, optional email delivery, and personal event and email preferences
+- Notifications from a dropdown on the bell (and a full inbox page), optional email delivery linking to the ticket page, and personal event and email preferences
 - Building, space and equipment registers with edit, archive/restore and delete
 - Recurring preventive-maintenance plans (edit, pause, resume, delete) and work-order generation
 - Spare-parts inventory with stock adjustments, usage on requests and low-stock alerts
@@ -132,7 +132,7 @@ Every API check asks for a named capability (for example `requests.assign` or `i
 |---|---|---|---|---|
 | Submit requests, follow and comment on their own, edit their own while Open | Yes | Yes | Yes | Yes |
 | See every request (`requests.view_all`) | — | Yes | Yes | Yes |
-| Update work assigned to them, be assigned work | — | Yes | Yes | Yes |
+| Update work assigned to them, edit its title and description, be assigned work | — | Yes | Yes | Yes |
 | Edit, update, assign and delete any request; approve reservations; moderate comments and files | — | — | Yes | Yes |
 | See maintenance plans and inventory; download exports | — | Yes | Yes | Yes |
 | Manage buildings, spaces, assets, maintenance plans, parts; reports | — | — | Yes | Yes |
@@ -162,7 +162,15 @@ Verify restoration in a separate deployment before relying on backups. Store enc
 
 Public repository: https://github.com/ssan9876/go-fmx-clone. CI runs SQLite and PostgreSQL API tests, browser checks, and a Docker build on main and pull requests. Pushing a `vMAJOR.MINOR.PATCH` tag matching `package.json` runs the same checks and publishes `facilities.tar.gz` and `SHA256SUMS` as a GitHub release. Release downloads contain source; the installation builds its own Docker image. No GitHub token is needed to download public releases.
 
-Administrators use **Settings → Updates → Check for updates** for stable-release status and release notes. Applying updates requires server access:
+Administrators use **Settings → Updates → Check for updates** for stable-release status and release notes, and **Install** to update the server from the browser. The button needs the host update agent, installed once on the server:
+
+```sh
+sudo /opt/facilities/bin/facilities-update --install-agent
+```
+
+The agent is a root systemd path unit watching `/opt/facilities/run`, a folder shared with the app container. Pressing **Install** writes `request.json` there; the agent runs the same verified updater as the command below (checksum, backup, health check, rollback) and writes `status.json`, which the page shows until the new version answers and the page reloads. The request can only name `latest` or a published `vMAJOR.MINOR.PATCH` newer than the installed one; the app never gets Docker access. The full log is in `/opt/facilities/run/update.log`. Every successful update reinstalls the agent, so it stays current. Without the agent, the page shows the command to run instead.
+
+You can still update from the server:
 
 ```sh
 sudo /opt/facilities/bin/facilities-update --check

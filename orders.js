@@ -176,6 +176,13 @@ export function setupOrders(app, db, env) {
   app.get('/api/orders', async (req, res) => res.json(await listOrders(db, req.user, req.query, timezone, page(req))));
   app.get('/api/summary', async (req, res) => res.json(await orderSummary(db, req.user, timezone)));
   app.get('/api/orders/:id', async (req, res) => {
+    // Ticket pages address tickets by number ("WO-0042" or "42") as well as by id.
+    const byNumber = req.params.id.match(/^(?:wo-?)?0*(\d{1,9})$/i);
+    if (byNumber) {
+      const found = (await q('SELECT id FROM work_orders WHERE number=$1', [Number(byNumber[1])]))[0];
+      if (!found) throw error('Work order not found.', 404);
+      req.params.id = found.id;
+    }
     await accessibleOrder(req);
     const order = (await q(`SELECT ${orderColumns} ${orderJoins} WHERE w.id=$1`, [req.params.id]))[0];
     const modules = await moduleSettings(db);
@@ -265,11 +272,19 @@ export function setupOrders(app, db, env) {
     const body = req.body || {};
     const editsDetails = detailFields.some(k => k in body);
     const owner = row.requester_id === req.user.id;
-    if (editsDetails && !(can(req.user, 'requests.edit_any') || (owner && row.status === 'Open')))
+    const fullEdit = can(req.user, 'requests.edit_any') || (owner && row.status === 'Open');
+    // The assignee may rewrite the ticket's text (title and description) but not where, when or how urgent.
+    const textEdit =
+      can(req.user, 'requests.edit_assigned') &&
+      row.assignee_id === req.user.id &&
+      detailFields.filter(k => k in body).every(k => ['title', 'description'].includes(k));
+    if (editsDetails && !(fullEdit || textEdit))
       throw error(
-        owner
-          ? 'Requests can be edited by the requester only while they are Open.'
-          : 'Your role cannot edit the details of this request.',
+        row.assignee_id === req.user.id && can(req.user, 'requests.edit_assigned')
+          ? 'As the assignee you can edit the title and description only.'
+          : owner
+            ? 'Requests can be edited by the requester only while they are Open.'
+            : 'Your role cannot edit the details of this request.',
         403,
       );
     const mayStamp =

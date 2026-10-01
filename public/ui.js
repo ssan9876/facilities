@@ -37,6 +37,7 @@ export const paths = {
   edit: 'M4 20h4L19 9l-4-4L4 16z M13 7l4 4',
   door: 'M5 21V3h11v18 M16 6h3v15 M12 12h.01 M2 21h20',
   qr: 'M4 4h6v6H4z M14 4h6v6h-6z M4 14h6v6H4z M14 14h2v2h-2z M18 18h2v2h-2z M14 18h2 M18 14h2',
+  'arrow-left': 'M19 12H5 M10 7l-5 5 5 5',
 };
 export const icon = k =>
   `<svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="${paths[k] || paths.work}"/></svg>`;

@@ -9,7 +9,10 @@ test('stable release versions compare numerically and reject prereleases', () =>
 });
 test('release checks are admin-only and repository configuration cannot change the request host', async () => {
   let handler;
-  setupReleases({get: (_path, fn) => (handler = fn)}, {RELEASE_REPOSITORY: 'https://attacker.invalid'});
+  setupReleases(
+    {get: (path, fn) => path === '/api/releases' && (handler = fn), post: () => {}},
+    {RELEASE_REPOSITORY: 'https://attacker.invalid'},
+  );
   let status, body;
   const res = {
     status(n) {
