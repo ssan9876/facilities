@@ -4,6 +4,7 @@ import {auditUI, bindAudit} from './audit.js';
 import {formsUI, bindForms} from './settings-forms.js';
 import {dataUI, bindData} from './settings-data.js';
 import {accessUI, bindAccess} from './access-settings.js';
+import {appearance, applyAppearance} from './ui.js';
 function updatesUI(state, escape) {
   const release = state.release,
     agent = state.updateAgent,
@@ -45,41 +46,47 @@ const sectionCapability = {
   audit: 'admin.audit',
   updates: 'admin.updates',
 };
+// Settings are grouped by what an administrator is trying to do.
+const settingsGroups = [
+  [
+    'Workspace',
+    [
+      ['modules', 'Features'],
+      ['forms', 'Request forms'],
+      ['delivery', 'Notifications'],
+      ['branding', 'Identity'],
+      ['workspace', 'Workspace'],
+    ],
+  ],
+  [
+    'People & access',
+    [
+      ['people', 'People'],
+      ['groups', 'Groups'],
+      ['roles', 'Roles'],
+      ['assignment', 'Auto-assignment'],
+      ['access', 'Access as code'],
+      ['provisioning', 'Provisioning'],
+    ],
+  ],
+  [
+    'System',
+    [
+      ['data', 'Backups & data'],
+      ['audit', 'Audit log'],
+      ['updates', 'Updates'],
+    ],
+  ],
+];
+// The sections this person may open, as [tab, label].
+export const allowedSettingsTabs = state =>
+  settingsGroups
+    .flatMap(([, items]) => items)
+    .filter(([key]) => state.me.user.capabilities.includes(sectionCapability[key]));
 export function settingsUI(state, escape, icon, heading) {
   const types = requestTypes,
     modules = state.data.modules;
-  // Settings are grouped by what an administrator is trying to do.
-  const groups = [
-    [
-      'Workspace',
-      [
-        ['modules', 'Features'],
-        ['forms', 'Request forms'],
-        ['delivery', 'Notifications'],
-        ['branding', 'Identity'],
-        ['workspace', 'Workspace'],
-      ],
-    ],
-    [
-      'People & access',
-      [
-        ['people', 'People'],
-        ['groups', 'Groups'],
-        ['roles', 'Roles'],
-        ['assignment', 'Auto-assignment'],
-        ['access', 'Access as code'],
-        ['provisioning', 'Provisioning'],
-      ],
-    ],
-    [
-      'System',
-      [
-        ['data', 'Backups & data'],
-        ['audit', 'Audit log'],
-        ['updates', 'Updates'],
-      ],
-    ],
-  ];
+  const groups = settingsGroups;
   // Each section needs its own administration capability; the Administrator role holds them all.
   const caps = state.me.user.capabilities;
   const visible = groups
@@ -184,7 +191,18 @@ export function notificationsUI(state, escape, icon, heading) {
         .map(([key, [label, description]]) => toggle(escape, key, label, description, state.data.preferences[key]))
         .join(
           '',
-        )}<div class="settings-footer"><p>You won’t receive notifications for your own actions.</p><div class="form-error" role="alert"></div><button class="primary" type="submit">Save preferences</button></div></form>`
+        )}<div class="settings-footer"><p>You won’t receive notifications for your own actions.</p><div class="form-error" role="alert"></div><button class="primary" type="submit">Save preferences</button></div></form><section class="settings-sheet appearance-sheet"><div class="sheet-heading"><h2>Appearance on this device</h2><p>Changes apply right away and are remembered in this browser.</p></div><div class="setting-row"><span><strong>Theme</strong><small>Dark is easier at night and in dim mechanical rooms.</small></span><span class="segmented" role="radiogroup" aria-label="Theme">${[
+        ['system', 'System'],
+        ['light', 'Light'],
+        ['dark', 'Dark'],
+      ]
+        .map(
+          ([v, l]) =>
+            `<label><input type="radio" name="theme" value="${v}" ${appearance().theme === v ? 'checked' : ''}><span>${l}</span></label>`,
+        )
+        .join(
+          '',
+        )}</span></div>${toggle(escape, 'contrast', 'Higher contrast', 'Darker text, stronger lines and focus outlines.', appearance().contrast === 'more')}</section>`
     );
   const notes = state.data.notifications;
   return (
@@ -200,6 +218,11 @@ export function bindSettings(state, api, refresh, render, toast, openOrder) {
   bindForms(state, render, refresh);
   bindData(state, render);
   bindAccess(state, render);
+  document
+    .querySelectorAll('.appearance-sheet [name=theme]')
+    .forEach(r => (r.onchange = () => applyAppearance({theme: r.value})));
+  const contrast = document.querySelector('.appearance-sheet [name=contrast]');
+  if (contrast) contrast.onchange = () => applyAppearance({contrast: contrast.checked ? 'more' : 'normal'});
   const status = document.querySelector('[data-email-status]');
   if (status)
     status.onclick = async () => {

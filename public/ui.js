@@ -34,6 +34,9 @@ export const paths = {
   clip: 'M16 7l-7.5 7.5a2.1 2.1 0 0 0 3 3L19 10a4.2 4.2 0 0 0-6-6l-7.5 7.5a6.4 6.4 0 0 0 9 9L20 15',
   download: 'M12 4v11 M7 10l5 5 5-5 M5 20h14',
   upload: 'M12 15V4 M7 9l5-5 5 5 M5 20h14',
+  filter: 'M4 5h16l-6 8v5l-4 2v-7z',
+  link: 'M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1 M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1',
+  keyboard: 'M3 6h18v12H3z M7 10h1 M11 10h1 M15 10h1 M7 14h10',
   history: 'M3 12a9 9 0 1 0 3-6.7 M3 4v5h5 M12 7v5l3 2',
   edit: 'M4 20h4L19 9l-4-4L4 16z M13 7l4 4',
   door: 'M5 21V3h11v18 M16 6h3v15 M12 12h.01 M2 21h20',
@@ -114,11 +117,118 @@ export const upload = (orderId, file) =>
     headers: {'Content-Type': file.type || 'application/octet-stream', 'X-File-Name': encodeURIComponent(file.name)},
   });
 let toastTimer;
-export function toast(message) {
-  $('#toast').textContent = message;
-  $('#toast').style.display = 'block';
+// A short message; with {undo}, an Undo button reverses the action for eight seconds.
+export function toast(message, {undo} = {}) {
+  const box = $('#toast');
+  const hide = () => (box.style.display = 'none');
+  box.textContent = '';
+  const text = document.createElement('span');
+  text.textContent = message;
+  box.append(text);
+  if (undo) {
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.className = 'toast-undo';
+    button.textContent = 'Undo';
+    button.onclick = async () => {
+      hide();
+      try {
+        await undo();
+        toast('Undone.');
+      } catch (err) {
+        toast(err.message);
+      }
+    };
+    box.append(button);
+  }
+  box.style.display = 'flex';
   clearTimeout(toastTimer);
-  toastTimer = setTimeout(() => ($('#toast').style.display = 'none'), 4500);
+  toastTimer = setTimeout(hide, undo ? 8000 : 4500);
+}
+
+// Drafts: text typed into a form is kept in this browser until it is sent, so leaving the page or a
+// locked phone never loses it. Only text fields are kept (choices depend on other fields).
+const draftKey = key => 'facilities.draft.' + key;
+export function autosave(form, key) {
+  if (!form) return {clear() {}};
+  const fields = () => [...form.querySelectorAll('textarea, input[type=text], input:not([type])')].filter(f => f.name);
+  let saved = null;
+  try {
+    saved = JSON.parse(localStorage.getItem(draftKey(key)) || 'null');
+  } catch {
+    /* storage unavailable: drafts are simply not kept */
+  }
+  let restored = false;
+  if (saved)
+    for (const f of fields())
+      if (saved[f.name] && !f.value) {
+        f.value = saved[f.name];
+        restored = true;
+      }
+  if (restored) {
+    const note = document.createElement('p');
+    note.className = 'draft-note';
+    note.innerHTML = 'Draft restored. <button type="button" class="quiet-button">Discard draft</button>';
+    note.querySelector('button').onclick = () => {
+      for (const f of fields()) if (saved[f.name] === f.value) f.value = '';
+      clear();
+      note.remove();
+    };
+    form.prepend(note);
+  }
+  let timer;
+  form.addEventListener('input', () => {
+    clearTimeout(timer);
+    timer = setTimeout(() => {
+      const body = Object.fromEntries(
+        fields()
+          .filter(f => f.value.trim())
+          .map(f => [f.name, f.value]),
+      );
+      try {
+        if (Object.keys(body).length) localStorage.setItem(draftKey(key), JSON.stringify(body));
+        else localStorage.removeItem(draftKey(key));
+      } catch {
+        /* storage full or blocked */
+      }
+    }, 400);
+  });
+  function clear() {
+    clearTimeout(timer);
+    try {
+      localStorage.removeItem(draftKey(key));
+    } catch {
+      /* nothing to clear */
+    }
+  }
+  return {clear};
+}
+
+// Appearance is chosen per device: theme (system, light, dark) and higher contrast.
+export function appearance() {
+  const read = (k, d) => {
+    try {
+      return localStorage.getItem(k) || d;
+    } catch {
+      return d;
+    }
+  };
+  return {theme: read('facilities.theme', 'system'), contrast: read('facilities.contrast', 'normal')};
+}
+export function applyAppearance(next = {}) {
+  const current = {...appearance(), ...next};
+  try {
+    localStorage.setItem('facilities.theme', current.theme);
+    localStorage.setItem('facilities.contrast', current.contrast);
+  } catch {
+    /* this visit only */
+  }
+  const root = document.documentElement;
+  if (current.theme === 'system') delete root.dataset.theme;
+  else root.dataset.theme = current.theme;
+  if (current.contrast === 'more') root.dataset.contrast = 'more';
+  else delete root.dataset.contrast;
+  return current;
 }
 export function heading(title, sub, type, action, extra = '') {
   return `<div class="page-heading"><div><h1>${title}</h1><p>${sub}</p></div><div class="heading-actions">${extra}${type ? `<button class="primary" data-create="${type}">${icon('plus')}${action}</button>` : ''}</div></div>`;

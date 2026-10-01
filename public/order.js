@@ -25,6 +25,7 @@ import {
   formActions,
   bindCancel,
   confirmButton,
+  autosave,
 } from './ui.js';
 import {hooks} from './hooks.js';
 import {locationFields, bindLocation, requestTiming, bindTiming} from './forms.js';
@@ -166,7 +167,7 @@ export async function ticketPage(ref) {
     o.assignee ? escape(o.assignee) : none('Unassigned'),
   ].join('<span class="sep" aria-hidden="true">·</span>');
   $('#ticket-page').innerHTML =
-    `<div class="tp"><header class="tp-head"><button type="button" class="quiet-button tp-back" data-ticket-back>${icon('arrow-left')}Back</button><div class="tp-title"><span class="ticket-no">${escape(number)}</span><h1>${escape(o.title)}</h1></div><p class="tp-summary">${summary}</p><div class="tp-actions">${actions}${canEditDetails ? `<button class="secondary" id="edit-order">${icon('edit')}${textEdit ? 'Edit text' : 'Edit details'}</button>` : ''}<button class="secondary" id="show-history">${icon('history')}Activity</button></div></header>` +
+    `<div class="tp"><header class="tp-head"><button type="button" class="quiet-button tp-back" data-ticket-back>${icon('arrow-left')}Back</button><div class="tp-title"><span class="ticket-no">${escape(number)}</span><h1>${escape(o.title)}</h1></div><p class="tp-summary">${summary}</p><div class="tp-actions">${p.take ? `<button type="button" class="primary" data-take>${icon('check')}Take it</button>` : ''}${actions}${canEditDetails ? `<button class="secondary" id="edit-order">${icon('edit')}${textEdit ? 'Edit text' : 'Edit details'}</button>` : ''}<button class="secondary" id="show-history">${icon('history')}Activity</button></div></header>` +
     `<div class="tp-grid"><aside class="tp-side">${controls}<section class="tp-card"><h2>Details</h2><dl class="tp-facts">${facts}</dl></section>${p.delete ? '<button class="quiet-button danger" id="delete-order">Delete request</button>' : ''}</aside>` +
     `<div class="tp-main"><section class="tp-card"><h2>Description</h2><p class="detail-description">${escape(o.description) || none('No additional details.')}</p>${answers}</section>${reservation}<div id="history" hidden></div><section class="tp-card"><h2>Conversation</h2><div id="comments" aria-live="polite">Loading comments…</div><form id="comment-form">${field('Add a comment', 'body', 'textarea')}<div class="form-error" role="alert"></div><div class="editor-actions"><button class="primary" type="submit">Post comment</button></div></form></section>${attachments}${parts}</div></div></div>`;
   const reopen = async message => {
@@ -215,8 +216,10 @@ export async function ticketPage(ref) {
       note.textContent = 'Saving…';
       try {
         await api(`/orders/${encodeURIComponent(id)}`, {method: 'PATCH', body: JSON.stringify({[key]: value})});
-        const person = state.data.users.find(u => u.id === value)?.name;
-        await reopen(
+        const person = (o.assignable || state.data.users).find(u => u.id === value)?.name;
+        const previous = key === 'assignee_id' ? o.assignee_id || '' : o[key];
+        await hooks.refresh();
+        toast(
           key === 'status'
             ? `${number} marked ${value}.`
             : key === 'assignee_id'
@@ -224,6 +227,7 @@ export async function ticketPage(ref) {
                 ? `${number} assigned to ${person}.`
                 : `${number} unassigned.`
               : `${number} priority set to ${value}.`,
+          {undo: () => undoChange(id, {[key]: previous})},
         );
         refocus(`[data-ticket-control="${focusNext}"]`);
       } catch (e) {
@@ -234,6 +238,22 @@ export async function ticketPage(ref) {
       }
     };
   });
+  const take = $('[data-take]');
+  if (take)
+    take.onclick = async () => {
+      take.disabled = true;
+      try {
+        await api(`/orders/${encodeURIComponent(id)}`, {
+          method: 'PATCH',
+          body: JSON.stringify({assignee_id: me.id}),
+        });
+        await hooks.refresh();
+        toast(`${number} is yours.`, {undo: () => undoChange(id, {assignee_id: null})});
+      } catch (e) {
+        toast(e.message);
+        take.disabled = false;
+      }
+    };
   $$('[data-stamp]').forEach(
     b =>
       (b.onclick = async () => {
@@ -244,7 +264,8 @@ export async function ticketPage(ref) {
             method: 'PATCH',
             body: JSON.stringify({status: b.dataset.stamp}),
           });
-          await reopen(`${number} marked ${b.dataset.stamp}.`);
+          await hooks.refresh();
+          toast(`${number} marked ${b.dataset.stamp}.`, {undo: () => undoChange(id, {status: o.status})});
         } catch (e) {
           toast(e.message);
           $$('[data-stamp]').forEach(x => (x.disabled = false));
@@ -414,6 +435,7 @@ export async function ticketPage(ref) {
       ),
     );
   };
+  const commentDraft = autosave($('#comment-form'), 'comment.' + id);
   $('#comment-form').onsubmit = async e => {
     e.preventDefault();
     const f = e.currentTarget,
@@ -425,6 +447,8 @@ export async function ticketPage(ref) {
         body: JSON.stringify(Object.fromEntries(new FormData(f))),
       });
       f.reset();
+      commentDraft.clear();
+      f.querySelector('.draft-note')?.remove();
       await loadComments();
     } catch (err) {
       f.querySelector('.form-error').textContent = err.message;
@@ -477,6 +501,13 @@ function editOrder(o) {
   });
 }
 
+// Undo puts the previous value back and redraws whatever is showing.
+async function undoChange(id, previous) {
+  await api(`/orders/${encodeURIComponent(id)}`, {method: 'PATCH', body: JSON.stringify({...previous, undo: true})});
+  await hooks.refresh();
+}
+export const undoTicketChange = undoChange;
+
 // Resolving asks how the work was resolved; the note is saved on the ticket as a comment.
 function resolveTicket(o, number) {
   dialog(
@@ -485,15 +516,17 @@ function resolveTicket(o, number) {
     {number},
   );
   bindCancel();
+  const draft = autosave($('#resolve-form'), 'resolve.' + o.id);
   $('#resolve-form textarea').focus();
   bindForm($('#resolve-form'), async data => {
     await api(`/orders/${encodeURIComponent(o.id)}`, {
       method: 'PATCH',
       body: JSON.stringify({status: 'Completed', resolution: data.resolution}),
     });
+    draft.clear();
     closeDialog();
     await hooks.refresh();
-    toast(`${number} resolved.`);
+    toast(`${number} resolved.`, {undo: () => undoChange(o.id, {status: o.status})});
   });
 }
 // The assignee's editor: the ticket's words only, never its place, priority or dates.

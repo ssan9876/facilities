@@ -58,6 +58,11 @@ const assert = require('node:assert/strict');
   const ticketUrl = page.url();
   await page.getByRole('button', {name: 'Mark in progress', exact: true}).click();
   await page.locator('#ticket-page .tp-summary .tag.in-progress').waitFor();
+  // Undo after a status change.
+  await page.getByRole('button', {name: 'Undo', exact: true}).click();
+  await page.locator('#ticket-page .tp-summary .tag.open').waitFor();
+  await page.getByRole('button', {name: 'Mark in progress', exact: true}).click();
+  await page.locator('#ticket-page .tp-summary .tag.in-progress').waitFor();
   // Ticket controls save on change; there is no separate save step. A keyboard arrow alone does not save.
   let patches = 0;
   const countPatch = r => r.request().method() === 'PATCH' && patches++;
@@ -164,6 +169,68 @@ const assert = require('node:assert/strict');
   await page.getByRole('button', {name: 'Apply to selected', exact: true}).click();
   await page.getByText('2 requests updated.', {exact: true}).waitFor();
   assert.equal(await page.locator('#bulk-bar').isHidden(), true, 'the bar closes once the selection is applied');
+  // Bulk changes can be undone from the toast.
+  await page.getByRole('button', {name: 'Undo', exact: true}).click();
+  await page.getByText('Undone.', {exact: true}).waitFor();
+  // The address follows the register, and a view pins it to the sidebar.
+  await page.locator('[data-filter="Open"]').click();
+  await page.waitForFunction(() => location.search.includes('view=orders') && location.search.includes('tab=Open'));
+  await page.locator('[data-save-view]').click();
+  await page.locator('#view-form').getByLabel('View name').fill('Open work');
+  await page.locator('#view-form').getByRole('button', {name: 'Save view'}).click();
+  await page.locator('#workspace-nav').getByRole('button', {name: 'Open work', exact: true}).waitFor();
+  await page.locator('#workspace-nav').getByRole('button', {name: 'Overview', exact: true}).click();
+  await page.locator('#workspace-nav').getByRole('button', {name: 'Open work', exact: true}).click();
+  await page.getByRole('heading', {name: 'All requests', exact: true}).waitFor();
+  assert.equal(await page.locator('[data-filter="Open"]').getAttribute('class'), 'selected');
+  const shared = page.url();
+  await page.goto(base);
+  await page.goto(shared);
+  await page.getByRole('heading', {name: 'All requests', exact: true}).waitFor();
+  assert.equal(await page.locator('[data-filter="Open"]').getAttribute('class'), 'selected', 'links reopen the list');
+  await page.screenshot({path: '.impeccable/review/views-desktop.png'});
+  // Command palette and shortcuts.
+  await page.keyboard.press('Control+k');
+  await page.locator('#palette-input').fill('calend');
+  await page.screenshot({path: '.impeccable/review/palette-desktop.png'});
+  await page.keyboard.press('Enter');
+  await page.getByRole('heading', {name: 'Calendar', exact: true}).waitFor();
+  await page.keyboard.press('Control+k');
+  await page.locator('#palette-input').fill('wo-2');
+  await page.keyboard.press('Enter');
+  await page.locator('#ticket-page .ticket-no').filter({hasText: 'WO-0002'}).waitFor();
+  await page.keyboard.press('?');
+  await page.getByRole('heading', {name: 'Keyboard shortcuts', exact: true}).waitFor();
+  await page.screenshot({path: '.impeccable/review/shortcuts-desktop.png'});
+  await page.keyboard.press('Escape');
+  await page.locator('#editor').waitFor({state: 'hidden'});
+  await page.keyboard.press('Escape');
+  await page.locator('#ticket-page').waitFor({state: 'detached'});
+  await page.keyboard.press('g');
+  await page.keyboard.press('r');
+  await page.getByRole('heading', {name: 'All requests', exact: true}).waitFor();
+  await page.keyboard.press('j');
+  assert.equal(await page.evaluate(() => document.activeElement.matches('tr[data-order]')), true, 'j moves to a row');
+  // Drafts survive closing the sheet.
+  await page.keyboard.press('n');
+  await page.locator('#create-form').getByLabel('What do you need?').fill('Half-written request');
+  await page.waitForTimeout(600);
+  await page.getByRole('button', {name: 'Close dialog'}).click();
+  await page.keyboard.press('n');
+  await page.getByText('Draft restored.').waitFor();
+  assert.equal(await page.locator('#create-form').getByLabel('What do you need?').inputValue(), 'Half-written request');
+  await page.locator('#create-form').getByRole('button', {name: 'Discard draft'}).click();
+  await page.getByRole('button', {name: 'Close dialog'}).click();
+  // Dark theme from the palette.
+  await page.keyboard.press('Control+k');
+  await page.locator('#palette-input').fill('dark theme');
+  await page.keyboard.press('Enter');
+  assert.equal(await page.evaluate(() => document.documentElement.dataset.theme), 'dark');
+  await page.waitForTimeout(400);
+  await page.screenshot({path: '.impeccable/review/dark-desktop.png', fullPage: true});
+  await page.keyboard.press('Control+k');
+  await page.locator('#palette-input').fill('light theme');
+  await page.keyboard.press('Enter');
   await page.getByRole('button', {name: 'Settings', exact: true}).click();
   for (const name of ['Maintenance requests', 'Schedule requests', 'Technology requests'])
     await page.getByRole('switch', {name, exact: true}).uncheck();
