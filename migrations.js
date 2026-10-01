@@ -271,6 +271,29 @@ export const migrations = [
       ]);
     },
   },
+  {
+    id: 15,
+    name: 'office-tools',
+    async up(q, dialect) {
+      // Requesters rate the fix once it is resolved.
+      await q(
+        'CREATE TABLE IF NOT EXISTS order_ratings (order_id TEXT PRIMARY KEY REFERENCES work_orders(id), user_id TEXT NOT NULL REFERENCES users(id), score INTEGER NOT NULL, comment TEXT NOT NULL, created_at TEXT NOT NULL)',
+      );
+      // Reply-by-email: each notification email carries a token naming the ticket and the person.
+      await q(
+        'CREATE TABLE IF NOT EXISTS reply_tokens (token TEXT PRIMARY KEY, order_id TEXT NOT NULL REFERENCES work_orders(id), user_id TEXT NOT NULL REFERENCES users(id), created_at TEXT NOT NULL)',
+      );
+      await addColumns(q, dialect, 'email_outbox', [['reply_to', 'TEXT']]);
+      // Outgoing webhooks (Slack, Teams, JSON) and their retrying delivery queue.
+      await q(
+        'CREATE TABLE IF NOT EXISTS webhooks (id TEXT PRIMARY KEY, name TEXT NOT NULL, kind TEXT NOT NULL, url TEXT NOT NULL, secret TEXT NOT NULL, events TEXT NOT NULL, active INTEGER NOT NULL DEFAULT 1, last_status TEXT, last_at TEXT, created_at TEXT NOT NULL)',
+      );
+      await q(
+        'CREATE TABLE IF NOT EXISTS webhook_deliveries (id TEXT PRIMARY KEY, webhook_id TEXT NOT NULL REFERENCES webhooks(id), event TEXT NOT NULL, payload TEXT NOT NULL, created_at TEXT NOT NULL, send_after TEXT NOT NULL, sent_at TEXT, attempts INTEGER NOT NULL DEFAULT 0, last_error TEXT)',
+      );
+      await q('CREATE INDEX IF NOT EXISTS webhook_deliveries_due ON webhook_deliveries(sent_at, send_after)');
+    },
+  },
 ];
 
 export async function migrate(db, list = migrations) {

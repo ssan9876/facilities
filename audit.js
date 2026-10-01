@@ -21,6 +21,7 @@ export async function audit(db, actor, action, entityType, entityId, summary, de
   );
   // Every audited change is streamed to open browsers (live.js); db may be a transaction.
   (db.root || db).live?.changed(entityType, entityId);
+  (db.root || db).webhooks?.event(action, entityType, entityId, details, actor);
 }
 // Field-level before/after values for the audit record; unchanged fields are omitted.
 export function changes(before, after, fields) {

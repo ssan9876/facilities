@@ -35,6 +35,9 @@ import {setupLive} from './live.js';
 import {setupViews} from './views.js';
 import {setupTicketTools, runningTimer, applyTemplates} from './ticket-tools.js';
 import {setupField} from './field.js';
+import {setupOffice, setupInbound} from './office.js';
+import {setupImport} from './importer.js';
+import {setupIntegrations} from './integrations.js';
 
 const today = () => dateInTimezone();
 
@@ -74,7 +77,15 @@ export async function createApp(env = process.env, dbOverride, options = {}) {
       },
     }),
   );
-  app.use(express.json({limit: '64kb', type: ['application/json', 'application/scim+json']}));
+  // Inbound email and CSV imports are larger and parsed by their own routes.
+  app.use(
+    express.json({
+      limit: '64kb',
+      type: req =>
+        !/^\/api\/(inbound|import)\//.test(req.path) &&
+        /^application\/(scim\+)?json/.test(req.get('content-type') || ''),
+    }),
+  );
   app.get('/health', async (req, res) => {
     await q('SELECT 1');
     res.json({ok: true, version: installedVersion, schema: latestMigration});
@@ -102,6 +113,11 @@ export async function createApp(env = process.env, dbOverride, options = {}) {
     '/api/provisioning',
     limiter('PROVISIONING', 600, req => req.ip),
   );
+  app.use(
+    '/api/inbound',
+    limiter('INBOUND', 120, req => req.ip),
+  );
+  setupInbound(app, db, env, {logger});
   await setupAuth(app, db, env, {logger, logoutKeys: options.logoutKeys});
   const live = setupLive(app, db, env, {logger});
   const writes = limiter('WRITES', 300, req =>
@@ -126,6 +142,9 @@ export async function createApp(env = process.env, dbOverride, options = {}) {
   setupRequestForms(app, db);
   setupViews(app, db);
   setupField(app, db, env);
+  const office = setupOffice(app, db, env, {accessibleOrder, logger});
+  setupImport(app, db, env);
+  const integrations = setupIntegrations(app, db, env, {logger});
   const tools = setupTicketTools(app, db, env, {accessibleOrder, notify});
   // Reference data and counts. Requests themselves are paged through /api/orders.
   app.get('/api/data', async (req, res) => {
@@ -208,7 +227,7 @@ export async function createApp(env = process.env, dbOverride, options = {}) {
       request_id: req.id,
     });
   });
-  return {app, db, logger, metrics, email, live, tools};
+  return {app, db, logger, metrics, email, live, tools, office, integrations};
 }
 
 export async function generateMaintenance(db, actor = systemActor) {

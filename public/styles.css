@@ -4871,3 +4871,91 @@ progress.progress::-moz-progress-bar {
   grid-template-columns: minmax(0, 1fr);
   grid-template-areas: 'main';
 }
+
+/* Rate the fix */
+.stars {
+  display: flex;
+  gap: 4px;
+  margin-bottom: 8px;
+}
+.stars button {
+  width: 44px;
+  height: 44px;
+  border: 1px solid var(--rule);
+  border-radius: var(--radius);
+  background: var(--paper);
+  color: var(--hold);
+  font-size: 24px;
+  line-height: 1;
+  cursor: pointer;
+}
+.stars button.on,
+.stars button:hover {
+  background: color-mix(in srgb, var(--hold) 14%, var(--paper));
+  border-color: var(--hold);
+}
+.stars-read {
+  color: var(--hold);
+  letter-spacing: 1px;
+}
+.rating-card .muted-line {
+  margin: 6px 0 0;
+}
+/* Quiet hours */
+.quiet-hours {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+}
+.quiet-hours select {
+  min-height: var(--control);
+  border: 1px solid var(--rule-strong);
+  border-radius: var(--radius);
+  background: var(--paper);
+  color: var(--ink);
+  padding: 0 10px;
+  font: inherit;
+}
+/* Import */
+.import-controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px 14px;
+  padding: 0 26px 18px;
+}
+.import-controls input[type='file'] {
+  position: absolute;
+  opacity: 0;
+  width: 1px;
+  height: 1px;
+}
+.import-result table td,
+.import-result table th {
+  font-size: 13px;
+}
+tr.row-error td {
+  background: var(--stamp-wash);
+}
+tr.row-error td:last-child {
+  color: var(--stamp);
+  font-weight: 600;
+}
+/* Calendar drag */
+.cal-chip[draggable='true'] {
+  cursor: grab;
+}
+.cal-chip.dragging {
+  opacity: 0.5;
+}
+.cal-day.drop-target {
+  outline: 2px dashed var(--carbon);
+  outline-offset: -2px;
+  background: var(--carbon-wash);
+}
+@media (max-width: 760px) {
+  .import-controls {
+    padding: 0 16px 16px;
+  }
+}

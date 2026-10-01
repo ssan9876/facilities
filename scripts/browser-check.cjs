@@ -92,6 +92,20 @@ const assert = require('node:assert/strict');
   await page.locator('#resolve-form').getByRole('button', {name: 'Resolve', exact: true}).click();
   await page.locator('#ticket-page .tp-summary .tag.completed').waitFor();
   await page.getByText('Resolution: Replaced the cartridge and tested the tap.', {exact: true}).waitFor();
+  // The requester rates the fix; the work order prints with its copies.
+  await page.locator('[data-rate="4"]').click();
+  await page.locator('#rate-form').getByRole('button', {name: 'Send rating'}).click();
+  await page.getByRole('heading', {name: 'Your rating', exact: true}).waitFor();
+  await page.getByRole('button', {name: 'Print', exact: true}).click();
+  await page.locator('#print-form').getByLabel('Office copy (pink)').check();
+  const [printed] = await Promise.all([
+    page.waitForEvent('popup'),
+    page.locator('#print-form').getByRole('button', {name: 'Open print view'}).click(),
+  ]);
+  await printed.getByText('Office copy', {exact: true}).waitFor();
+  assert.equal(await printed.locator('article.sheet').count(), 2);
+  await printed.screenshot({path: '.impeccable/review/print-desktop.png', fullPage: true});
+  await printed.close();
   await page.goBack();
   await page.locator('.order-title').first().waitFor();
   await page.goto(ticketUrl);
@@ -411,6 +425,27 @@ const assert = require('node:assert/strict');
   await page.locator('#rule-form').getByRole('button', {name: 'Create rule'}).click();
   await page.getByRole('cell', {name: 'Community Center plumbing', exact: true}).waitFor();
   await page.screenshot({path: '.impeccable/review/assignment-desktop.png', fullPage: true});
+  // Import from CSV and add an integration.
+  await page.getByRole('button', {name: 'Import', exact: true}).click();
+  await page.locator('#import-file').setInputFiles({
+    name: 'buildings.csv',
+    mimeType: 'text/csv',
+    buffer: Buffer.from('name,address\nWest Annex,1 West Road\nNorth Campus,duplicate\n'),
+  });
+  await page.getByText(/1 ready, 1 with problems/).waitFor();
+  await page.screenshot({path: '.impeccable/review/import-desktop.png', fullPage: true});
+  await page.getByRole('button', {name: 'Import 1 row', exact: true}).click();
+  await page.getByText('1 imported.', {exact: true}).waitFor();
+  await page.getByRole('button', {name: 'Integrations', exact: true}).click();
+  await page.locator('[data-new-webhook]').click();
+  await page.locator('#webhook-form').getByLabel('Name').fill('Facilities channel');
+  await page
+    .locator('#webhook-form')
+    .getByLabel('Webhook address')
+    .fill('https://hooks.slack.com/services/T000/B000/XXXX');
+  await page.locator('#webhook-form').getByRole('button', {name: 'Add integration'}).click();
+  await page.getByText('Facilities channel', {exact: true}).waitFor();
+  await page.screenshot({path: '.impeccable/review/integrations-desktop.png', fullPage: true});
   // Checklist templates, shared replies and due dates.
   await page.getByRole('button', {name: 'Checklists & replies', exact: true}).click();
   await page.locator('[data-new-template]').click();
@@ -632,6 +667,14 @@ const assert = require('node:assert/strict');
   await page.locator('#workspace-nav').getByRole('button', {name: 'Calendar', exact: true}).click();
   await page.locator('.cal-grid .cal-chip').first().waitFor();
   await page.screenshot({path: '.impeccable/review/calendar-desktop.png', fullPage: true});
+  // Drag a ticket to another day; Undo moves it back.
+  const dragged = page.locator('#calendar-root [data-cal-drag]').first();
+  const from = await dragged.evaluate(el => el.closest('[data-cal-day]').dataset.calDay);
+  const target = page.locator(`#calendar-root [data-cal-day]:not([data-cal-day="${from}"])`).nth(10);
+  await dragged.dragTo(target);
+  await page.getByText(/moved to/).waitFor();
+  await page.getByRole('button', {name: 'Undo', exact: true}).click();
+  await page.getByText('Undone.', {exact: true}).waitFor();
   await page.getByRole('button', {name: 'Agenda', exact: true}).click();
   await page.locator('.agenda').waitFor();
   await page.getByRole('button', {name: 'Month', exact: true}).click();

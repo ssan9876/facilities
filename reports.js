@@ -96,11 +96,21 @@ export async function buildReport(db, user, timezone, {from, to}) {
     byPerson: laborByPerson,
     byBuilding: await laborGroup('w.building_id', 'b.name'),
   };
+  // Requester ratings of fixes completed in the period.
+  const [rated] = await db.query(
+    `SELECT COUNT(*) AS count, AVG(rt.score) AS average ${joins} JOIN order_ratings rt ON rt.order_id=w.id ${completedRange}`,
+    completedValues,
+  );
+  const rating = {
+    count: n(rated.count),
+    average: rated.average == null ? null : Math.round(Number(rated.average) * 10) / 10,
+  };
   return {
     from,
     to,
     timezone,
     labor,
+    rating,
     created: n(created.count),
     completed: n(completed.count),
     averageHoursToComplete: completed.avg_hours == null ? null : Math.round(Number(completed.avg_hours) * 10) / 10,
@@ -134,7 +144,8 @@ export function setupReports(app, db, env) {
     const {orders} = await listOrders(db, req.user, req.query, timezone, {limit: 100000, offset: 0});
     // Custom answers export as one "Question: answer" cell per request.
     const answers = new Map(),
-      labor = new Map();
+      labor = new Map(),
+      ratings = new Map();
     for (let i = 0; i < orders.length; i += 500) {
       const ids = orders.slice(i, i + 500).map(o => o.id);
       if (!ids.length) continue;
@@ -148,6 +159,11 @@ export function setupReports(app, db, env) {
         ids,
       ))
         labor.set(r.order_id, n(r.minutes));
+      for (const r of await db.query(
+        `SELECT order_id, score FROM order_ratings WHERE order_id IN (${ids.map((_, n) => '$' + (n + 1)).join(',')})`,
+        ids,
+      ))
+        ratings.set(r.order_id, n(r.score));
     }
     res
       .attachment(`requests-${stamp()}.csv`)
@@ -176,6 +192,7 @@ export function setupReports(app, db, env) {
             'Description',
             'Answers',
             'Labor minutes',
+            'Rating',
           ],
           orders.map(o => [
             ticketLabel(o.number),
@@ -199,6 +216,7 @@ export function setupReports(app, db, env) {
             o.description,
             (answers.get(o.id) || []).join('; '),
             labor.get(o.id) || 0,
+            ratings.get(o.id) ?? '',
           ]),
         ),
       );

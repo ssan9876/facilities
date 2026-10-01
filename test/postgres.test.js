@@ -423,6 +423,22 @@ test(
       );
       const history = (await call('/api/assets/a2/history')).body;
       assert.ok(Array.isArray(history.tickets) && 'repeat' in history);
+      // Batch 4 SQL: ratings in reports, reply tokens, imports, webhooks and printing.
+      await call(`/api/orders/${id}`, 'PATCH', {status: 'Completed', resolution: 'Done'});
+      assert.equal((await call(`/api/orders/${id}/rating`, 'POST', {score: 4})).status, 200);
+      assert.ok('rating' in (await call('/api/reports/summary')).body);
+      assert.equal((await call(`/api/orders/${id}/reopen`, 'POST', {reason: 'Back again'})).status, 200);
+      const {replyAddress} = await import('../email.js');
+      process.env.INBOUND_EMAIL_ADDRESS = 'replies@example.test';
+      assert.match(await replyAddress(db, id, 'demo-admin'), /^replies\+/);
+      delete process.env.INBOUND_EMAIL_ADDRESS;
+      const imported = await call('/api/import/buildings', 'POST', {
+        csv: `name\n${marker} Annex\n`,
+        apply: true,
+      });
+      assert.equal(imported.body.created, 1);
+      assert.equal((await call('/api/admin/webhooks')).status, 200);
+      assert.equal((await fetch(base + '/print?tickets=' + id, {headers: {cookie}})).status, 200);
     } finally {
       live.close();
       server.closeAllConnections?.();
