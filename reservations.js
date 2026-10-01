@@ -1,6 +1,6 @@
 import {randomUUID} from 'node:crypto';
 import {error, text, bool, optionalInteger} from './validation.js';
-import {can, requireCap} from './permissions.js';
+import {can, canOn, requireCap} from './permissions.js';
 
 const places = requireCap('records.manage', 'Your role cannot manage spaces.');
 import {audit, changes} from './audit.js';
@@ -147,10 +147,10 @@ export function setupSpaces(app, db, env, {notify}) {
     if (!['approved', 'declined', 'cancelled'].includes(decision)) throw error('Choose approve, decline or cancel.');
     const result = await db.transaction(async tx => {
       const order = (await tx.query('SELECT * FROM work_orders WHERE id=$1', [req.params.id]))[0];
-      if (!order || (!can(req.user, 'requests.view_all') && order.requester_id !== req.user.id))
+      if (!order || (!canOn(req.user, 'requests.view_all', order) && order.requester_id !== req.user.id))
         throw error('Work order not found.', 404);
       if (!order.space_id) throw error('This request does not reserve a space.');
-      const approver = can(req.user, 'reservations.approve');
+      const approver = canOn(req.user, 'reservations.approve', order);
       if (decision === 'cancelled' ? !(approver || order.requester_id === req.user.id) : !approver)
         throw error(
           decision === 'cancelled'

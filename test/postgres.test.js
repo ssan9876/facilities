@@ -271,3 +271,101 @@ test(
     }
   },
 );
+
+test(
+  'PostgreSQL applies the access file, scoped visibility and assignment rules',
+  {skip: !process.env.TEST_DATABASE_URL},
+  async () => {
+    const {mkdtempSync, writeFileSync, rmSync} = await import('node:fs');
+    const {join} = await import('node:path');
+    const {tmpdir} = await import('node:os');
+    const dir = mkdtempSync(join(tmpdir(), 'pg-access-'));
+    const marker = 'pga' + Date.now();
+    const file = join(dir, 'access.yaml');
+    writeFileSync(
+      file,
+      `version: 1
+roles:
+  ${marker}:
+    name: Scoped ${marker}
+    extends: technician
+    scope: {buildings: [North Campus]}
+groups:
+  ${marker}-crew:
+    name: Crew ${marker}
+    roles: [${marker}]
+assignment:
+  - name: Rule ${marker}
+    buildings: [Community Center]
+    assign_to: {role: ${marker}}
+`,
+    );
+    const db = await openDatabase(process.env.TEST_DATABASE_URL);
+    const {app} = await createApp(
+      {
+        AUTH_MODE: 'demo',
+        SEED_DEMO: 'true',
+        SESSION_SECRET: 'postgres-integration-test-secret',
+        LOG_LEVEL: 'silent',
+        ACCESS_FILE: file,
+      },
+      db,
+    );
+    const server = app.listen(0, '127.0.0.1');
+    await new Promise(resolve => server.once('listening', resolve));
+    const base = `http://127.0.0.1:${server.address().port}`;
+    let cookie = '',
+      csrf = '';
+    const call = async (path, method = 'GET', body) => {
+      const response = await fetch(base + path, {
+        method,
+        redirect: 'manual',
+        headers: {cookie, 'x-csrf-token': csrf, 'Content-Type': 'application/json'},
+        body: body === undefined ? undefined : JSON.stringify(body),
+      });
+      if (response.headers.get('set-cookie')) cookie = response.headers.get('set-cookie').split(';')[0];
+      const type = response.headers.get('content-type') || '';
+      return {status: response.status, body: type.includes('json') ? await response.json() : await response.text()};
+    };
+    try {
+      await call('/auth/login');
+      csrf = (await call('/api/me')).body.csrf;
+      const status = (await call('/api/admin/access')).body.status;
+      assert.equal(status.ok, true, JSON.stringify(status.problems));
+      assert.equal((await call('/api/admin/roles')).body.find(r => r.id === marker).source, 'code');
+      // A scoped person sees their own tickets plus North Campus.
+      await db.query("INSERT INTO users(id,subject,name,email,role) VALUES($1,$1,$2,'',$3)", [
+        marker,
+        'Scoped',
+        marker,
+      ]);
+      const crew = (await call('/api/admin')).body.groups.find(g => g.name === `Crew ${marker}`);
+      assert.equal(crew.source, 'code');
+      const made = await call('/api/orders', 'POST', {title: marker, building_id: 'b3', due_date: '2026-10-09'});
+      assert.equal(made.body.assignee_id, null, 'the scoped role cannot be assigned Community Center work');
+      // This test's own session, from its signed cookie (s:<id>.<signature>).
+      const sessionId = decodeURIComponent(cookie.slice(cookie.indexOf('=') + 1))
+        .slice(2)
+        .split('.')[0];
+      const row = (await db.query('SELECT body FROM sessions WHERE id=$1', [sessionId]))[0];
+      await db.query('UPDATE sessions SET body=$1,user_id=$2 WHERE id=$3', [
+        JSON.stringify({...JSON.parse(row.body), userId: marker}),
+        marker,
+        sessionId,
+      ]);
+      const visible = (await call('/api/orders?limit=200')).body.orders;
+      assert.ok(
+        visible.length > 0 && visible.every(o => o.building_id === 'b1'),
+        JSON.stringify(visible.map(o => [o.id, o.building_id])) + JSON.stringify((await call('/api/me')).body.user),
+      );
+      assert.equal((await call('/api/calendar?from=2026-01-01&to=2026-02-28')).status, 200);
+      const csv = await call('/api/reports/orders.csv');
+      assert.equal(csv.status, 200);
+      assert.ok(!csv.body.includes('Operations Center'), 'exports follow the same scope');
+    } finally {
+      await new Promise(resolve => server.close(resolve));
+      await db.close();
+      rmSync(dir, {recursive: true, force: true});
+    }
+  },
+);

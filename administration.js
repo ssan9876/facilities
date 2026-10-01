@@ -2,7 +2,16 @@ import {randomUUID, randomBytes, createHash, timingSafeEqual} from 'node:crypto'
 import express from 'express';
 import {scimRouter} from './scim.js';
 import {audit, changes} from './audit.js';
-import {can, capabilityCatalog, createRole, updateRole, removeRole} from './permissions.js';
+import {
+  can,
+  capabilityCatalog,
+  capabilitiesFor,
+  createRole,
+  updateRole,
+  removeRole,
+  loadGroups,
+  assertCanGrant,
+} from './permissions.js';
 
 const fail = (message, status = 400) => Object.assign(new Error(message), {status});
 const clean = (value, max = 200) => {
@@ -10,8 +19,17 @@ const clean = (value, max = 200) => {
     throw fail(`Enter text between 1 and ${max} characters.`);
   return value.trim();
 };
-const admin = (req, res, next) =>
-  can(req.user, 'admin') ? next() : res.status(403).json({error: 'Administrator access required.'});
+const section =
+  (...names) =>
+  (req, res, next) =>
+    names.some(n => can(req.user, `admin.${n}`))
+      ? next()
+      : res.status(403).json({error: 'Your role cannot manage this part of the workspace.'});
+const people = section('people'),
+  roleAdmin = section('roles'),
+  settingsAdmin = section('settings');
+// Groups hand out the roles they grant, so changing them needs the same capabilities.
+const groupCapabilities = (db, group) => [...new Set((group?.roles || []).flatMap(r => capabilitiesFor(db, r)))];
 export async function workspaceSettings(db) {
   return JSON.parse((await db.query("SELECT body FROM admin_settings WHERE id='workspace'"))[0]?.body || '{}');
 }
@@ -50,6 +68,7 @@ export async function saveProvisionedUser(db, env, body, id, actor) {
   if (collision && collision.id !== id) throw fail('This SSO identity already exists. Update it by ID.', 409);
   const role = body.role ?? existing?.role ?? 'requester';
   if (role === 'admin' || !db.roles?.[role]) throw fail('Choose an existing role other than administrator.');
+  if (actor && role !== existing?.role) assertCanGrant(actor, capabilitiesFor(db, role));
   if (body.active !== undefined && typeof body.active !== 'boolean') throw fail('active must be a boolean.');
   const name = clean(body.name ?? existing?.name, 120),
     email = body.email ?? existing?.email ?? '';
@@ -115,17 +134,20 @@ export async function saveProvisionedUser(db, env, body, id, actor) {
 }
 
 export function setupAdministration(app, db, env) {
-  app.get('/api/admin', admin, async (req, res) =>
+  app.get('/api/admin', section('settings', 'people', 'roles'), async (req, res) => {
+    const peopleAccess = can(req.user, 'admin.people') || can(req.user, 'admin.roles');
     res.json({
-      settings: await workspaceSettings(db),
-      users: (await db.query('SELECT * FROM users ORDER BY name')).map(safeUser),
-      groups: await db.query('SELECT * FROM user_groups ORDER BY name'),
-      members: await db.query('SELECT * FROM group_members'),
-      keys: await db.query('SELECT id,name,expires_at,revoked FROM provisioning_keys ORDER BY expires_at'),
+      settings: can(req.user, 'admin.settings') ? await workspaceSettings(db) : {},
+      users: peopleAccess ? (await db.query('SELECT * FROM users ORDER BY name')).map(safeUser) : [],
+      groups: peopleAccess ? Object.values(db.groups) : [],
+      members: peopleAccess ? await db.query('SELECT * FROM group_members') : [],
+      keys: can(req.user, 'admin.people')
+        ? await db.query('SELECT id,name,expires_at,revoked FROM provisioning_keys ORDER BY expires_at')
+        : [],
       roles: await rolesPayload(),
       capabilities: capabilityCatalog.map(([id, group, label, description]) => ({id, group, label, description})),
-    }),
-  );
+    });
+  });
   // Roles: built-in defaults come from permissions.js; overrides and custom roles live in the database.
   const rolesPayload = async () => {
     const counts = Object.fromEntries(
@@ -138,16 +160,18 @@ export function setupAdministration(app, db, env) {
         (a, b) => (order.indexOf(a.id) + 1 || 99) - (order.indexOf(b.id) + 1 || 99) || a.name.localeCompare(b.name),
       );
   };
-  app.get('/api/admin/roles', admin, async (req, res) => res.json(await rolesPayload()));
-  app.post('/api/admin/roles', admin, async (req, res) => {
-    const role = await createRole(db, req.body || {});
+  app.get('/api/admin/roles', roleAdmin, async (req, res) => res.json(await rolesPayload()));
+  app.post('/api/admin/roles', roleAdmin, async (req, res) => {
+    const body = {...(req.body || {})};
+    delete body.id;
+    const role = await createRole(db, body, {actor: req.user});
     await audit(db, req.user, 'role.create', 'role', role.id, `Created role ${role.name}`, {
       capabilities: [null, role.capabilities.join(', ')],
     });
     res.status(201).json(role);
   });
-  app.patch('/api/admin/roles/:id', admin, async (req, res) => {
-    const {before, after} = await updateRole(db, req.params.id, req.body || {});
+  app.patch('/api/admin/roles/:id', roleAdmin, async (req, res) => {
+    const {before, after} = await updateRole(db, req.params.id, req.body || {}, {actor: req.user});
     const added = after.capabilities.filter(c => !before.capabilities.includes(c)),
       removed = before.capabilities.filter(c => !after.capabilities.includes(c));
     await audit(
@@ -157,11 +181,15 @@ export function setupAdministration(app, db, env) {
       'role',
       after.id,
       `Updated role ${after.name}${added.length ? ` · granted ${added.join(', ')}` : ''}${removed.length ? ` · removed ${removed.join(', ')}` : ''}`,
-      changes(before, after, ['name', 'description']),
+      changes(
+        {...before, scope: JSON.stringify(before.scope), submit: JSON.stringify(before.submit)},
+        {...after, scope: JSON.stringify(after.scope), submit: JSON.stringify(after.submit)},
+        ['name', 'description', 'scope', 'submit'],
+      ),
     );
     res.json(after);
   });
-  app.delete('/api/admin/roles/:id', admin, async (req, res) => {
+  app.delete('/api/admin/roles/:id', roleAdmin, async (req, res) => {
     const role = await removeRole(db, req.params.id);
     await audit(
       db,
@@ -173,7 +201,7 @@ export function setupAdministration(app, db, env) {
     );
     res.json({ok: true});
   });
-  app.put('/api/admin/workspace', admin, async (req, res) => {
+  app.put('/api/admin/workspace', settingsAdmin, async (req, res) => {
     const name = clean(req.body.name, 80),
       welcome = clean(req.body.welcome, 200);
     const icon = req.body.icon ?? '';
@@ -196,36 +224,62 @@ export function setupAdministration(app, db, env) {
     );
     res.json(settings);
   });
-  app.post('/api/admin/groups', admin, async (req, res) => {
+  const groupBody = (req, before) => {
     const name = clean(req.body.name, 80),
       description = typeof req.body.description === 'string' ? req.body.description.trim() : '';
     if (description.length > 300) throw fail('Description must be under 300 characters.');
-    if ((await db.query('SELECT id FROM user_groups WHERE name=$1', [name])).length)
+    const roles = req.body.roles ?? before?.roles ?? [];
+    if (!Array.isArray(roles) || roles.some(r => !db.roles[r] || r === 'admin'))
+      throw fail('Choose existing roles other than administrator for the group to grant.');
+    const sso = req.body.sso ?? before?.sso ?? [];
+    if (!Array.isArray(sso) || sso.length > 20 || sso.some(c => typeof c !== 'string' || !c.trim() || c.length > 200))
+      throw fail('SSO group claims must be a list of up to 20 values.');
+    const rolesChanged = JSON.stringify([...roles].sort()) !== JSON.stringify([...(before?.roles || [])].sort());
+    if (rolesChanged) {
+      if (!can(req.user, 'admin.roles')) throw fail('Changing the roles a group grants needs Roles and access.', 403);
+      assertCanGrant(req.user, groupCapabilities(db, {roles}));
+    }
+    return {
+      name,
+      description,
+      roles: [...new Set(roles)],
+      sso: sso.map(c => c.trim()),
+      auto: req.body.auto_assign === true,
+    };
+  };
+  app.post('/api/admin/groups', people, async (req, res) => {
+    const g = groupBody(req);
+    if ((await db.query('SELECT id FROM user_groups WHERE name=$1', [g.name])).length)
       throw fail('A group already uses that name.', 409);
     const id = randomUUID();
-    await db.query('INSERT INTO user_groups VALUES($1,$2,$3,$4)', [
-      id,
-      name,
-      description,
-      Number(req.body.auto_assign === true),
-    ]);
-    await audit(db, req.user, 'group.create', 'group', id, `Created group ${name}`);
+    await db.query(
+      "INSERT INTO user_groups(id,name,description,auto_assign,roles,sso,source) VALUES($1,$2,$3,$4,$5,$6,'ui')",
+      [id, g.name, g.description, Number(g.auto), JSON.stringify(g.roles), JSON.stringify(g.sso)],
+    );
+    await loadGroups(db);
+    await audit(db, req.user, 'group.create', 'group', id, `Created group ${g.name}`, {
+      roles: [null, g.roles.join(', ')],
+    });
     res.status(201).json({id});
   });
-  app.patch('/api/admin/groups/:id', admin, async (req, res) => {
-    const before = (await db.query('SELECT * FROM user_groups WHERE id=$1', [req.params.id]))[0];
+  app.patch('/api/admin/groups/:id', people, async (req, res) => {
+    const before = db.groups[req.params.id];
     if (!before) throw fail('Group not found.', 404);
-    const name = clean(req.body.name, 80),
-      description = typeof req.body.description === 'string' ? req.body.description.trim() : '';
-    if (description.length > 300) throw fail('Description must be under 300 characters.');
+    if (before.source === 'code')
+      throw fail(`The ${before.name} group is managed by the access file. Change it there and reload.`, 409);
+    const g = groupBody(req, before);
+    const {name, description} = g;
     if ((await db.query('SELECT id FROM user_groups WHERE name=$1 AND id<>$2', [name, req.params.id])).length)
       throw fail('A group already uses that name.', 409);
-    await db.query('UPDATE user_groups SET name=$1,description=$2,auto_assign=$3 WHERE id=$4', [
+    await db.query('UPDATE user_groups SET name=$1,description=$2,auto_assign=$3,roles=$4,sso=$5 WHERE id=$6', [
       name,
       description,
-      Number(req.body.auto_assign === true),
+      Number(g.auto),
+      JSON.stringify(g.roles),
+      JSON.stringify(g.sso),
       req.params.id,
     ]);
+    await loadGroups(db);
     await audit(
       db,
       req.user,
@@ -233,19 +287,27 @@ export function setupAdministration(app, db, env) {
       'group',
       req.params.id,
       `Updated group ${name}`,
-      changes(before, {name, description, auto_assign: Number(req.body.auto_assign === true)}, [
-        'name',
-        'description',
-        'auto_assign',
-      ]),
+      changes(
+        {
+          ...before,
+          auto_assign: Number(before.auto_assign),
+          roles: before.roles.join(', '),
+          sso: before.sso.join(', '),
+        },
+        {name, description, auto_assign: Number(g.auto), roles: g.roles.join(', '), sso: g.sso.join(', ')},
+        ['name', 'description', 'auto_assign', 'roles', 'sso'],
+      ),
     );
     res.json({ok: true});
   });
-  app.put('/api/admin/groups/:id/members/:user', admin, async (req, res) => {
-    const group = (await db.query('SELECT name FROM user_groups WHERE id=$1', [req.params.id]))[0],
+  app.put('/api/admin/groups/:id/members/:user', people, async (req, res) => {
+    const group = db.groups[req.params.id],
       member = (await db.query('SELECT name FROM users WHERE id=$1', [req.params.user]))[0];
     if (!group || !member) throw fail('Group or user not found.', 404);
     if (typeof req.body.member !== 'boolean') throw fail('member must be a boolean.');
+    if (group.members_managed)
+      throw fail(`The access file lists the members of ${group.name}. Change them there and reload.`, 409);
+    if (req.body.member) assertCanGrant(req.user, groupCapabilities(db, group));
     if (req.body.member)
       await db.query("INSERT INTO group_members VALUES($1,$2,'manual') ON CONFLICT DO NOTHING", [
         req.params.id,
@@ -262,13 +324,13 @@ export function setupAdministration(app, db, env) {
     );
     res.json({ok: true});
   });
-  app.post('/api/admin/users', admin, async (req, res) =>
+  app.post('/api/admin/users', people, async (req, res) =>
     res.status(201).json(safeUser(await saveProvisionedUser(db, env, req.body, undefined, req.user))),
   );
-  app.patch('/api/admin/users/:id', admin, async (req, res) =>
+  app.patch('/api/admin/users/:id', people, async (req, res) =>
     res.json(safeUser(await saveProvisionedUser(db, env, req.body, req.params.id, req.user))),
   );
-  app.post('/api/admin/keys', admin, async (req, res) => {
+  app.post('/api/admin/keys', people, async (req, res) => {
     const name = clean(req.body.name, 80),
       days = req.body.days ?? 90;
     if (!Number.isInteger(days) || days < 1 || days > 365) throw fail('Expiration must be 1–365 days.');
@@ -291,7 +353,7 @@ export function setupAdministration(app, db, env) {
     );
     res.status(201).json({id, secret, expires_at});
   });
-  app.delete('/api/admin/keys/:id', admin, async (req, res) => {
+  app.delete('/api/admin/keys/:id', people, async (req, res) => {
     const key = (await db.query('SELECT name,revoked FROM provisioning_keys WHERE id=$1', [req.params.id]))[0];
     if (!key) throw fail('Token not found.', 404);
     await db.query('UPDATE provisioning_keys SET revoked=1 WHERE id=$1', [req.params.id]);

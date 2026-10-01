@@ -1,7 +1,7 @@
 import {randomUUID} from 'node:crypto';
 import {queueNotificationEmail, emailConfigured} from './email.js';
 import {audit, changes} from './audit.js';
-import {can} from './permissions.js';
+import {can, canOn} from './permissions.js';
 
 export const requestTypes = ['maintenance', 'schedule', 'technology'];
 export const features = [...requestTypes, 'notifications', 'email', 'inventory'];
@@ -43,16 +43,18 @@ export async function notify(db, order, event, recipients, actorId, message) {
 export async function visibleNotifications(db, user) {
   const enabled = await moduleSettings(db);
   const rows = await db.query(
-    'SELECT n.*,w.title,w.request_type,w.requester_id FROM notifications n JOIN work_orders w ON w.id=n.order_id WHERE n.user_id=$1 ORDER BY n.created_at DESC LIMIT 100',
+    'SELECT n.*,w.title,w.request_type,w.requester_id,w.building_id FROM notifications n JOIN work_orders w ON w.id=n.order_id WHERE n.user_id=$1 ORDER BY n.created_at DESC LIMIT 100',
     [user.id],
   );
-  return rows.filter(n => enabled[n.request_type] && (can(user, 'requests.view_all') || n.requester_id === user.id));
+  return rows.filter(
+    n => enabled[n.request_type] && (canOn(user, 'requests.view_all', n) || n.requester_id === user.id),
+  );
 }
 export function setupSettings(app, db) {
   const admin = (req, res, next) =>
-    can(req.user, 'admin')
+    can(req.user, 'admin.settings')
       ? next()
-      : res.status(403).json({error: 'Only an administrator can change workspace settings.'});
+      : res.status(403).json({error: 'Your role cannot change workspace settings.'});
   app.patch('/api/settings', admin, async (req, res) => {
     const body = req.body;
     if (

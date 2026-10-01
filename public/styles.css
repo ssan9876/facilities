@@ -3949,3 +3949,181 @@ tr.picked td {
     padding: 16px;
   }
 }
+
+/* Access as code */
+.source-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 12px;
+  font-weight: 650;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: var(--carbon-wash);
+  color: var(--carbon-deep);
+  white-space: nowrap;
+  vertical-align: middle;
+}
+.role-col .source-badge {
+  margin-top: 4px;
+}
+.role-scope {
+  display: block;
+  margin-top: 4px;
+  color: var(--ink-2);
+  font-weight: 400;
+  text-transform: none;
+  letter-spacing: 0;
+}
+.problem-list {
+  margin: 10px 0 0;
+  padding: 12px 12px 12px 30px;
+  background: var(--stamp-wash);
+  border-radius: var(--radius);
+  font-size: 14px;
+  line-height: 1.5;
+  display: grid;
+  gap: 4px;
+  font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
+}
+.access-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  justify-content: flex-end;
+}
+.steps {
+  margin: 10px 0 0;
+  padding-left: 22px;
+  display: grid;
+  gap: 8px;
+  font-size: 15px;
+  line-height: 1.5;
+}
+.check-group {
+  border: 1px solid var(--rule);
+  border-radius: var(--radius);
+  padding: 10px 14px 12px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 18px;
+  margin: 0;
+}
+.check-group legend {
+  font-size: 14px;
+  font-weight: 650;
+  padding: 0 4px;
+}
+.plain-fieldset {
+  border: 0;
+  padding: 0;
+  margin: 0;
+  min-width: 0;
+}
+.role-col small {
+  font-size: 12px;
+}
+.role-col .quiet-button {
+  font-size: 13px;
+  min-height: 32px;
+}
+.access-active {
+  margin-top: 10px;
+  padding: 10px 12px;
+  background: var(--desk);
+  border-radius: var(--radius);
+  font-size: 14px;
+  color: var(--ink-2);
+}
+.editor-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 26px;
+  border-top: 1px solid var(--rule);
+}
+.dirty-note {
+  margin-left: auto;
+  font-size: 13px;
+  font-weight: 650;
+  color: var(--hold);
+}
+.code-editor {
+  display: block;
+  width: calc(100% - 52px);
+  margin: 0 26px;
+  min-height: 420px;
+  max-height: 70vh;
+  resize: vertical;
+  padding: 14px 16px;
+  border: 1px solid var(--rule-strong);
+  border-radius: var(--radius);
+  background: #fbfbfa;
+  color: var(--ink);
+  font: 14px/1.6 ui-monospace, SFMono-Regular, Consolas, 'Liberation Mono', monospace;
+  tab-size: 2;
+  white-space: pre;
+  overflow: auto;
+}
+.code-editor:focus {
+  outline: none;
+  border-color: var(--carbon);
+  box-shadow: var(--focus-ring);
+}
+.check-result {
+  margin: 14px 26px 0;
+  padding: 12px 14px;
+  border-radius: var(--radius);
+  font-size: 14px;
+  line-height: 1.5;
+}
+.check-result.ok {
+  background: var(--done-wash);
+  color: color-mix(in srgb, var(--done) 80%, black);
+}
+.check-result.bad {
+  background: var(--stamp-wash);
+  color: var(--stamp);
+}
+.check-result .problem-list {
+  background: transparent;
+  padding: 6px 0 0 18px;
+  color: var(--ink);
+}
+.version-list {
+  list-style: none;
+  margin: 12px 0 0;
+  padding: 0;
+  display: grid;
+}
+.version-list li {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 0;
+  border-top: 1px solid var(--row);
+}
+.version-list li span {
+  display: grid;
+  gap: 2px;
+}
+.version-list small {
+  font-size: 13px;
+  color: var(--ink-2);
+}
+@media (max-width: 760px) {
+  .editor-toolbar {
+    padding: 12px 16px;
+  }
+  .code-editor {
+    width: calc(100% - 32px);
+    margin: 0 16px;
+    min-height: 320px;
+    font-size: 13px;
+  }
+  .check-result {
+    margin: 12px 16px 0;
+  }
+}

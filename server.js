@@ -29,7 +29,8 @@ import {
   limitFromEnv,
 } from './observability.js';
 import {latestMigration} from './migrations.js';
-import {can, loadRoles, sqlRoleList, rolesWith} from './permissions.js';
+import {can, loadRoles, usersWith} from './permissions.js';
+import {setupAccess, loadAccessFile, accessStatus, autoAssign} from './access.js';
 
 const today = () => dateInTimezone();
 
@@ -50,6 +51,9 @@ export async function createApp(env = process.env, dbOverride, options = {}) {
     ]);
     if (env.SEED_DEMO === 'true' && !(await q('SELECT id FROM buildings')).length) await seed(db);
   }
+  // The access file (roles, groups, SSO mapping, assignment rules) applies once records exist to refer to.
+  db.access = await accessStatus(db);
+  await loadAccessFile(db, env, {logger});
   const app = express();
   app.disable('x-powered-by');
   if (env.NODE_ENV === 'production') app.set('trust proxy', 1);
@@ -103,6 +107,7 @@ export async function createApp(env = process.env, dbOverride, options = {}) {
   setupSettings(app, db);
   setupReleases(app, env, db);
   setupAdministration(app, db, env);
+  setupAccess(app, db, env, {logger});
   setupAudit(app, db);
   const email = setupEmail(app, db, env, {logger, workspaceSettings, transport: options.transport});
   const {accessibleOrder, checkLocation} = setupOrders(app, db, env);
@@ -117,7 +122,7 @@ export async function createApp(env = process.env, dbOverride, options = {}) {
   // Reference data and counts. Requests themselves are paged through /api/orders.
   app.get('/api/data', async (req, res) => {
     const modules = await moduleSettings(db);
-    const assignable = new Set(rolesWith(db, 'requests.assignable'));
+    const assignable = new Set((await usersWith(db, 'requests.assignable')).map(u => u.id));
     const [buildings, assets, maintenance, users, spaces, parts, counts] = await Promise.all([
       q('SELECT * FROM buildings ORDER BY name'),
       q('SELECT * FROM assets ORDER BY name'),
@@ -128,12 +133,14 @@ export async function createApp(env = process.env, dbOverride, options = {}) {
           ),
       can(req.user, 'requests.view_all')
         ? q('SELECT id,name,role FROM users WHERE active=1 ORDER BY name').then(rows =>
-            rows.map(u => ({...u, assignable: assignable.has(u.role)})),
+            rows.map(u => ({...u, assignable: assignable.has(u.id)})),
           )
         : [],
       modules.schedule ? q('SELECT * FROM spaces ORDER BY name') : [],
       !can(req.user, 'inventory.view') || !modules.inventory ? [] : listParts(db),
-      can(req.user, 'admin') ? q('SELECT request_type,COUNT(*) AS count FROM work_orders GROUP BY request_type') : [],
+      can(req.user, 'admin.settings')
+        ? q('SELECT request_type,COUNT(*) AS count FROM work_orders GROUP BY request_type')
+        : [],
     ]);
     res.json({
       buildings,
@@ -184,6 +191,7 @@ export async function createApp(env = process.env, dbOverride, options = {}) {
         (err.status && err.status < 500) || err.status === 502 || err.status === 503
           ? err.message
           : 'Something went wrong. Try again or contact your administrator.',
+      ...(err.status < 500 && Array.isArray(err.problems) ? {problems: err.problems} : {}),
       request_id: req.id,
     });
   });
@@ -227,8 +235,8 @@ export async function generateMaintenance(db, actor = systemActor) {
         id,
         `Generated maintenance request “${plan.title}” due ${plan.next_due}`,
       );
-      const notified = sqlRoleList(db, 'requests.notified');
-      const recipients = await db.query(`SELECT id FROM users WHERE ${notified.sql} AND active=1`, notified.values);
+      const order = (await db.query('SELECT * FROM work_orders WHERE id=$1', [id]))[0];
+      const recipients = await usersWith(db, 'requests.notified', order);
       await notify(
         db,
         {id, title: plan.title},
@@ -237,6 +245,7 @@ export async function generateMaintenance(db, actor = systemActor) {
         null,
         'A scheduled maintenance request is ready.',
       );
+      await autoAssign(db, id, {notify});
     }
     const next = new Date(plan.next_due + 'T12:00:00Z');
     do {

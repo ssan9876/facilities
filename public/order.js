@@ -75,22 +75,22 @@ export async function ticketPage(ref) {
   document.title = 'Facilities';
   const me = state.me.user,
     owner = o.requester_id === me.id;
-  const canStamp = can('requests.update_any') || (can('requests.update_assigned') && o.assignee_id === me.id);
-  const canAssign = can('requests.assign');
-  const fullEdit = can('requests.edit_any') || (owner && o.status === 'Open');
-  const textEdit = !fullEdit && can('requests.edit_assigned') && o.assignee_id === me.id;
+  // The server says what this person may do with this ticket (role scopes included).
+  const p = o.permissions || {};
+  const canStamp = p.update;
+  const canAssign = p.assign;
+  const fullEdit = p.edit_any || (owner && o.status === 'Open');
+  const textEdit = !fullEdit && p.edit_assigned;
   const canEditDetails = fullEdit || textEdit;
-  const canRecordParts =
-    state.data.modules.inventory &&
-    (can('parts.record_any') || (can('requests.update_assigned') && o.assignee_id === me.id));
+  const canRecordParts = state.data.modules.inventory && p.record_parts;
   const when =
     o.request_type === 'schedule'
       ? `${fmtTime(o.starts_at)} – ${fmtTime(o.ends_at)} · ${escape(state.me.timezone)}`
       : 'Due ' + fmt(o.due_date);
   const reservation = o.space_id
-    ? `<section class="tp-card reservation"><div><strong>${icon('door')}${escape(o.space)}</strong> ${reservationTag(o.reservation_status)}<p>${o.reservation_status === 'pending' ? 'This space reservation is waiting for a manager.' : o.reservation_status === 'approved' ? 'The space is reserved for this time.' : 'The space is not reserved for this request.'}</p></div><div class="inline-actions">${can('reservations.approve') && o.reservation_status === 'pending' ? '<button class="primary" data-reservation="approved">Approve</button><button class="secondary" data-reservation="declined">Decline</button>' : ''}${(can('reservations.approve') || owner) && ['pending', 'approved'].includes(o.reservation_status) ? '<button class="quiet-button" data-reservation="cancelled">Cancel reservation</button>' : ''}</div></section>`
+    ? `<section class="tp-card reservation"><div><strong>${icon('door')}${escape(o.space)}</strong> ${reservationTag(o.reservation_status)}<p>${o.reservation_status === 'pending' ? 'This space reservation is waiting for a manager.' : o.reservation_status === 'approved' ? 'The space is reserved for this time.' : 'The space is not reserved for this request.'}</p></div><div class="inline-actions">${p.approve && o.reservation_status === 'pending' ? '<button class="primary" data-reservation="approved">Approve</button><button class="secondary" data-reservation="declined">Decline</button>' : ''}${(p.approve || owner) && ['pending', 'approved'].includes(o.reservation_status) ? '<button class="quiet-button" data-reservation="cancelled">Cancel reservation</button>' : ''}</div></section>`
     : '';
-  const attachments = `<section class="tp-card"><h2>Attachments</h2>${o.attachments.length ? `<ul class="attachment-list">${o.attachments.map(a => `<li>${a.content_type.startsWith('image/') && a.content_type !== 'image/heic' ? `<a href="/api/attachments/${escape(a.id)}" target="_blank" rel="noopener" tabindex="-1" aria-hidden="true"><img src="/api/attachments/${escape(a.id)}" alt="" loading="lazy"></a>` : `<span class="file-symbol">${icon('clip')}</span>`}<div><a href="/api/attachments/${escape(a.id)}?download" download>${escape(a.file_name)}</a><small>${bytes(a.size)} · ${escape(a.uploader)} · ${fmtStamp(a.created_at)}</small></div>${a.uploaded_by === me.id || can('requests.moderate') ? `<button class="quiet-button" data-remove-attachment="${escape(a.id)}">Remove</button>` : ''}</li>`).join('')}</ul>` : '<p class="muted-line">No photos or files yet.</p>'}<label class="upload-button secondary">${icon('clip')}Add photos or files<input type="file" id="attach-input" multiple accept="image/jpeg,image/png,image/gif,image/webp,image/heic,application/pdf,text/plain,text/csv,.docx,.xlsx"></label></section>`;
+  const attachments = `<section class="tp-card"><h2>Attachments</h2>${o.attachments.length ? `<ul class="attachment-list">${o.attachments.map(a => `<li>${a.content_type.startsWith('image/') && a.content_type !== 'image/heic' ? `<a href="/api/attachments/${escape(a.id)}" target="_blank" rel="noopener" tabindex="-1" aria-hidden="true"><img src="/api/attachments/${escape(a.id)}" alt="" loading="lazy"></a>` : `<span class="file-symbol">${icon('clip')}</span>`}<div><a href="/api/attachments/${escape(a.id)}?download" download>${escape(a.file_name)}</a><small>${bytes(a.size)} · ${escape(a.uploader)} · ${fmtStamp(a.created_at)}</small></div>${a.uploaded_by === me.id || p.moderate ? `<button class="quiet-button" data-remove-attachment="${escape(a.id)}">Remove</button>` : ''}</li>`).join('')}</ul>` : '<p class="muted-line">No photos or files yet.</p>'}<label class="upload-button secondary">${icon('clip')}Add photos or files<input type="file" id="attach-input" multiple accept="image/jpeg,image/png,image/gif,image/webp,image/heic,application/pdf,text/plain,text/csv,.docx,.xlsx"></label></section>`;
   const activeParts = (state.data.parts || []).filter(p => !p.archived_at);
   const parts =
     state.data.modules.inventory && can('inventory.view')
@@ -121,7 +121,7 @@ export async function ticketPage(ref) {
                 o.status,
               )
             : ''
-        }${canAssign ? control('Assigned to', 'assignee_id', [['', 'Unassigned'], ...state.data.users.filter(u => u.assignable).map(u => [u.id, u.name])], o.assignee_id || '') : ''}${
+        }${canAssign ? control('Assigned to', 'assignee_id', [['', 'Unassigned'], ...(o.assignable || []).map(u => [u.id, u.name])], o.assignee_id || '') : ''}${
           canPriority
             ? control(
                 'Priority',
@@ -166,7 +166,7 @@ export async function ticketPage(ref) {
   ].join('<span class="sep" aria-hidden="true">·</span>');
   $('#ticket-page').innerHTML =
     `<div class="tp"><header class="tp-head"><button type="button" class="quiet-button tp-back" data-ticket-back>${icon('arrow-left')}Back</button><div class="tp-title"><span class="ticket-no">${escape(number)}</span><h1>${escape(o.title)}</h1></div><p class="tp-summary">${summary}</p><div class="tp-actions">${actions}${canEditDetails ? `<button class="secondary" id="edit-order">${icon('edit')}${textEdit ? 'Edit text' : 'Edit details'}</button>` : ''}<button class="secondary" id="show-history">${icon('history')}Activity</button></div></header>` +
-    `<div class="tp-grid"><aside class="tp-side">${controls}<section class="tp-card"><h2>Details</h2><dl class="tp-facts">${facts}</dl></section>${can('requests.delete') ? '<button class="quiet-button danger" id="delete-order">Delete request</button>' : ''}</aside>` +
+    `<div class="tp-grid"><aside class="tp-side">${controls}<section class="tp-card"><h2>Details</h2><dl class="tp-facts">${facts}</dl></section>${p.delete ? '<button class="quiet-button danger" id="delete-order">Delete request</button>' : ''}</aside>` +
     `<div class="tp-main"><section class="tp-card"><h2>Description</h2><p class="detail-description">${escape(o.description) || none('No additional details.')}</p>${answers}</section>${reservation}<div id="history" hidden></div><section class="tp-card"><h2>Conversation</h2><div id="comments" aria-live="polite">Loading comments…</div><form id="comment-form">${field('Add a comment', 'body', 'textarea')}<div class="form-error" role="alert"></div><div class="editor-actions"><button class="primary" type="submit">Post comment</button></div></form></section>${attachments}${parts}</div></div></div>`;
   const reopen = async message => {
     await hooks.refresh();
@@ -376,7 +376,7 @@ export async function ticketPage(ref) {
       comments
         .map(
           c =>
-            `<div class="comment" data-comment="${escape(c.id)}"><strong>${escape(c.author)}</strong><small>${new Date(c.created_at).toLocaleString()}${c.edited_at ? ' · edited' : ''}</small>${c.user_id === me.id || can('requests.moderate') ? `<span class="comment-actions">${c.user_id === me.id ? `<button class="quiet-button" data-edit-comment="${escape(c.id)}">Edit</button>` : ''}<button class="quiet-button" data-delete-comment="${escape(c.id)}">Delete</button></span>` : ''}<p>${escape(c.body)}</p></div>`,
+            `<div class="comment" data-comment="${escape(c.id)}"><strong>${escape(c.author)}</strong><small>${new Date(c.created_at).toLocaleString()}${c.edited_at ? ' · edited' : ''}</small>${c.user_id === me.id || p.moderate ? `<span class="comment-actions">${c.user_id === me.id ? `<button class="quiet-button" data-edit-comment="${escape(c.id)}">Edit</button>` : ''}<button class="quiet-button" data-delete-comment="${escape(c.id)}">Delete</button></span>` : ''}<p>${escape(c.body)}</p></div>`,
         )
         .join('') || '<p>No comments yet. Keep your team in the loop.</p>';
     $$('[data-edit-comment]').forEach(

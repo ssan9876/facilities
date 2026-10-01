@@ -160,9 +160,44 @@ Every API check asks for a named capability (for example `requests.assign` or `i
 | Edit, update, assign and delete any request; approve reservations; moderate comments and files | — | — | Yes | Yes |
 | See maintenance plans and inventory; download exports | — | Yes | Yes | Yes |
 | Manage buildings, spaces, assets, maintenance plans, parts; reports | — | — | Yes | Yes |
-| Administer the workspace (`admin`) | — | — | — | Yes |
+| Administer the workspace (every `admin.*` section) | — | — | — | Yes |
 
-To change the defaults for an installation, edit `builtinRoles` in `permissions.js` (or add capabilities to `capabilityCatalog` and check them with `can(user, '...')` / `requireCap('...')`). Administrators can also adjust any built-in role in **Settings → Roles** (stored in the database, audited, and resettable to the file's defaults) and create custom roles such as "Custodian", starting from an existing role's permissions. Assign custom roles under **Settings → People**. The administrator role always keeps every capability, and no other role can be granted `admin`. Role changes apply on each person's next request. SSO group mapping assigns only the built-in roles; give custom roles to people from Settings → People (which makes the account administrator-managed so sign-in no longer overwrites it).
+Administration is split into sections that can be granted on their own: `admin.settings` (features, identity, notification delivery), `admin.forms`, `admin.people` (people, groups, provisioning tokens), `admin.roles` (roles, auto-assignment, the access file), `admin.audit`, `admin.data` (backups and retention) and `admin.updates`. An "IT administrator" can, for example, install updates and read the audit log without touching people or roles. Anyone who manages roles, groups or people can only hand out capabilities they hold themselves.
+
+**Scopes.** A role can be limited to some request types and/or buildings. Its ticket capabilities (`requests.*`, `reservations.approve`, `parts.record_any`) then apply only to tickets inside that scope, everywhere: lists, search, reports, CSV exports, the calendar, ticket pages, assignment and notifications. A role can also limit which request types its holders can open (`submit`). People always see and follow their own requests.
+
+**Groups grant roles.** A person's access is their own role plus every role granted by the groups they belong to. Groups can follow SSO group claims (members join and leave at each sign-in), be filled by SCIM, by hand, or automatically for newly provisioned people.
+
+**Auto-assignment.** Rules in **Settings → Auto-assignment** (or the access file) assign new tickets by request type, category and building to someone in a group or role, or to one person. *Least busy* picks whoever has the fewest open tickets; *take turns* rotates. Only people who can be assigned that ticket (their role's scope included) are picked; generated maintenance requests use the same rules.
+
+To change the defaults in code, edit `builtinRoles` in `permissions.js` (or add capabilities to `capabilityCatalog` and check them with `can(user, '...')` or, for ticket work, `canOn(user, '...', order)`). Administrators can adjust any built-in role in **Settings → Roles** (stored in the database, audited, and resettable to the file's defaults) and create custom roles such as "Custodian". The administrator role always keeps every capability, and no other role can be granted `admin`. Role changes apply on each person's next request.
+
+### Access as code
+
+Roles, groups, the SSO sign-in role mapping and auto-assignment rules can live in one YAML document. Administrators edit it in **Settings → Access as code**: type in the editor, **Upload file**, or start from the template or the current setup; **Check** validates without changing anything and **Apply** makes it active. Every applied version is kept (the latest 50) with who applied it and when, and any of them can be loaded back and re-applied. The document can also live on the server as a file, versioned with the rest of your configuration; whichever changed last is active (the server file is applied at startup only when its content changed since it was last applied, so edits made in Settings survive restarts). The standard install reads `/opt/facilities/config/access.yaml` (mounted read-only at `/config/access.yaml`); elsewhere set `ACCESS_FILE` or place `config/access.yaml` next to the app. [`deployment/access.example.yaml`](deployment/access.example.yaml) documents every option and capability (regenerate it with `npm run access:template`); **Settings → Access as code** downloads the same template or exports your current setup as a starting file.
+
+```yaml
+version: 1
+roles:
+  north-plumber:
+    name: North Campus plumber
+    extends: technician
+    add: [parts.record_any]
+    scope: {request_types: [maintenance], buildings: [North Campus]}
+groups:
+  plumbers:
+    roles: [north-plumber]
+    sso: [facilities-plumbers]
+sso:
+  roles: {admin: [facilities-admins], manager: [facilities-managers]}
+assignment:
+  - name: North Campus plumbing
+    category: Plumbing
+    buildings: [North Campus]
+    assign_to: {group: plumbers}
+```
+
+The file applies at startup and from **Settings → Access as code → Reload from file**. It is validated as a whole first; if anything is wrong (an unknown capability, building, category, role or person), nothing changes, the last good configuration stays active, and every problem is listed in Settings. Roles, groups and rules the file defines are marked "Access file" and are read-only in Settings; everything else stays editable there. Removing something from the file hands it back to Settings (built-in roles return to their defaults; unused custom roles are deleted). When the file has an `sso.roles` map it replaces the `OIDC_ADMIN_GROUP` / `OIDC_MANAGER_GROUP` / `OIDC_TECHNICIAN_GROUP` variables; the first matching role in file order wins, and `OIDC_ADMIN_SUBJECT` is always an administrator. Every apply is recorded in the audit log.
 
 ### Maintenance scheduling
 
@@ -215,4 +250,4 @@ The current Syntra provider advertises standard profile/email claims but does no
 
 ## Verification status
 
-`npm test` runs 38 tests covering persistence, versioned and legacy migrations and transactions, organization dates, role mapping, production guards, the full role permission matrix, CSRF, session expiry and revocation, server-side paging/filtering/search, record lifecycle, request editing/deletion and comment ownership, attachments (type checks, limits, access), space conflicts and approval, inventory stock rules, reports and CSV safety, email outbox delivery and retries, SCIM discovery/paging/filters/patch paths/errors, audit attribution, Graph group overage, back-channel logout validation and replay, metrics, request IDs and rate limits. Two PostgreSQL tests run when `TEST_DATABASE_URL` is set. `npm run lint` and `npm run format:check` run ESLint and Prettier. Browser checks pass for creating/completing/commenting on requests, editing records and requests, reservations and conflicts, attachments, parts, inventory, reports, the audit log, schedule times, module switches, notification preferences, navigation, and mobile overflow. GitHub CI passes against PostgreSQL 17 and SQLite, browser checks, and a Docker image build. A Linux container deployment and release upgrade were verified on Proxmox. Live Syntra discovery, client registration, PKCE authorization and the login-page redirect were verified; completing the credentialed sign-in still requires a user login. Email delivery, Graph overage lookup and back-channel logout are verified with test doubles; confirm them against your mail server and identity provider after deployment.
+`npm test` runs 56 tests (four of them need PostgreSQL) covering the access file (validation, apply, export, template), role scopes, groups granting roles, administration sections and grant limits, auto-assignment, persistence, versioned and legacy migrations and transactions, organization dates, role mapping, production guards, the full role permission matrix, CSRF, session expiry and revocation, server-side paging/filtering/search, record lifecycle, request editing/deletion and comment ownership, attachments (type checks, limits, access), space conflicts and approval, inventory stock rules, reports and CSV safety, email outbox delivery and retries, SCIM discovery/paging/filters/patch paths/errors, audit attribution, Graph group overage, back-channel logout validation and replay, metrics, request IDs and rate limits. Four PostgreSQL tests run when `TEST_DATABASE_URL` is set. `npm run lint` and `npm run format:check` run ESLint and Prettier. Browser checks pass for creating/completing/commenting on requests, editing records and requests, reservations and conflicts, attachments, parts, inventory, reports, the audit log, schedule times, module switches, notification preferences, navigation, and mobile overflow. GitHub CI passes against PostgreSQL 17 and SQLite, browser checks, and a Docker image build. A Linux container deployment and release upgrade were verified on Proxmox. Live Syntra discovery, client registration, PKCE authorization and the login-page redirect were verified; completing the credentialed sign-in still requires a user login. Email delivery, Graph overage lookup and back-channel logout are verified with test doubles; confirm them against your mail server and identity provider after deployment.

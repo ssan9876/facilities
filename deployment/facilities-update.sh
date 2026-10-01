@@ -5,7 +5,7 @@ ROOT=${FACILITIES_HOME:-/opt/facilities}
 REPO=${FACILITIES_REPOSITORY:-ssan9876/facilities}
 [[ "$REPO" =~ ^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$ ]] || { echo 'Invalid repository'; exit 1; }
 [[ $EUID == 0 ]] || { echo 'Run with sudo.'; exit 1; }
-mkdir -p "$ROOT"/releases "$ROOT"/backups "$ROOT"/bin
+mkdir -p "$ROOT"/releases "$ROOT"/backups "$ROOT"/bin "$ROOT"/config
 # The update agent: the app (container user 1000) may drop request.json into $RUN; a root
 # systemd path unit runs this script with --from-request. The app never gets Docker access.
 RUN="$ROOT/run"

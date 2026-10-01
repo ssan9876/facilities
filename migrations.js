@@ -194,6 +194,35 @@ export const migrations = [
       await q('CREATE INDEX IF NOT EXISTS work_orders_category ON work_orders(category_id)');
     },
   },
+  {
+    id: 12,
+    name: 'access-as-code',
+    async up(q, dialect) {
+      // Roles gain a scope (request types and buildings) and the types they may submit; groups grant roles
+      // and can match SSO group claims. "source" marks rows applied from the access file.
+      await addColumns(q, dialect, 'roles', [
+        ['scope', "TEXT NOT NULL DEFAULT '{}'"],
+        ['submit', 'TEXT'],
+        ['source', "TEXT NOT NULL DEFAULT 'ui'"],
+      ]);
+      await addColumns(q, dialect, 'user_groups', [
+        ['roles', "TEXT NOT NULL DEFAULT '[]'"],
+        ['sso', "TEXT NOT NULL DEFAULT '[]'"],
+        ['source', "TEXT NOT NULL DEFAULT 'ui'"],
+        ['members_managed', 'INTEGER NOT NULL DEFAULT 0'],
+        ['code_key', 'TEXT'],
+      ]);
+      await q('CREATE INDEX IF NOT EXISTS group_members_user ON group_members(user_id)');
+      // New tickets matching a rule are assigned to someone in its group or role (or one person).
+      await q(
+        'CREATE TABLE IF NOT EXISTS assignment_rules (id TEXT PRIMARY KEY, name TEXT NOT NULL, sort INTEGER NOT NULL DEFAULT 0, request_type TEXT, category_id TEXT REFERENCES categories(id), buildings TEXT NOT NULL, target_kind TEXT NOT NULL, target_id TEXT NOT NULL, strategy TEXT NOT NULL, active INTEGER NOT NULL DEFAULT 1, last_user_id TEXT, source TEXT NOT NULL, created_at TEXT NOT NULL)',
+      );
+      // Every applied access document (edited or uploaded in Settings, or read from the file), newest last.
+      await q(
+        'CREATE TABLE IF NOT EXISTS access_versions (id TEXT PRIMARY KEY, created_at TEXT NOT NULL, actor_name TEXT NOT NULL, source TEXT NOT NULL, body TEXT NOT NULL, summary TEXT NOT NULL)',
+      );
+    },
+  },
 ];
 
 export async function migrate(db, list = migrations) {

@@ -1,6 +1,7 @@
 import {randomUUID} from 'node:crypto';
 import {statuses, priorities, error, text, date, localTime, likePattern} from './validation.js';
-import {can, requireCap, sqlRoleList} from './permissions.js';
+import {can, canOn, canSubmit, requireCap, scopeSql, usersWith} from './permissions.js';
+import {autoAssign} from './access.js';
 import {dateInTimezone, startOfDayUtc, addDays} from './dates.js';
 import {moduleSettings, requireModule, notify} from './requests.js';
 import {audit, auditQuery, changes} from './audit.js';
@@ -48,7 +49,9 @@ export function orderFilter(user, modules, params, timezone) {
   const enabled = ['maintenance', 'schedule', 'technology'].filter(t => modules[t]);
   if (!enabled.length) where.push('1=0');
   else add(`w.request_type IN (${enabled.map(() => '?').join(',')})`, ...enabled);
-  if (!can(user, 'requests.view_all')) add('w.requester_id=?', user.id);
+  // Everyone sees their own requests; "see every request" covers the request types and buildings in scope.
+  const visible = scopeSql(user, 'requests.view_all');
+  if (visible.sql !== '1=1') add(`(w.requester_id=? OR ${visible.sql})`, user.id, ...visible.values);
   // List filters accept one value or a comma-separated list ("High,Urgent").
   const list = (value, allowed, label) => {
     const items = String(value)
@@ -215,7 +218,7 @@ export function setupOrders(app, db, env) {
   };
   const accessibleOrder = async (req, id = req.params.id) => {
     const order = (await q('SELECT * FROM work_orders WHERE id=$1', [id]))[0];
-    if (!order || (!can(req.user, 'requests.view_all') && order.requester_id !== req.user.id))
+    if (!order || (!canOn(req.user, 'requests.view_all', order) && order.requester_id !== req.user.id))
       throw error('Work order not found.', 404);
     await requireModule(db, order.request_type);
     return order;
@@ -301,13 +304,30 @@ export function setupOrders(app, db, env) {
           )
         : [],
     ]);
-    res.json({...order, attachments, parts, answers: await answersFor(db, order.id)});
+    const mine = order.assignee_id === req.user.id;
+    const permissions = {
+      edit_any: canOn(req.user, 'requests.edit_any', order),
+      edit_assigned: mine && canOn(req.user, 'requests.edit_assigned', order),
+      update:
+        canOn(req.user, 'requests.update_any', order) || (mine && canOn(req.user, 'requests.update_assigned', order)),
+      assign: canOn(req.user, 'requests.assign', order),
+      delete: canOn(req.user, 'requests.delete', order),
+      moderate: canOn(req.user, 'requests.moderate', order),
+      record_parts:
+        canOn(req.user, 'parts.record_any', order) || (mine && canOn(req.user, 'requests.update_assigned', order)),
+      approve: canOn(req.user, 'reservations.approve', order),
+    };
+    const assignable = permissions.assign
+      ? (await usersWith(db, 'requests.assignable', order)).map(u => ({id: u.id, name: u.name}))
+      : undefined;
+    res.json({...order, attachments, parts, answers: await answersFor(db, order.id), permissions, assignable});
   });
 
   app.post('/api/orders', async (req, res) => {
     const body = req.body;
     const requestType = body.request_type || 'maintenance';
     await requireModule(db, requestType);
+    if (!canSubmit(req.user, requestType)) throw error('Your role cannot submit this type of request.', 403);
     const form = await checkSubmission(db, requestType, body, {today: dateInTimezone(timezone)});
     const title = text(body, 'title'),
       description = text(body, 'description', 5000, true),
@@ -360,8 +380,8 @@ export function setupOrders(app, db, env) {
       );
       return reserved;
     });
-    const notified = sqlRoleList(db, 'requests.notified');
-    const recipients = await q(`SELECT id FROM users WHERE ${notified.sql} AND active=1`, notified.values);
+    const created = (await q('SELECT * FROM work_orders WHERE id=$1', [id]))[0];
+    const recipients = await usersWith(db, 'requests.notified', created);
     await notify(
       db,
       {id},
@@ -370,7 +390,8 @@ export function setupOrders(app, db, env) {
       req.user.id,
       `${req.user.name} submitted a ${requestType} request${reservation.reservation_status === 'pending' ? ' that needs reservation approval' : ''}.`,
     );
-    res.status(201).json({id, reservation_status: reservation.reservation_status});
+    const assigned = await autoAssign(db, id, {notify});
+    res.status(201).json({id, reservation_status: reservation.reservation_status, assignee_id: assigned?.id || null});
   });
 
   app.patch('/api/orders/:id', async (req, res) => {
@@ -378,15 +399,15 @@ export function setupOrders(app, db, env) {
     const body = req.body || {};
     const editsDetails = detailFields.some(k => k in body);
     const owner = row.requester_id === req.user.id;
-    const fullEdit = can(req.user, 'requests.edit_any') || (owner && row.status === 'Open');
+    const fullEdit = canOn(req.user, 'requests.edit_any', row) || (owner && row.status === 'Open');
     // The assignee may rewrite the ticket's text (title and description) but not where, when or how urgent.
     const textEdit =
-      can(req.user, 'requests.edit_assigned') &&
+      canOn(req.user, 'requests.edit_assigned', row) &&
       row.assignee_id === req.user.id &&
       detailFields.filter(k => k in body).every(k => ['title', 'description'].includes(k));
     if (editsDetails && !(fullEdit || textEdit))
       throw error(
-        row.assignee_id === req.user.id && can(req.user, 'requests.edit_assigned')
+        row.assignee_id === req.user.id && canOn(req.user, 'requests.edit_assigned', row)
           ? 'As the assignee you can edit the title and description only.'
           : owner
             ? 'Requests can be edited by the requester only while they are Open.'
@@ -394,8 +415,8 @@ export function setupOrders(app, db, env) {
         403,
       );
     const mayStamp =
-      can(req.user, 'requests.update_any') ||
-      (can(req.user, 'requests.update_assigned') && row.assignee_id === req.user.id);
+      canOn(req.user, 'requests.update_any', row) ||
+      (canOn(req.user, 'requests.update_assigned', row) && row.assignee_id === req.user.id);
     if ('status' in body && body.status !== row.status && !mayStamp)
       throw error('Your role cannot change the status of this request.', 403);
     const status = body.status ?? row.status;
@@ -408,18 +429,9 @@ export function setupOrders(app, db, env) {
     let assignee = row.assignee_id;
     if ('assignee_id' in body) {
       assignee = body.assignee_id || null;
-      if (assignee !== row.assignee_id && !can(req.user, 'requests.assign'))
+      if (assignee !== row.assignee_id && !canOn(req.user, 'requests.assign', row))
         throw error('Your role cannot assign work.', 403);
-      const assignable = sqlRoleList(db, 'requests.assignable', 2);
-      if (
-        assignee &&
-        !(
-          await q(`SELECT id FROM users WHERE id=$1 AND active=1 AND ${assignable.sql}`, [
-            assignee,
-            ...assignable.values,
-          ])
-        ).length
-      )
+      if (assignee && !(await usersWith(db, 'requests.assignable', row)).some(u => u.id === assignee))
         throw error('Choose an enabled person whose role can be assigned work.');
     }
     const next = {...row, status, assignee_id: assignee};
@@ -559,6 +571,7 @@ export function setupOrders(app, db, env) {
     requireCap('requests.delete', 'Your role cannot delete requests.'),
     async (req, res) => {
       const row = await accessibleOrder(req);
+      if (!canOn(req.user, 'requests.delete', row)) throw error('Your role cannot delete this request.', 403);
       await db.transaction(async tx => {
         const used = await tx.query('SELECT part_id,quantity FROM part_usage WHERE work_order_id=$1', [row.id]);
         for (const table of [
@@ -627,7 +640,7 @@ export function setupOrders(app, db, env) {
       await q('SELECT * FROM comments WHERE id=$1 AND work_order_id=$2', [req.params.comment, row.id])
     )[0];
     if (!comment) throw error('Comment not found.', 404);
-    if (comment.user_id !== req.user.id && !(allowManager && can(req.user, 'requests.moderate')))
+    if (comment.user_id !== req.user.id && !(allowManager && canOn(req.user, 'requests.moderate', row)))
       throw error(
         allowManager
           ? 'Only the author or a manager can delete this comment.'

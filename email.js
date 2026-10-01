@@ -1,6 +1,6 @@
 import nodemailer from 'nodemailer';
 import {randomUUID} from 'node:crypto';
-import {admin, error} from './validation.js';
+import {section, error} from './validation.js';
 import {audit} from './audit.js';
 
 // Messages are written to email_outbox and sent by a background worker with retries,
@@ -136,7 +136,7 @@ export function setupEmail(app, db, env, {logger, workspaceSettings, transport: 
       timer.unref();
     }
   };
-  app.get('/api/admin/email', admin, async (req, res) => {
+  app.get('/api/admin/email', section('settings'), async (req, res) => {
     const [stats] = await db.query(
       'SELECT SUM(CASE WHEN sent_at IS NULL AND attempts<$1 THEN 1 ELSE 0 END) AS pending, SUM(CASE WHEN sent_at IS NULL AND attempts>=$1 THEN 1 ELSE 0 END) AS failed, SUM(CASE WHEN sent_at IS NOT NULL THEN 1 ELSE 0 END) AS sent FROM email_outbox',
       [maxAttempts],
@@ -156,7 +156,7 @@ export function setupEmail(app, db, env, {logger, workspaceSettings, transport: 
       lastError,
     });
   });
-  app.post('/api/admin/email/test', admin, async (req, res) => {
+  app.post('/api/admin/email/test', section('settings'), async (req, res) => {
     if (!configured)
       throw error('SMTP is not configured on the server. Set SMTP_HOST (or SMTP_URL) and SMTP_FROM.', 503);
     if (!req.user.email) throw error('Your account has no email address to send the test to.');

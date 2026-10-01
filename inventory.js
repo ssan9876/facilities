@@ -1,6 +1,6 @@
 import {randomUUID} from 'node:crypto';
 import {error, text, integer, bool} from './validation.js';
-import {can, requireCap} from './permissions.js';
+import {canOn, requireCap} from './permissions.js';
 
 const view = requireCap('inventory.view', 'Your role cannot see inventory.');
 const manage = requireCap('inventory.manage', 'Your role cannot manage parts and stock.');
@@ -157,8 +157,8 @@ export function setupInventory(app, db, {accessibleOrder}) {
   });
 
   const canRecord = (req, order) =>
-    can(req.user, 'parts.record_any') ||
-    (can(req.user, 'requests.update_assigned') && order.assignee_id === req.user.id);
+    canOn(req.user, 'parts.record_any', order) ||
+    (canOn(req.user, 'requests.update_assigned', order) && order.assignee_id === req.user.id);
   app.post('/api/orders/:id/parts', async (req, res) => {
     await enabled();
     const order = await accessibleOrder(req);

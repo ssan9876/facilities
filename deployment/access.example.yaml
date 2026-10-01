@@ -1,0 +1,113 @@
+# Facilities access file (version 1)
+#
+# Declares roles, groups, the SSO sign-in role mapping and ticket assignment rules. Edit and apply it in
+# Settings → Access as code (or upload it there), or save it on the server as config/access.yaml
+# (ACCESS_FILE) where it is applied at startup when it changes. The whole document is checked first: if
+# anything is wrong, nothing changes and every problem is listed. Everything defined here is read-only in
+# the other Settings tabs; anything not mentioned stays editable there.
+#
+# This template applies as-is. Lines starting with "#" are examples that need names from your workspace
+# (buildings, request-form categories, people); uncomment and adjust them.
+#
+# Capabilities (use "requests.*" style wildcards to take a whole group):
+#   Requests
+#     requests.view_all          See every request. Without it, people see only the requests they submitted.
+#     requests.edit_any          Edit any request. Change title, place, priority and dates at any stage. Everyone can edit their own request while it is Open.
+#     requests.edit_assigned     Edit the text of work assigned to them. Change the title and description of requests assigned to them.
+#     requests.update_assigned   Update work assigned to them. Stamp status and record parts on requests assigned to them.
+#     requests.update_any        Update any request. Stamp the status of any request.
+#     requests.assign            Assign work. Choose who a request is assigned to.
+#     requests.assignable        Can be assigned work. Appears in the "Assigned to" list.
+#     requests.delete            Delete requests. Permanently remove a request; the audit log keeps a record.
+#     requests.notified          Notified of new requests. Receives a notification for every new request.
+#     requests.moderate          Remove others’ comments and files. Delete comments and attachments added by other people.
+#     reservations.approve       Approve space reservations. Approve or decline reservations for spaces that need approval.
+#   Places
+#     records.manage             Manage buildings, spaces and assets. Add, edit, archive and delete places and equipment, and print QR report labels.
+#   Maintenance
+#     maintenance.view           See preventive maintenance. View recurring maintenance plans.
+#     maintenance.manage         Manage maintenance plans. Create, edit, pause and delete plans, and generate due requests.
+#   Stock
+#     inventory.view             See inventory. View parts, stock levels and parts used on requests.
+#     inventory.manage           Manage parts and stock. Add and edit parts and adjust stock.
+#     parts.record_any           Record parts on any request. Without it, parts can be recorded only on work assigned to them.
+#   Reports
+#     reports.view               View reports. Open the Reports page.
+#     reports.export             Download CSV exports. Export requests, assets, maintenance plans and parts.
+#   Administration
+#     admin.settings             Workspace settings. Features, identity, workspace and notification delivery.
+#     admin.forms                Request forms. Categories, questions and required fields for each type.
+#     admin.people               People and groups. Provision and disable people, manage groups and provisioning tokens.
+#     admin.roles                Roles and access. Roles, assignment rules and the access file.
+#     admin.audit                Audit log. Read and export the audit log.
+#     admin.data                 Backups and data. Back up now and data retention.
+#     admin.updates              Updates. Install new releases.
+#     admin                      Full administrator. Every capability. Only the Administrator role holds it.
+#
+# Built-in roles (list them under roles: to change their capabilities; the administrator role is fixed):
+#   requester   Requester: Submits requests and follows their own tickets.
+#   technician  Technician: Works assigned tickets in the field.
+#   manager     Manager: Triages, assigns and plans work.
+#   admin       Administrator: Everything, including workspace settings.
+#
+# A role's scope limits its ticket capabilities (requests.*, reservations.approve, parts.record_any) to
+# some request types and/or buildings. "submit" limits which request types its holders can open; leave
+# it out to allow every enabled type. A person's access is their own role plus every role their groups
+# grant, so give someone a narrow base role and add scoped roles through groups.
+version: 1
+
+roles:
+  # Override a built-in role.
+  technician:
+    capabilities:
+      - requests.view_all
+      - requests.edit_assigned
+      - requests.update_assigned
+      - requests.assignable
+      - maintenance.view
+      - inventory.view
+
+  # A custom role built from another one, limited to maintenance tickets.
+  plumber:
+    name: Plumber
+    description: Works plumbing tickets.
+    extends: technician
+    add: [parts.record_any]
+    remove: [maintenance.view]
+    scope:
+      request_types: [maintenance]
+      # buildings: [North Campus]     # building names from Settings → Buildings
+    submit: [maintenance]
+
+  # An IT administrator who only installs updates, runs backups and reads the audit log.
+  it-admin:
+    name: IT administrator
+    capabilities: [admin.updates, admin.data, admin.audit]
+
+groups:
+  plumbers:
+    name: Plumbers
+    description: Everyone who takes plumbing work.
+    roles: [plumber]                  # roles this group grants on top of each member's own role
+    sso: [facilities-plumbers]        # members join and leave from this SSO group claim at sign-in
+    # members: [pat@example.org]      # listing members (email or username) makes the file own membership
+    # auto_assign: true               # every newly provisioned person joins
+
+# Which role people sign in with, from their SSO group claims (first match wins). Replaces the
+# OIDC_ADMIN_GROUP / OIDC_MANAGER_GROUP / OIDC_TECHNICIAN_GROUP variables when present.
+sso:
+  roles:
+    admin: [facilities-admins]
+    manager: [facilities-managers]
+    technician: [facilities-technicians]
+  default_role: requester
+
+# New tickets are assigned by the first matching rule to someone in its group or role who can be
+# assigned that ticket. least_busy picks whoever has the fewest open tickets; round_robin takes turns.
+assignment:
+  - name: Maintenance to the plumbers
+    request_type: maintenance
+    # category: Plumbing              # a category of the request type (Settings → Request forms)
+    # buildings: [North Campus]
+    assign_to: {group: plumbers}      # or {role: technician} or {user: pat@example.org}
+    strategy: least_busy

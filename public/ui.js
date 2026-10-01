@@ -33,6 +33,7 @@ export const paths = {
   chart: 'M4 20V4 M4 20h16 M8 16v-5 M12 16V8 M16 16v-8',
   clip: 'M16 7l-7.5 7.5a2.1 2.1 0 0 0 3 3L19 10a4.2 4.2 0 0 0-6-6l-7.5 7.5a6.4 6.4 0 0 0 9 9L20 15',
   download: 'M12 4v11 M7 10l5 5 5-5 M5 20h14',
+  upload: 'M12 15V4 M7 9l5-5 5 5 M5 20h14',
   history: 'M3 12a9 9 0 1 0 3-6.7 M3 4v5h5 M12 7v5l3 2',
   edit: 'M4 20h4L19 9l-4-4L4 16z M13 7l4 4',
   door: 'M5 21V3h11v18 M16 6h3v15 M12 12h.01 M2 21h20',
