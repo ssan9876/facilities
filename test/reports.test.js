@@ -25,7 +25,7 @@ test('reports summarize the period and exports follow register filters', async (
   const {call, db} = w;
   const today = dateInTimezone();
   try {
-    await call('/api/orders/demo-1', 'PATCH', {status: 'Completed'});
+    await call('/api/orders/demo-1', 'PATCH', {status: 'Completed', resolution: 'Fixed and checked.'});
     await db.query("UPDATE work_orders SET created_at=$1,completed_at=$2 WHERE id='demo-1'", [
       new Date(Date.now() - 5 * 3600000).toISOString(),
       new Date().toISOString(),
@@ -33,7 +33,7 @@ test('reports summarize the period and exports follow register filters', async (
     await call('/api/maintenance', 'POST', {title: 'Due PM', building_id: 'b1', interval_days: 30, next_due: today});
     await generateMaintenance(db);
     const pm = (await db.query('SELECT work_order_id FROM maintenance_runs'))[0].work_order_id;
-    await call('/api/orders/' + pm, 'PATCH', {status: 'Completed'});
+    await call('/api/orders/' + pm, 'PATCH', {status: 'Completed', resolution: 'Fixed and checked.'});
     await call('/api/orders/demo-2/parts', 'POST', {part_id: 'p1', quantity: 2});
     const r = (await call(`/api/reports/summary?from=${today}&to=${today}`)).body;
     assert.equal(r.created, 7);

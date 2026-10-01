@@ -111,7 +111,7 @@ test('request details, deletion, comment ownership and history', async () => {
       'requesters edit their open requests',
     );
     assert.equal(
-      (await call('/api/orders/' + id, 'PATCH', {status: 'Completed'})).status,
+      (await call('/api/orders/' + id, 'PATCH', {status: 'Completed', resolution: 'Fixed and checked.'})).status,
       403,
       'requesters cannot change status',
     );

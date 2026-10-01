@@ -65,8 +65,16 @@ test('custom roles grant exactly their capabilities', async () => {
     assert.equal((await call('/api/orders/demo-2', 'PATCH', {assignee_id: person.id})).status, 200);
     await as(person.id);
     assert.equal((await call('/api/orders')).body.total, 6);
-    assert.equal((await call('/api/orders/demo-2', 'PATCH', {status: 'Completed'})).status, 200, 'assigned work');
-    assert.equal((await call('/api/orders/demo-3', 'PATCH', {status: 'Completed'})).status, 403, 'unassigned work');
+    assert.equal(
+      (await call('/api/orders/demo-2', 'PATCH', {status: 'Completed', resolution: 'Fixed and checked.'})).status,
+      200,
+      'assigned work',
+    );
+    assert.equal(
+      (await call('/api/orders/demo-3', 'PATCH', {status: 'Completed', resolution: 'Fixed and checked.'})).status,
+      403,
+      'unassigned work',
+    );
     await as('demo-admin');
     // Narrow the role: only their own requests, and notified of new ones.
     assert.equal(

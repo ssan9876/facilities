@@ -38,12 +38,8 @@ const nextStages = {
   'On hold': ['In progress', 'Completed'],
   Completed: ['Open'],
 };
-const stageAction = {
-  'In progress': 'Mark in progress',
-  'On hold': 'Put on hold',
-  Completed: 'Mark completed',
-  Open: 'Reopen',
-};
+// The header offers forward steps only; On hold is set from the status menu.
+const stageAction = {'In progress': 'Mark in progress', Completed: 'Resolve', Open: 'Reopen'};
 const fact = (label, value) => `<div><dt>${label}</dt><dd>${value}</dd></div>`;
 const none = text => `<span class="unassigned">${text}</span>`;
 // The ticket redraws after a save; put focus back on the matching control once it exists again.
@@ -103,6 +99,7 @@ export async function ticketPage(ref) {
   // Quick actions: the next stages as plain buttons, the likeliest one first.
   const actions = canStamp
     ? nextStages[o.status]
+        .filter(stage => stageAction[stage])
         .map(
           (stage, i) =>
             `<button type="button" class="${i === 0 ? 'primary' : 'secondary'}" data-stamp="${stage}">${stageAction[stage]}</button>`,
@@ -120,7 +117,7 @@ export async function ticketPage(ref) {
             ? control(
                 'Status',
                 'status',
-                statuses.map(x => [x, x]),
+                statuses.filter(x => x !== 'Completed' || o.status === 'Completed').map(x => [x, x]),
                 o.status,
               )
             : ''
@@ -239,6 +236,7 @@ export async function ticketPage(ref) {
   $$('[data-stamp]').forEach(
     b =>
       (b.onclick = async () => {
+        if (b.dataset.stamp === 'Completed') return resolveTicket(o, number);
         $$('[data-stamp]').forEach(x => (x.disabled = true));
         try {
           await api(`/orders/${encodeURIComponent(id)}`, {
@@ -478,6 +476,25 @@ function editOrder(o) {
   });
 }
 
+// Resolving asks how the work was resolved; the note is saved on the ticket as a comment.
+function resolveTicket(o, number) {
+  dialog(
+    'Resolve request',
+    `<form id="resolve-form"><p class="form-context">Describe what was done. The note is added to the conversation and the requester is notified.</p><div class="form-grid">${field('Resolution note', 'resolution', 'textarea')}</div>${formActions('Resolve')}</form>`,
+    {number},
+  );
+  bindCancel();
+  $('#resolve-form textarea').focus();
+  bindForm($('#resolve-form'), async data => {
+    await api(`/orders/${encodeURIComponent(o.id)}`, {
+      method: 'PATCH',
+      body: JSON.stringify({status: 'Completed', resolution: data.resolution}),
+    });
+    closeDialog();
+    await hooks.refresh();
+    toast(`${number} resolved.`);
+  });
+}
 // The assignee's editor: the ticket's words only, never its place, priority or dates.
 function editText(o) {
   dialog(
