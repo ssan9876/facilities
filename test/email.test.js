@@ -80,7 +80,7 @@ test('notifications are queued as email, honour preferences and retry on failure
     assert.equal(await deliverEmails(db, mail, options), 1);
     assert.equal(mail.sent.length, 1);
     assert.match(mail.sent[0].subject, /^Campus: WO-0001 Air conditioning not cooling/);
-    assert.match(mail.sent[0].text, /https:\/\/facilities\.example\.test\/#order=demo-1/);
+    assert.match(mail.sent[0].text, /https:\/\/facilities\.example\.test\/tickets\/WO-0001/);
     assert.equal(await deliverEmails(db, mail, options), 0, 'sent messages are not repeated');
     const status = (await call('/api/admin/email')).body;
     assert.deepEqual([status.configured, status.sent, status.pending], [true, 1, 0]);

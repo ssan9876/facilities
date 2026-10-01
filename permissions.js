@@ -17,6 +17,12 @@ export const capabilityCatalog = [
     'Change title, place, priority and dates at any stage. Everyone can edit their own request while it is Open.',
   ],
   [
+    'requests.edit_assigned',
+    'Requests',
+    'Edit the text of work assigned to them',
+    'Change the title and description of requests assigned to them.',
+  ],
+  [
     'requests.update_assigned',
     'Requests',
     'Update work assigned to them',
@@ -79,6 +85,7 @@ export const builtinRoles = {
     description: 'Works assigned tickets in the field.',
     capabilities: [
       'requests.view_all',
+      'requests.edit_assigned',
       'requests.update_assigned',
       'requests.assignable',
       'maintenance.view',

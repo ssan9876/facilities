@@ -20,6 +20,8 @@ export function setupLabels(app, db, env) {
   const index = fileURLToPath(new URL('./public/index.html', import.meta.url));
   // The report link is part of the single-page app; the client reads the query and opens the form.
   app.get('/report', (req, res) => res.sendFile(index));
+  // Every ticket has its own address; the app shell renders it after sign-in.
+  app.get('/tickets/:ref', (req, res) => res.sendFile(index));
   app.get('/labels', async (req, res) => {
     if (!req.user) return res.redirect(`/auth/login?return=${encodeURIComponent(req.originalUrl)}`);
     if (!can(req.user, 'records.manage'))

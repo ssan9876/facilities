@@ -39,14 +39,10 @@ const nextStages = {
   Completed: ['Open'],
 };
 const pause = ms => new Promise(resolve => setTimeout(resolve, reducedMotion() ? 0 : ms));
-// The ticket is stamped, then filed away into the pad.
-async function stampAndFile(status) {
+// The new stage is stamped onto the strip before the ticket redraws with its new state.
+async function stampLand(status) {
   $('#lifecycle-slot').innerHTML = lifecycle(status, true);
-  await pause(560);
-  $('#editor').classList.add('filing');
-  await pause(240);
-  closeDialog();
-  $('#editor').classList.remove('filing');
+  await pause(620);
 }
 const cell = (label, value, cls = '') =>
   `<div class="cell ${cls}"><span class="cell-label">${label}</span><span class="cell-value">${value}</span></div>`;
@@ -66,20 +62,33 @@ const describeChange = (key, [from, to]) => {
   return `<li><strong>${escape(label)}</strong> ${escape(value(from))} → ${escape(value(to))}</li>`;
 };
 
-export async function orderEditor(id) {
+// Opening a ticket navigates to its own page (/tickets/WO-0042); the shell handles history.
+export const orderEditor = ref => hooks.openTicket(ref);
+
+// Renders the ticket page into #ticket-page. ref is a ticket id or WO number.
+export async function ticketPage(ref) {
+  const page = $('#ticket-page');
   let o;
   try {
-    o = await api(`/orders/${encodeURIComponent(id)}`);
+    o = await api(`/orders/${encodeURIComponent(ref)}`);
   } catch (err) {
-    toast(err.message);
+    if (page) page.innerHTML = `<div class="empty"><h2>Ticket unavailable</h2><p>${escape(err.message)}</p></div>`;
     return;
   }
+  if (!$('#ticket-page')) return;
+  const id = o.id,
+    number = ticketNo(o.number);
+  if (o.number && location.pathname !== `/tickets/${number}`)
+    history.replaceState(history.state, '', `/tickets/${number}`);
+  document.title = `${number} ${o.title} · ${state.me.branding?.name || 'Facilities'}`;
   const me = state.me.user,
     owner = o.requester_id === me.id;
   const canStamp = can('requests.update_any') || (can('requests.update_assigned') && o.assignee_id === me.id);
   const canAssign = can('requests.assign');
   const canUpdate = canStamp || canAssign;
-  const canEditDetails = can('requests.edit_any') || (owner && o.status === 'Open');
+  const fullEdit = can('requests.edit_any') || (owner && o.status === 'Open');
+  const textEdit = !fullEdit && can('requests.edit_assigned') && o.assignee_id === me.id;
+  const canEditDetails = fullEdit || textEdit;
   const canRecordParts =
     state.data.modules.inventory &&
     (can('parts.record_any') || (can('requests.update_assigned') && o.assignee_id === me.id));
@@ -140,23 +149,21 @@ export async function orderEditor(id) {
       ? cell('When', when)
       : cell('Completed', o.completed_at ? fmtStamp(o.completed_at) : '—'),
   ].join('');
-  dialog(
-    o.title,
-    `<div id="lifecycle-slot">${lifecycle(o.status)}</div>${stampBar}<div class="ticket-fields">${fields}${cell('Description of work', `<span class="detail-description">${escape(o.description) || 'No additional details.'}</span>`, 'wide')}</div><div class="detail-toolbar">${canEditDetails ? `<button class="secondary" id="edit-order">${icon('edit')}Edit details</button>` : ''}<button class="secondary" id="show-history">${icon('history')}Activity</button>${can('requests.delete') ? '<button class="secondary danger" id="delete-order">Delete request</button>' : ''}</div>${reservation}${canUpdate ? `<section class="detail-section stamp-forward"><div class="section-head compact"><h2>${canAssign ? 'Reassign or correct' : 'Correct the status'}</h2></div>${update}</section>` : `<p class="muted-line">Assigned to ${escape(o.assignee) || 'no one yet'}.</p>`}<div id="history" hidden></div>${attachments}${parts}<section class="detail-section"><div class="section-head compact"><h2>Conversation</h2></div><div id="comments" aria-live="polite">Loading comments…</div><form id="comment-form">${field('Add a comment', 'body', 'textarea')}<div class="form-error" role="alert"></div><div class="editor-actions"><button class="secondary" type="submit">Post comment</button></div></form></section>`,
-    {number: ticketNo(o.number), copy, kind: 'ticket'},
-  );
+  $('#ticket-page').innerHTML =
+    `<div class="ticket-bar"><button type="button" class="quiet-button" data-ticket-back>${icon('arrow-left')}Back</button><span class="copy-label"><span class="copies" data-copy="${copy}" aria-hidden="true"><i class="c-requester"></i><i class="c-technician"></i><i class="c-office"></i></span>${{requester: 'Requester copy', technician: 'Technician copy', office: 'Office copy'}[copy]}</span></div><article class="ticket-sheet" data-copy="${copy}"><header class="ticket-head"><span class="ticket-no">${escape(number)}</span><h1>${escape(o.title)}</h1></header><div class="ticket-body">` +
+    `<div id="lifecycle-slot">${lifecycle(o.status)}</div>${stampBar}<div class="ticket-fields">${fields}${cell('Description of work', `<span class="detail-description">${escape(o.description) || 'No additional details.'}</span>`, 'wide')}</div><div class="detail-toolbar">${canEditDetails ? `<button class="secondary" id="edit-order">${icon('edit')}${textEdit ? 'Edit text' : 'Edit details'}</button>` : ''}<button class="secondary" id="show-history">${icon('history')}Activity</button>${can('requests.delete') ? '<button class="secondary danger" id="delete-order">Delete request</button>' : ''}</div>${reservation}${canUpdate ? `<section class="detail-section stamp-forward"><div class="section-head compact"><h2>${canAssign ? 'Reassign or correct' : 'Correct the status'}</h2></div>${update}</section>` : `<p class="muted-line">Assigned to ${escape(o.assignee) || 'no one yet'}.</p>`}<div id="history" hidden></div>${attachments}${parts}<section class="detail-section"><div class="section-head compact"><h2>Conversation</h2></div><div id="comments" aria-live="polite">Loading comments…</div><form id="comment-form">${field('Add a comment', 'body', 'textarea')}<div class="form-error" role="alert"></div><div class="editor-actions"><button class="secondary" type="submit">Post comment</button></div></form></section>` +
+    `</div></article>`;
   const reopen = async message => {
     await hooks.refresh();
-    await orderEditor(id);
     if (message) toast(message);
   };
+  const back = $('[data-ticket-back]');
+  if (back) back.onclick = () => hooks.leaveTicket();
   if (canUpdate)
     bindForm($('#update-form'), async data => {
       await api(`/orders/${encodeURIComponent(id)}`, {method: 'PATCH', body: JSON.stringify(data)});
-      if (data.status !== o.status) await stampAndFile(data.status);
-      else closeDialog();
-      await hooks.refresh();
-      toast(data.status !== o.status ? `${ticketNo(o.number)} stamped ${data.status}.` : 'Request updated.');
+      if (data.status !== o.status) await stampLand(data.status);
+      await reopen(data.status !== o.status ? `${number} stamped ${data.status}.` : 'Request updated.');
     });
   $$('[data-stamp]').forEach(
     b =>
@@ -167,25 +174,23 @@ export async function orderEditor(id) {
             method: 'PATCH',
             body: JSON.stringify({status: b.dataset.stamp}),
           });
-          await stampAndFile(b.dataset.stamp);
-          await hooks.refresh();
-          toast(`${ticketNo(o.number)} stamped ${b.dataset.stamp}.`);
+          await stampLand(b.dataset.stamp);
+          await reopen(`${number} stamped ${b.dataset.stamp}.`);
         } catch (e) {
           toast(e.message);
           $$('[data-stamp]').forEach(x => (x.disabled = false));
         }
       }),
   );
-  if ($('#edit-order')) $('#edit-order').onclick = () => editOrder(o);
+  if ($('#edit-order')) $('#edit-order').onclick = () => (textEdit ? editText(o) : editOrder(o));
   if ($('#delete-order'))
     confirmButton(
       $('#delete-order'),
       async () => {
         try {
           await api(`/orders/${encodeURIComponent(id)}`, {method: 'DELETE'});
-          closeDialog();
-          await hooks.refresh();
           toast('Request deleted. The activity log keeps a record.');
+          hooks.leaveTicket();
         } catch (e) {
           toast(e.message);
         }
@@ -387,12 +392,28 @@ function editOrder(o) {
       delete data.space_id;
     }
     const r = await api(`/orders/${encodeURIComponent(o.id)}`, {method: 'PATCH', body: JSON.stringify(data)});
+    closeDialog();
     await hooks.refresh();
-    await orderEditor(o.id);
     toast(
       r.reservation_status === 'pending' && o.reservation_status !== 'pending'
         ? 'Saved. The new reservation time needs approval.'
         : 'Request details saved.',
     );
+  });
+}
+
+// The assignee's editor: the ticket's words only, never its place, priority or dates.
+function editText(o) {
+  dialog(
+    'Edit ticket text',
+    `<form id="edit-form"><div class="form-grid">${field('Title', 'title', 'text', o.title).replace('class="field ', 'class="field full ')}${field('Details', 'description', 'textarea', o.description, true)}</div>${formActions('Save text')}</form>`,
+    {number: ticketNo(o.number)},
+  );
+  bindCancel();
+  bindForm($('#edit-form'), async data => {
+    await api(`/orders/${encodeURIComponent(o.id)}`, {method: 'PATCH', body: JSON.stringify(data)});
+    closeDialog();
+    await hooks.refresh();
+    toast('Ticket text saved.');
   });
 }
