@@ -10,7 +10,9 @@ exec 9>"$ROOT/update.lock"
 flock -n 9 || { echo 'Another update is running.'; exit 1; }
 curl_https() { curl --fail --silent --show-error --location --proto '=https' --proto-redir '=https' --retry 3 --connect-timeout 15 "$@"; }
 version=${1:---check}
+automatic=0
 if [[ "$version" == --latest || "$version" == --check ]]; then
+  automatic=1
   latest=$(curl_https "https://api.github.com/repos/$REPO/releases/latest" | python3 -c 'import json,sys; r=json.load(sys.stdin); assert not r["draft"] and not r["prerelease"]; print(r["tag_name"])')
   if [[ "$version" == --check ]]; then
     echo "Installed: $(cat "$ROOT/current/package.json" 2>/dev/null | python3 -c 'import json,sys; print(json.load(sys.stdin)["version"])' 2>/dev/null || echo none)"
@@ -23,6 +25,15 @@ fi
 [[ -f "$ROOT/.env" ]] || { echo "Configure $ROOT/.env first (mode 600)."; exit 1; }
 chmod 600 "$ROOT/.env"
 previous=$(readlink -f "$ROOT/current" || true)
+[[ -d "$previous" ]] || previous=''
+if [[ $automatic == 1 && -n "$previous" ]]; then
+  python3 - "$previous/package.json" "$version" <<'PY'
+import json,sys
+installed=tuple(map(int,json.load(open(sys.argv[1]))['version'].split('.')))
+requested=tuple(map(int,sys.argv[2][1:].split('.')))
+assert requested>=installed, 'Latest release is older than this installation. Use an explicit version only after reviewing downgrade compatibility.'
+PY
+fi
 target="$ROOT/releases/$version"
 [[ "$previous" != "$target" ]] || { echo "$version is already installed."; exit 0; }
 work=$(mktemp -d "$ROOT/.download.XXXXXX")

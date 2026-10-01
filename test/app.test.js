@@ -32,6 +32,7 @@ test('role mapping uses explicit IdP groups and allowed group restriction',()=>{
   assert.equal(roleForClaims({groups:['facilities-technicians']}),'technician');
   assert.equal(roleForClaims({groups:['facilities-managers']}),'manager');
   assert.equal(roleForClaims({groups:['facilities-admins']}),'admin');
+  assert.equal(roleForClaims({groups:'facilities-admins'}),'admin');
   assert.equal(roleForClaims({sub:'admin-sub'},{OIDC_ADMIN_SUBJECT:'admin-sub'}),'admin');
   assert.throws(()=>roleForClaims({groups:['facilities-admins']},{OIDC_ALLOWED_GROUPS:'employees'}),/allowed organization/);
 });
