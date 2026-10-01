@@ -48,6 +48,27 @@ sorting, ETags and group creation through SCIM are not supported.
 or the compatibility attribute `oidc_subject` (Syntra forwards arbitrary mapped
 attributes). The value must match the actual OIDC `sub`, not a person record UUID
 unless those IDs are known to match. FMX deliberately rejects creates without it.
+With the updated Syntra profile support, map `oidc_subject` to
+`%person.syntraUserId%`. This resolves the single login linked to the Person;
+people without a linked login, or with an ambiguous link, must not be provisioned
+by substituting a different identifier.
+
+Recommended Syntra account profile:
+
+| Setting / target attribute | Template |
+| --- | --- |
+| Account name template | `%person.businessEmail%` |
+| `oidc_subject` | `%person.syntraUserId%` |
+| `displayName` | `%person.displayName%` |
+| `name.givenName` | `%person.givenName%` |
+| `name.familyName` | `%person.familyName%` |
+| `emails` | `%person.businessEmail%` |
+
+Do not add a separate `userName` attribute template: Syntra's connector sets it
+from the Account name template, and a competing mapping would break create-retry
+correlation. Keep the bootstrap administrator outside the selected create actions;
+FMX intentionally rejects provisioning changes to that protected account.
+
 Syntra uses `externalId` for an action provenance marker; FMX preserves that marker
 without treating it as authentication identity. Map userName, displayName or
 name.givenName/name.familyName, emails and active normally.
