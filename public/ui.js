@@ -92,16 +92,110 @@ const reservationLabels = {
 export const reservationTag = s => (s ? tag('reservation-' + s, reservationLabels[s]) : '');
 // This tab's id: sent with every call and on the live stream, so the server does not echo our own changes.
 export const tabId = crypto.randomUUID?.() || String(Math.random()).slice(2) + Date.now();
-export async function api(url, options = {}) {
-  const res = await fetch('/api' + url, {
-    ...options,
-    headers: {
-      'Content-Type': 'application/json',
-      'x-csrf-token': state.me?.csrf || '',
-      'x-live-client': tabId,
-      ...options.headers,
-    },
+// ---- Offline queue ----
+// Ticket work done without a connection is kept on this device (IndexedDB) and sent, in order, when the
+// connection returns. Only changes that make sense later are queued; everything else says it needs a
+// connection.
+const queueable = (url, method) =>
+  method !== 'GET' &&
+  (/^\/orders$/.test(url) ||
+    /^\/orders\/[^/?]+(\/(comments|checklist(\/[^/]+)?|time(\/start)?|attachments|follow))?$/.test(url) ||
+    url === '/time/stop' ||
+    url === '/notifications/read');
+function openQueue() {
+  return new Promise((resolve, reject) => {
+    const req = indexedDB.open('facilities-offline', 1);
+    req.onupgradeneeded = () => req.result.createObjectStore('queue', {keyPath: 'id', autoIncrement: true});
+    req.onsuccess = () => resolve(req.result);
+    req.onerror = () => reject(req.error);
   });
+}
+async function store(mode, fn) {
+  const db = await openQueue();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction('queue', mode);
+    const out = fn(tx.objectStore('queue'));
+    tx.oncomplete = () => resolve(out?.result);
+    tx.onerror = () => reject(tx.error);
+  });
+}
+export const queuedChanges = () => store('readonly', s => s.getAll()).catch(() => []);
+async function enqueue(url, options) {
+  await store('readwrite', s =>
+    s.add({
+      url,
+      method: options.method,
+      body: options.body ?? null,
+      type: options.headers?.['Content-Type'] || 'application/json',
+      fileName: options.headers?.['X-File-Name'] || null,
+      at: new Date().toISOString(),
+    }),
+  );
+  dispatchEvent(new CustomEvent('offline-queue'));
+  toast('Saved on this device. It will be sent when you are back online.');
+  return {queued: true};
+}
+let flushing = false;
+// Sends queued changes in order. A change the server refuses is dropped and reported; a lost connection
+// stops the run so the rest wait for the next one.
+export async function flushQueue() {
+  if (flushing || !navigator.onLine) return {sent: 0, failed: []};
+  flushing = true;
+  let sent = 0;
+  const failed = [];
+  try {
+    for (const item of await queuedChanges()) {
+      let res;
+      try {
+        res = await fetch('/api' + item.url, {
+          method: item.method,
+          body: item.body,
+          headers: {
+            'Content-Type': item.type,
+            'x-csrf-token': state.me?.csrf || '',
+            'x-live-client': tabId,
+            ...(item.fileName ? {'X-File-Name': item.fileName} : {}),
+          },
+        });
+      } catch {
+        break;
+      }
+      if (res.status >= 500 || res.status === 429) break;
+      if (!res.ok)
+        failed.push((await res.json().catch(() => ({}))).error || `Could not send a change (${res.status}).`);
+      else sent++;
+      await store('readwrite', s => s.delete(item.id));
+    }
+  } finally {
+    flushing = false;
+    dispatchEvent(new CustomEvent('offline-queue'));
+  }
+  return {sent, failed};
+}
+
+export async function api(url, options = {}) {
+  const method = (options.method || 'GET').toUpperCase();
+  if (!navigator.onLine && queueable(url, method)) return enqueue(url, options);
+  let res;
+  try {
+    res = await fetch('/api' + url, {
+      ...options,
+      headers: {
+        'Content-Type': 'application/json',
+        'x-csrf-token': state.me?.csrf || '',
+        'x-live-client': tabId,
+        ...options.headers,
+      },
+    });
+  } catch (err) {
+    if (queueable(url, method)) return enqueue(url, options);
+    throw new Error(
+      navigator.onLine ? 'Could not reach the server. Try again.' : 'You are offline. This needs a connection.',
+      {
+        cause: err,
+      },
+    );
+  }
   const data = res.headers.get('content-type')?.includes('json') ? await res.json() : null;
   if (!res.ok)
     throw new Error(

@@ -34,6 +34,7 @@ import {setupAccess, loadAccessFile, accessStatus, autoAssign} from './access.js
 import {setupLive} from './live.js';
 import {setupViews} from './views.js';
 import {setupTicketTools, runningTimer, applyTemplates} from './ticket-tools.js';
+import {setupField} from './field.js';
 
 const today = () => dateInTimezone();
 
@@ -124,6 +125,7 @@ export async function createApp(env = process.env, dbOverride, options = {}) {
   setupHousekeeping(app, db, env);
   setupRequestForms(app, db);
   setupViews(app, db);
+  setupField(app, db, env);
   const tools = setupTicketTools(app, db, env, {accessibleOrder, notify});
   // Reference data and counts. Requests themselves are paged through /api/orders.
   app.get('/api/data', async (req, res) => {

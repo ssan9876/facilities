@@ -663,6 +663,36 @@ const assert = require('node:assert/strict');
     false,
     'Calendar must fit on mobile',
   );
+  // Asset history from the Assets list, a scanned label, and work done offline.
+  await page.locator('#workspace-nav').getByRole('button', {name: 'Assets', exact: true}).click();
+  await page.locator('[data-open-asset="a2"]').click();
+  await page.getByRole('heading', {name: 'Main circulation pump', exact: true}).waitFor();
+  await page.screenshot({path: '.impeccable/review/asset-desktop.png', fullPage: true});
+  const QR = require('qrcode');
+  const label = await QR.toBuffer(base + '/report?building=b1&asset=a1', {width: 360, margin: 2});
+  await page.keyboard.press('Control+k');
+  await page.locator('#palette-input').fill('scan');
+  await page.keyboard.press('Enter');
+  await page.locator('#scan-status').waitFor();
+  await page.locator('#scan-photo').setInputFiles({name: 'label.png', mimeType: 'image/png', buffer: label});
+  await page.getByRole('heading', {name: 'Rooftop HVAC · Unit 04', exact: true}).waitFor();
+  await page.getByRole('button', {name: 'Report a problem', exact: true}).click();
+  assert.equal(await page.locator('#create-form [name=asset_id]').inputValue(), 'a1', 'the report starts at the asset');
+  await page.getByRole('button', {name: 'Close dialog'}).click();
+  await page.goto(base + '/tickets/WO-0002');
+  await page.locator('#comment-form').waitFor();
+  await page.waitForFunction(() => navigator.serviceWorker?.controller || true);
+  await page.context().setOffline(true);
+  await page.getByLabel('Add a comment').fill('Written in the basement');
+  await page.getByRole('button', {name: 'Post comment', exact: true}).click();
+  await page
+    .locator('#offline-bar')
+    .getByText(/offline/)
+    .waitFor();
+  await page.screenshot({path: '.impeccable/review/offline-desktop.png'});
+  await page.context().setOffline(false);
+  await page.getByText(/1 offline change sent\./).waitFor({timeout: 15000});
+  await page.getByText('Written in the basement', {exact: true}).waitFor();
   // Live updates: a ticket created in one browser appears in another without reloading.
   await mobile.goto(base);
   await mobile.getByRole('button', {name: 'Menu', exact: true}).click();

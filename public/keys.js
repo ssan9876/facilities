@@ -179,6 +179,7 @@ function commands() {
   for (const [page, , title] of hooks.navItems()) add('Go to', title, () => hooks.go(page));
   for (const v of state.data?.views || []) add('Views', v.name, () => hooks.openView(v.id));
   if ($('[data-create="order"]') || hooks.canCreate()) add('Do', 'New request', () => hooks.createOrder(), 'n');
+  add('Do', 'Scan a QR label', () => hooks.scan());
   if (state.page === 'ticket') {
     const ticketActions = [
       ['[data-take]', 'Take this ticket', 't'],
