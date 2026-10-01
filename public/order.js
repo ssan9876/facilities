@@ -68,6 +68,7 @@ export async function ticketPage(ref) {
     return;
   }
   if (!$('#ticket-page')) return;
+  state.ticketId = o.id;
   const id = o.id,
     number = ticketNo(o.number);
   if (o.number && location.pathname !== `/tickets/${number}`)

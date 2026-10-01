@@ -31,6 +31,7 @@ import {
 import {latestMigration} from './migrations.js';
 import {can, loadRoles, usersWith} from './permissions.js';
 import {setupAccess, loadAccessFile, accessStatus, autoAssign} from './access.js';
+import {setupLive} from './live.js';
 
 const today = () => dateInTimezone();
 
@@ -99,6 +100,7 @@ export async function createApp(env = process.env, dbOverride, options = {}) {
     limiter('PROVISIONING', 600, req => req.ip),
   );
   await setupAuth(app, db, env, {logger, logoutKeys: options.logoutKeys});
+  const live = setupLive(app, db, env, {logger});
   const writes = limiter('WRITES', 300, req =>
     ['GET', 'HEAD', 'OPTIONS'].includes(req.method) ? null : req.user?.id || req.ip,
   );
@@ -195,7 +197,7 @@ export async function createApp(env = process.env, dbOverride, options = {}) {
       request_id: req.id,
     });
   });
-  return {app, db, logger, metrics, email};
+  return {app, db, logger, metrics, email, live};
 }
 
 export async function generateMaintenance(db, actor = systemActor) {

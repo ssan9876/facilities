@@ -554,6 +554,31 @@ const assert = require('node:assert/strict');
     false,
     'Calendar must fit on mobile',
   );
+  // Live updates: a ticket created in one browser appears in another without reloading.
+  await mobile.goto(base);
+  await mobile.getByRole('button', {name: 'Menu', exact: true}).click();
+  await mobile.locator('#workspace-nav').getByRole('button', {name: 'All requests', exact: true}).click();
+  await mobile.locator('.order-title').first().waitFor();
+  await mobile.waitForTimeout(800); // the stream connects right after the first render
+  const liveTitle = 'Streamed ' + Date.now();
+  const created = await page.evaluate(
+    async title =>
+      (
+        await fetch('/api/orders', {
+          method: 'POST',
+          headers: {'Content-Type': 'application/json', 'x-csrf-token': (await (await fetch('/api/me')).json()).csrf},
+          body: JSON.stringify({
+            title,
+            request_type: 'technology',
+            building_id: 'b1',
+            due_date: new Date().toISOString().slice(0, 10),
+          }),
+        })
+      ).status,
+    liveTitle,
+  );
+  assert.equal(created, 201);
+  await mobile.getByText(liveTitle, {exact: true}).waitFor({timeout: 5000});
   assert.deepEqual(errors, [], 'Browser console must not contain JavaScript errors');
   console.log(
     'Browser checks passed: create, complete, comment, edit, reservations, attachments, parts, inventory, reports, audit, navigation, desktop and mobile.',

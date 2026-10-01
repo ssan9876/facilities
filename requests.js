@@ -30,10 +30,19 @@ export async function notify(db, order, event, recipients, actorId, message) {
   for (const userId of new Set(recipients.filter(id => id && id !== actorId))) {
     const prefs = await preferences(db, userId);
     if (!prefs[event]) continue;
+    const id = randomUUID(),
+      created = new Date().toISOString();
     await db.query(
       'INSERT INTO notifications(id,user_id,order_id,event,message,created_at) VALUES($1,$2,$3,$4,$5,$6)',
-      [randomUUID(), userId, order.id, event, message, new Date().toISOString()],
+      [id, userId, order.id, event, message, created],
     );
+    (db.root || db).live?.toUsers([userId], 'notification', {
+      id,
+      order_id: order.id,
+      event,
+      message,
+      created_at: created,
+    });
     if (modules.email && prefs.email) {
       const user = (await db.query('SELECT id,email FROM users WHERE id=$1 AND active=1', [userId]))[0];
       if (user?.email) await queueNotificationEmail(db, user, order, message);
@@ -122,6 +131,8 @@ export function setupSettings(app, db) {
         row.id,
         req.user.id,
       ]);
+    // Other open tabs of the same person update their badge.
+    db.live?.toUsers([req.user.id], 'notification', {read: id || 'all'});
     res.json({ok: true});
   });
 }

@@ -251,32 +251,19 @@ export function bindSettings(state, api, refresh, render, toast, openOrder) {
         render();
       });
   }
-  // While an update runs, poll its status and the server's version; reload once the new version answers.
-  const watchUpdate = () => {
-    if (state.updateTimer) return;
-    const startVersion = state.release?.installed;
-    state.updateTimer = setInterval(async () => {
+  // Update progress is streamed (live:update); when the server restarts on the new version, the app's
+  // reconnect handler reloads the page.
+  if (!state.updateListener) {
+    state.updateListener = true;
+    addEventListener('live:update', async () => {
       try {
-        const health = await fetch('/health', {cache: 'no-store'}).then(r => r.json());
-        if (startVersion && health.version !== startVersion) {
-          clearInterval(state.updateTimer);
-          toast(`Updated to ${health.version}. Reloading…`);
-          setTimeout(() => location.reload(), 1200);
-          return;
-        }
-        state.restarting = false;
         state.updateAgent = await api('/admin/update');
-        if (['succeeded', 'failed'].includes(state.updateAgent.status?.state)) {
-          clearInterval(state.updateTimer);
-          state.updateTimer = null;
-        }
       } catch {
-        state.restarting = true;
+        return;
       }
       if (state.settingsTab === 'updates' && state.page === 'settings') render();
-    }, 3000);
-  };
-  if (['requested', 'running'].includes(state.updateAgent?.status?.state)) watchUpdate();
+    });
+  }
   const install = document.querySelector('[data-install-update]');
   if (install)
     install.onclick = async () => {
@@ -284,7 +271,6 @@ export function bindSettings(state, api, refresh, render, toast, openOrder) {
       try {
         state.updateAgent = await api('/admin/update', {method: 'POST', body: JSON.stringify({version: 'latest'})});
         render();
-        watchUpdate();
       } catch (e) {
         toast(e.message);
         install.disabled = false;

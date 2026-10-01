@@ -5,6 +5,7 @@ import {migrate} from './migrations.js';
 
 // Both drivers expose query(sql, $n-values), transaction(fn) and close(). Code running inside
 // transaction(fn) must use the tx argument; the SQLite plain query waits for open transactions.
+// tx.root is the database itself, for services attached to it (such as the live update hub).
 export async function openDatabase(
   url = process.env.DATABASE_URL,
   file = process.env.SQLITE_PATH || 'data/facilities.db',
@@ -23,7 +24,7 @@ export async function openDatabase(
         const client = await pool.connect();
         try {
           await client.query('BEGIN');
-          const result = await fn({dialect: 'postgres', query: runner(client)});
+          const result = await fn({dialect: 'postgres', query: runner(client), root: db});
           await client.query('COMMIT');
           return result;
         } catch (err) {
@@ -36,7 +37,7 @@ export async function openDatabase(
       async session(fn) {
         const client = await pool.connect();
         try {
-          return await fn({dialect: 'postgres', query: runner(client)});
+          return await fn({dialect: 'postgres', query: runner(client), root: db});
         } finally {
           client.release();
         }
@@ -71,7 +72,7 @@ export async function openDatabase(
         await previous;
         try {
           run('BEGIN IMMEDIATE');
-          const result = await fn({dialect: 'sqlite', query: async (sql, values) => run(sql, values)});
+          const result = await fn({dialect: 'sqlite', query: async (sql, values) => run(sql, values), root: db});
           run('COMMIT');
           return result;
         } catch (err) {
@@ -85,7 +86,7 @@ export async function openDatabase(
           release();
         }
       },
-      session: fn => fn({dialect: 'sqlite', query: async (sql, values) => run(sql, values)}),
+      session: fn => fn({dialect: 'sqlite', query: async (sql, values) => run(sql, values), root: db}),
       close: async () => {
         await lock;
         sqlite.close();
