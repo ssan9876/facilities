@@ -4,7 +4,7 @@ import {
   $$,
   escape,
   icon,
-  manage,
+  can,
   money,
   tag,
   api,
@@ -31,14 +31,14 @@ export function inventoryPage() {
     heading(
       'Inventory',
       'Spare parts and supplies, deducted as technicians record them on requests.',
-      manage() ? 'part' : null,
+      can('inventory.manage') ? 'part' : null,
       'Add part',
       extra,
     ) +
     (lowCount
       ? `<div class="notice">${lowCount} part${lowCount === 1 ? ' is' : 's are'} at or below the reorder level.</div>`
       : '') +
-    `<div class="work-panel"><div class="table-wrap"><table><thead><tr><th>Part</th><th>Stored at</th><th>On hand</th><th>Reorder level</th><th>Unit cost</th>${manage() ? '<th><span class="visually-hidden">Actions</span></th>' : ''}</tr></thead><tbody>${parts.map(p => `<tr><td><strong>${escape(p.name)}</strong>${p.archived_at ? ' ' + tag('archived', 'Archived') : ''}<div class="order-sub">${escape(p.sku) || 'No SKU'}</div></td><td>${escape(p.building) || 'Any building'}<div class="order-sub">${escape(p.location) || '—'}</div></td><td>${p.quantity}${low(p) ? ' ' + tag('urgent', 'Low stock') : ''}</td><td>${p.min_quantity}</td><td>${money(p.unit_cost_cents)}</td>${manage() ? `<td class="row-actions"><button class="quiet-button" data-edit-part="${escape(p.id)}" aria-label="Edit ${escape(p.name)}">${icon('edit')}Edit</button></td>` : ''}</tr>`).join('')}</tbody></table></div>${parts.length ? '' : '<div class="empty">No parts yet. Add the supplies your technicians use most.</div>'}</div>`
+    `<div class="work-panel"><div class="table-wrap"><table><thead><tr><th>Part</th><th>Stored at</th><th>On hand</th><th>Reorder level</th><th>Unit cost</th>${can('inventory.manage') ? '<th><span class="visually-hidden">Actions</span></th>' : ''}</tr></thead><tbody>${parts.map(p => `<tr><td><strong>${escape(p.name)}</strong>${p.archived_at ? ' ' + tag('archived', 'Archived') : ''}<div class="order-sub">${escape(p.sku) || 'No SKU'}</div></td><td>${escape(p.building) || 'Any building'}<div class="order-sub">${escape(p.location) || '—'}</div></td><td>${p.quantity}${low(p) ? ' ' + tag('urgent', 'Low stock') : ''}</td><td>${p.min_quantity}</td><td>${money(p.unit_cost_cents)}</td>${can('inventory.manage') ? `<td class="row-actions"><button class="quiet-button" data-edit-part="${escape(p.id)}" aria-label="Edit ${escape(p.name)}">${icon('edit')}Edit</button></td>` : ''}</tr>`).join('')}</tbody></table></div>${parts.length ? '' : '<div class="empty">No parts yet. Add the supplies your technicians use most.</div>'}</div>`
   );
 }
 export function bindInventory() {

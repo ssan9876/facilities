@@ -6,6 +6,11 @@ import {randomUUID, randomBytes} from 'node:crypto';
 import {defaultTimezone} from './dates.js';
 import {setupProvisioning, workspaceSettings} from './administration.js';
 import {audit} from './audit.js';
+import {capabilitiesFor} from './permissions.js';
+
+// Only same-origin paths are honoured after sign-in, so a link cannot redirect elsewhere.
+export const safeReturn = value =>
+  typeof value === 'string' && /^\/(?![/\\])[\w\-./?=&%]*$/.test(value) && value.length < 500 ? value : '/';
 
 export function roleForClaims(claims, env = process.env) {
   const groups = Array.isArray(claims.groups)
@@ -220,13 +225,14 @@ export async function setupAuth(app, db, env, {logger, logoutKeys} = {}) {
   const regenerate = req => new Promise((resolve, reject) => req.session.regenerate(e => (e ? reject(e) : resolve())));
   const save = req => new Promise((resolve, reject) => req.session.save(e => (e ? reject(e) : resolve())));
   app.get('/auth/login', async (req, res) => {
+    const returnTo = safeReturn(req.query.return);
     if (mode === 'demo') {
       const user = (await db.query('SELECT * FROM users WHERE subject=$1', ['demo-admin']))[0];
       await regenerate(req);
       req.session.userId = user.id;
       await save(req);
       await audit(db, user, 'auth.login', 'user', user.id, 'Signed in (demo)');
-      return res.redirect('/');
+      return res.redirect(returnTo);
     }
     const c = await getConfig();
     req.session.oidc = {
@@ -234,6 +240,7 @@ export async function setupAuth(app, db, env, {logger, logoutKeys} = {}) {
       state: oidc.randomState(),
       nonce: oidc.randomNonce(),
       at: Date.now(),
+      returnTo,
     };
     const {verifier, state, nonce} = req.session.oidc;
     const target = oidc.buildAuthorizationUrl(c, {
@@ -315,13 +322,18 @@ export async function setupAuth(app, db, env, {logger, logoutKeys} = {}) {
     req.session.oidcIdentity = {subject, sid: typeof claims.sid === 'string' ? claims.sid : null};
     await save(req);
     await audit(db, user, 'auth.login', 'user', user.id, 'Signed in');
-    res.redirect('/');
+    res.redirect(safeReturn(pending.returnTo));
   });
   app.use(async (req, res, next) => {
     if (req.session.userId)
       req.user = (
         await db.query('SELECT id,name,email,role FROM users WHERE id=$1 AND active=1', [req.session.userId])
       )[0];
+    // Capabilities are resolved per request, so role changes apply immediately.
+    if (req.user) {
+      req.user.capabilities = capabilitiesFor(db, req.user.role);
+      req.user.role_name = db.roles?.[req.user.role]?.name || req.user.role;
+    }
     next();
   });
   app.get('/api/me', async (req, res) => {

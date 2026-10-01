@@ -17,7 +17,8 @@ A working first version of an FMX-inspired facilities-management application, bu
 - Spare-parts inventory with stock adjustments, usage on requests and low-stock alerts
 - Reports (workload, completion time, maintenance compliance, parts cost) and CSV exports
 - OpenID Connect SSO with PKCE, state and nonce validation
-- Requester, technician, manager and administrator permissions enforced by the API
+- Capability-based permissions: built-in requester, technician, manager and administrator roles defined in `permissions.js`, per-workspace overrides and custom roles in Settings → Roles, all enforced by the API
+- A focused requester view to report problems and follow their own tickets, and printable QR labels that open a pre-filled request for a building, space or asset
 - Persistent server-side sessions; CSRF-protected writes
 - PostgreSQL deployment and SQLite local development
 - Work Ticket Pad interface: numbered WO tickets, stamped states and ruled ledgers, with a phone dock and stacked registers; Archivo bundled locally
@@ -64,6 +65,12 @@ Managers edit buildings, spaces, assets and maintenance plans from their registe
 Attachments are stored in the database, so the PostgreSQL backup below includes them. Each file is checked against its type's file signature; SVG and HTML are refused. Images open inline, other files download. Limits: `ATTACHMENT_MAX_MB` (default 10) per file and `ATTACHMENT_MAX_PER_REQUEST` (default 20). Keep the proxy's `client_max_body_size` above the file limit; the supplied nginx configurations allow 12 MB.
 
 **Inventory** lists parts with an optional building, storage location, reorder level and unit cost. Managers adjust stock with a reason; managers and the assigned technician record parts used on a request, which deducts stock atomically and refuses to go below zero. Returning a part restores the quantity. Parts at or below their reorder level are flagged on the overview and inventory pages. Administrators can turn inventory off under **Settings → Features**.
+
+## Requesters and QR report labels
+
+People whose role cannot see every request get a short workspace: **Your requests** with a report form on the page (type, what needs attention, building, optional asset, details and photos) and a register of their own tickets. Booking a space opens the full request sheet.
+
+On **Buildings**, **QR labels** opens a printable sheet for that building, its spaces and its assets. Each QR code links to `APP_URL/report?building=…&asset=…`; scanning it signs the person in if needed and opens a new request with the location filled in. Set `APP_URL` to the address people's phones can reach before printing.
 
 ## Reservations
 
@@ -117,22 +124,21 @@ Role variables: `OIDC_ADMIN_GROUP`, `OIDC_MANAGER_GROUP`, `OIDC_TECHNICIAN_GROUP
 
 Roles are synchronized on each login, not continuously while a session is active. Sessions last eight hours with activity. Sign out clears this application's session; it does not log out of the IdP. Signing out at the IdP ends Facilities sessions when back-channel logout is configured. Provider access restrictions remain essential, especially when `OIDC_ALLOWED_GROUPS` is empty.
 
-### Permissions
+### Permissions and roles
 
-| Action | Requester | Technician | Manager / Admin |
-|---|---|---|---|
-| Create work orders, attach files | Yes | Yes | Yes |
-| View / comment on orders | Own requests | All | All |
-| Edit request details | Own, while Open | Own, while Open | All |
-| Change order status | No | Assigned to self | All |
-| Record parts on a request | No | Assigned to self | All |
-| Assign work, delete requests, approve reservations | No | No | Yes |
-| Create / edit / archive buildings, spaces, assets, PM plans, parts | No | No | Yes |
-| View inventory, export CSV | No | Yes | Yes |
-| Reports | No | No | Yes |
-| Settings, people, audit log | No | No | Administrator only |
+Every API check asks for a named capability (for example `requests.assign` or `inventory.manage`), never for a role name. `permissions.js` lists the capabilities and the defaults for the four built-in roles:
 
-Users may edit and delete their own comments; managers may delete any comment. Uploaders and managers may remove attachments.
+| Capability | Requester | Technician | Manager | Administrator |
+|---|---|---|---|---|
+| Submit requests, follow and comment on their own, edit their own while Open | Yes | Yes | Yes | Yes |
+| See every request (`requests.view_all`) | — | Yes | Yes | Yes |
+| Update work assigned to them, be assigned work | — | Yes | Yes | Yes |
+| Edit, update, assign and delete any request; approve reservations; moderate comments and files | — | — | Yes | Yes |
+| See maintenance plans and inventory; download exports | — | Yes | Yes | Yes |
+| Manage buildings, spaces, assets, maintenance plans, parts; reports | — | — | Yes | Yes |
+| Administer the workspace (`admin`) | — | — | — | Yes |
+
+To change the defaults for an installation, edit `builtinRoles` in `permissions.js` (or add capabilities to `capabilityCatalog` and check them with `can(user, '...')` / `requireCap('...')`). Administrators can also adjust any built-in role in **Settings → Roles** (stored in the database, audited, and resettable to the file's defaults) and create custom roles such as "Custodian", starting from an existing role's permissions. Assign custom roles under **Settings → People**. The administrator role always keeps every capability, and no other role can be granted `admin`. Role changes apply on each person's next request. SSO group mapping assigns only the built-in roles; give custom roles to people from Settings → People (which makes the account administrator-managed so sign-in no longer overwrites it).
 
 ### Maintenance scheduling
 

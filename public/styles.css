@@ -2248,6 +2248,171 @@ dialog#editor.filing {
   color: var(--ink-3);
 }
 
+/* Administration ledgers, role grid and requester reporting */
+.settings-sheet.wide-sheet {
+  max-width: none;
+}
+.sheet-toolbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 18px;
+  flex-wrap: wrap;
+}
+.sheet-toolbar > div {
+  flex: 1;
+  min-width: 260px;
+}
+.ledger-tools {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  padding: 12px 26px;
+  border-bottom: 1px solid var(--rule);
+}
+.ledger-tools select {
+  border: 1px solid var(--rule-strong);
+  border-radius: 3px;
+  padding: 6px 10px;
+  background: var(--paper);
+  font-size: 13px;
+}
+.check-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 10px 18px;
+  margin-bottom: 12px;
+}
+.member-search {
+  margin-bottom: 12px;
+}
+.danger-text {
+  color: var(--stamp);
+}
+code {
+  font-size: 0.92em;
+  background: var(--desk);
+  border: 1px solid var(--rule);
+  border-radius: 2px;
+  padding: 0 4px;
+}
+.matrix-wrap {
+  max-height: 70vh;
+}
+table.matrix {
+  white-space: normal;
+}
+.matrix th.cap {
+  text-align: left;
+  min-width: 260px;
+  max-width: 340px;
+  font-size: 13px;
+  font-weight: 400;
+  font-stretch: 100%;
+  text-transform: none;
+  letter-spacing: 0;
+  color: var(--ink);
+  background: var(--paper);
+  position: sticky;
+  left: 0;
+  z-index: 1;
+  border-right: 1px solid var(--rule);
+}
+.matrix thead th {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  vertical-align: bottom;
+}
+.matrix thead th.cap {
+  z-index: 3;
+}
+.matrix th.cap strong {
+  display: block;
+  font-size: 13px;
+}
+.matrix th.cap small {
+  display: block;
+  color: var(--ink-3);
+  font-size: 12px;
+  line-height: 1.4;
+  margin-top: 2px;
+}
+.role-col {
+  min-width: 128px;
+  text-align: center;
+}
+.role-col .role-name {
+  display: block;
+  font-size: 13px;
+  color: var(--ink);
+}
+.role-col small {
+  display: block;
+  font-size: 10.5px;
+  font-weight: 600;
+  color: var(--ink-3);
+  margin-top: 2px;
+}
+.role-col .quiet-button {
+  font-size: 11px;
+  text-transform: none;
+  letter-spacing: 0;
+  margin-top: 4px;
+}
+.matrix-group th {
+  background: var(--desk);
+  text-align: left;
+  font-size: 11px;
+  padding: 6px 14px;
+  border-bottom: 1px solid var(--rule);
+}
+.matrix-cell {
+  text-align: center;
+  vertical-align: middle;
+}
+.matrix-cell input {
+  width: 18px;
+  height: 18px;
+  accent-color: var(--carbon);
+  cursor: pointer;
+}
+.matrix-cell input:disabled {
+  cursor: not-allowed;
+}
+.quick-report {
+  background: var(--paper);
+  border: 1px solid var(--rule);
+  border-top: 2px solid var(--ink);
+  padding: 16px 18px 18px;
+  margin-bottom: 8px;
+}
+.login-context {
+  padding: 10px 22px;
+  border-bottom: 1px dashed var(--rule-strong);
+  font-size: 13px;
+  color: var(--ink);
+}
+
+/* Pad polish: perforated ticket edge, ledger margin rule, perforated phone stubs */
+dialog#editor[data-kind='ticket']::before {
+  content: '';
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 9px;
+  background: radial-gradient(circle at 0 50%, rgb(28 31 36 / 0.38) 3.5px, transparent 4px) 0 0 / 9px 14px repeat-y;
+  pointer-events: none;
+  z-index: 5;
+}
+.ledger th.col-no,
+.ledger td.col-no {
+  border-right: 3px double var(--rule-strong);
+  padding-right: 16px;
+}
+.ledger td.col-request {
+  padding-left: 16px;
+}
+
 /* Medium screens */
 @media (max-width: 1180px) {
   .today-grid {
@@ -2497,13 +2662,23 @@ dialog#editor.filing {
     display: block;
     white-space: normal;
   }
+  .ledger td.col-no {
+    border-right: 0;
+    padding-right: 0;
+  }
+  .ledger td.col-request {
+    padding-left: 0;
+  }
+  .ledger-tools {
+    padding: 12px 16px;
+  }
   .ledger tr.clickable {
     display: grid;
     grid-template-columns: auto minmax(0, 1fr) auto;
     grid-template-areas: 'no stamp due' 'req req req' 'assignee assignee priority';
     gap: 6px 10px;
     padding: 12px 14px;
-    border-top: 1px solid var(--row);
+    border-top: 1px dashed var(--rule-strong);
   }
   .ledger tbody tr:first-child {
     border-top: 0;

@@ -1,5 +1,8 @@
 import {randomUUID} from 'node:crypto';
-import {error, text, bool, manager, optionalInteger} from './validation.js';
+import {error, text, bool, optionalInteger} from './validation.js';
+import {can, requireCap} from './permissions.js';
+
+const places = requireCap('records.manage', 'Your role cannot manage spaces.');
 import {audit, changes} from './audit.js';
 import {moduleSettings} from './requests.js';
 
@@ -61,7 +64,7 @@ export function setupSpaces(app, db, env, {notify}) {
       requires_approval: pick('requires_approval', () => Number(bool(body.requires_approval))),
     };
   };
-  app.post('/api/spaces', manager, async (req, res) => {
+  app.post('/api/spaces', places, async (req, res) => {
     await requireSchedule();
     const row = {id: randomUUID(), ...(await fields(req.body, null)), created_at: new Date().toISOString()};
     await db.query(
@@ -71,7 +74,7 @@ export function setupSpaces(app, db, env, {notify}) {
     await audit(db, req.user, 'space.create', 'space', row.id, `Added space ${row.name}`);
     res.status(201).json(row);
   });
-  app.patch('/api/spaces/:id', manager, async (req, res) => {
+  app.patch('/api/spaces/:id', places, async (req, res) => {
     const existing = await read(req.params.id),
       next = await fields(req.body, existing);
     if (
@@ -113,7 +116,7 @@ export function setupSpaces(app, db, env, {notify}) {
     );
     res.json({ok: true});
   });
-  app.delete('/api/spaces/:id', manager, async (req, res) => {
+  app.delete('/api/spaces/:id', places, async (req, res) => {
     const existing = await read(req.params.id);
     if ((await db.query('SELECT id FROM work_orders WHERE space_id=$1 LIMIT 1', [existing.id])).length)
       throw error('This space has reservations. Archive it to keep their history.', 409);
@@ -133,7 +136,7 @@ export function setupSpaces(app, db, env, {notify}) {
     );
     res.json(
       rows.map(r =>
-        req.user.role === 'requester'
+        !can(req.user, 'requests.view_all')
           ? {starts_at: r.starts_at, ends_at: r.ends_at, reservation_status: r.reservation_status}
           : r,
       ),
@@ -144,11 +147,11 @@ export function setupSpaces(app, db, env, {notify}) {
     if (!['approved', 'declined', 'cancelled'].includes(decision)) throw error('Choose approve, decline or cancel.');
     const result = await db.transaction(async tx => {
       const order = (await tx.query('SELECT * FROM work_orders WHERE id=$1', [req.params.id]))[0];
-      if (!order || (req.user.role === 'requester' && order.requester_id !== req.user.id))
+      if (!order || (!can(req.user, 'requests.view_all') && order.requester_id !== req.user.id))
         throw error('Work order not found.', 404);
       if (!order.space_id) throw error('This request does not reserve a space.');
-      const managerial = ['admin', 'manager'].includes(req.user.role);
-      if (decision === 'cancelled' ? !(managerial || order.requester_id === req.user.id) : !managerial)
+      const approver = can(req.user, 'reservations.approve');
+      if (decision === 'cancelled' ? !(approver || order.requester_id === req.user.id) : !approver)
         throw error(
           decision === 'cancelled'
             ? 'Only the requester or a manager can cancel this reservation.'

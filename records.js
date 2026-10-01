@@ -1,5 +1,9 @@
 import {randomUUID} from 'node:crypto';
-import {error, text, date, integer, bool, manager} from './validation.js';
+import {error, text, date, integer, bool} from './validation.js';
+import {requireCap} from './permissions.js';
+
+const records = requireCap('records.manage', 'Your role cannot manage buildings and assets.');
+const plans = requireCap('maintenance.manage', 'Your role cannot manage maintenance plans.');
 import {requireModule} from './requests.js';
 import {audit, changes} from './audit.js';
 
@@ -41,7 +45,7 @@ export function setupRecords(app, db, {checkLocation}) {
   };
   const pick = (body, existing, key, parse) => (body[key] === undefined ? existing[key] : parse());
 
-  app.post('/api/buildings', manager, async (req, res) => {
+  app.post('/api/buildings', records, async (req, res) => {
     const row = {
       id: randomUUID(),
       name: text(req.body, 'name'),
@@ -52,7 +56,7 @@ export function setupRecords(app, db, {checkLocation}) {
     await audit(db, req.user, 'building.create', 'building', row.id, `Added building ${row.name}`);
     res.status(201).json(row);
   });
-  app.patch('/api/buildings/:id', manager, async (req, res) => {
+  app.patch('/api/buildings/:id', records, async (req, res) => {
     const existing = await find('buildings', req.params.id, 'Building'),
       body = req.body || {};
     const next = {
@@ -78,7 +82,7 @@ export function setupRecords(app, db, {checkLocation}) {
     );
     res.json({ok: true});
   });
-  app.delete('/api/buildings/:id', manager, async (req, res) => {
+  app.delete('/api/buildings/:id', records, async (req, res) => {
     const existing = await find('buildings', req.params.id, 'Building'),
       used = await blockers(db, 'building', existing.id);
     if (used.length)
@@ -91,7 +95,7 @@ export function setupRecords(app, db, {checkLocation}) {
     res.json({ok: true});
   });
 
-  app.post('/api/assets', manager, async (req, res) => {
+  app.post('/api/assets', records, async (req, res) => {
     const row = {
       id: randomUUID(),
       name: text(req.body, 'name'),
@@ -108,7 +112,7 @@ export function setupRecords(app, db, {checkLocation}) {
     await audit(db, req.user, 'asset.create', 'asset', row.id, `Added asset ${row.name}`);
     res.status(201).json(row);
   });
-  app.patch('/api/assets/:id', manager, async (req, res) => {
+  app.patch('/api/assets/:id', records, async (req, res) => {
     const existing = await find('assets', req.params.id, 'Asset'),
       body = req.body || {};
     const next = {
@@ -147,7 +151,7 @@ export function setupRecords(app, db, {checkLocation}) {
     );
     res.json({ok: true});
   });
-  app.delete('/api/assets/:id', manager, async (req, res) => {
+  app.delete('/api/assets/:id', records, async (req, res) => {
     const existing = await find('assets', req.params.id, 'Asset'),
       used = await blockers(db, 'asset', existing.id);
     if (used.length)
@@ -181,7 +185,7 @@ export function setupRecords(app, db, {checkLocation}) {
       await checkLocation(db, next.building_id, next.asset_id);
     return next;
   };
-  app.post('/api/maintenance', manager, async (req, res) => {
+  app.post('/api/maintenance', plans, async (req, res) => {
     await requireModule(db, 'maintenance');
     const next = await planFields(req.body || {}, null),
       id = randomUUID();
@@ -202,7 +206,7 @@ export function setupRecords(app, db, {checkLocation}) {
     await audit(db, req.user, 'maintenance.create', 'maintenance', id, `Created maintenance plan ${next.title}`);
     res.status(201).json({id});
   });
-  app.patch('/api/maintenance/:id', manager, async (req, res) => {
+  app.patch('/api/maintenance/:id', plans, async (req, res) => {
     await requireModule(db, 'maintenance');
     const existing = await find('maintenance', req.params.id, 'Maintenance plan'),
       next = await planFields(req.body || {}, existing);
@@ -222,7 +226,7 @@ export function setupRecords(app, db, {checkLocation}) {
     );
     res.json({ok: true});
   });
-  app.delete('/api/maintenance/:id', manager, async (req, res) => {
+  app.delete('/api/maintenance/:id', plans, async (req, res) => {
     await requireModule(db, 'maintenance');
     const existing = await find('maintenance', req.params.id, 'Maintenance plan');
     // Generated requests stay in the register; only the plan and its occurrence ledger are removed.

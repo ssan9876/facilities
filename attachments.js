@@ -1,6 +1,7 @@
 import express from 'express';
 import {randomUUID} from 'node:crypto';
-import {error, canManage} from './validation.js';
+import {error} from './validation.js';
+import {can} from './permissions.js';
 import {audit} from './audit.js';
 
 // Content is checked against file signatures so a renamed file cannot claim to be an image.
@@ -116,7 +117,7 @@ export function setupAttachments(app, db, env, {accessibleOrder, uploadLimiter})
   });
   app.delete('/api/attachments/:id', async (req, res) => {
     const meta = await load(req);
-    if (meta.uploaded_by !== req.user.id && !canManage(req.user))
+    if (meta.uploaded_by !== req.user.id && !can(req.user, 'requests.moderate'))
       throw error('Only the uploader or a manager can remove this attachment.', 403);
     await db.query('DELETE FROM attachments WHERE id=$1', [meta.id]);
     await audit(db, req.user, 'attachment.delete', 'work_order', meta.work_order_id, `Removed ${meta.file_name}`, {

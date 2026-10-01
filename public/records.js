@@ -4,8 +4,7 @@ import {
   $$,
   escape,
   icon,
-  manage,
-  staffRole,
+  can,
   fmt,
   today,
   tag,
@@ -30,7 +29,7 @@ const categories = ['HVAC', 'Electrical', 'Plumbing', 'Safety', 'Equipment', 'Ot
 const archivedTag = r => (r.archived_at ? ' ' + tag('archived', 'Archived') : '');
 const visible = rows => rows.filter(r => state.showArchived || !r.archived_at);
 const editButton = (kind, id, label) =>
-  manage()
+  can('records.manage')
     ? `<button class="quiet-button" data-edit="${kind}" data-id="${escape(id)}" aria-label="${escape(label)}">${icon('edit')}Edit</button>`
     : '';
 const archivedToggle = rows =>
@@ -38,7 +37,7 @@ const archivedToggle = rows =>
     ? `<label class="field-check inline"><input type="checkbox" id="show-archived" ${state.showArchived ? 'checked' : ''}>Show archived</label>`
     : '';
 const exportLink = (file, label) =>
-  staffRole()
+  can('reports.export')
     ? `<a class="secondary link-button" href="/api/reports/${file}" download>${icon('download')}${label}</a>`
     : '';
 
@@ -46,12 +45,12 @@ export function recordsPage(page) {
   const d = state.data;
   if (page === 'buildings') {
     const spaces = d.modules.schedule
-      ? `<div class="section-head"><div><h2>Spaces</h2><p>Rooms and areas that schedule requests can reserve.</p></div>${manage() ? `<button class="secondary" data-create="space">${icon('plus')}Add space</button>` : ''}</div><div class="work-panel"><div class="table-wrap"><table><thead><tr><th>Space</th><th>Building</th><th>Capacity</th><th>Reservations</th>${manage() ? '<th><span class="visually-hidden">Actions</span></th>' : ''}</tr></thead><tbody>${visible(
+      ? `<div class="section-head"><div><h2>Spaces</h2><p>Rooms and areas that schedule requests can reserve.</p></div>${can('records.manage') ? `<button class="secondary" data-create="space">${icon('plus')}Add space</button>` : ''}</div><div class="work-panel"><div class="table-wrap"><table><thead><tr><th>Space</th><th>Building</th><th>Capacity</th><th>Reservations</th>${can('records.manage') ? '<th><span class="visually-hidden">Actions</span></th>' : ''}</tr></thead><tbody>${visible(
           d.spaces,
         )
           .map(
             s =>
-              `<tr><td><strong>${escape(s.name)}</strong>${archivedTag(s)}</td><td>${escape(d.buildings.find(b => b.id === s.building_id)?.name)}</td><td>${s.capacity ?? '—'}</td><td>${s.requires_approval ? 'Manager approval' : 'Confirmed automatically'}</td>${manage() ? `<td class="row-actions">${editButton('space', s.id, 'Edit ' + s.name)}</td>` : ''}</tr>`,
+              `<tr><td><strong>${escape(s.name)}</strong>${archivedTag(s)}</td><td>${escape(d.buildings.find(b => b.id === s.building_id)?.name)}</td><td>${s.capacity ?? '—'}</td><td>${s.requires_approval ? 'Manager approval' : 'Confirmed automatically'}</td>${can('records.manage') ? `<td class="row-actions">${editButton('space', s.id, 'Edit ' + s.name)}</td>` : ''}</tr>`,
           )
           .join(
             '',
@@ -61,16 +60,16 @@ export function recordsPage(page) {
       heading(
         'Buildings',
         'The places your team looks after.',
-        manage() ? 'building' : null,
+        can('records.manage') ? 'building' : null,
         'Add building',
         archivedToggle([...d.buildings, ...d.spaces]),
       ) +
-      `<div class="work-panel"><div class="table-wrap"><table><thead><tr><th>Building</th><th>Address</th><th>Assets</th><th>Active requests</th>${manage() ? '<th><span class="visually-hidden">Actions</span></th>' : ''}</tr></thead><tbody>${visible(
+      `<div class="work-panel"><div class="table-wrap"><table><thead><tr><th>Building</th><th>Address</th><th>Assets</th><th>Active requests</th>${can('records.manage') ? '<th><span class="visually-hidden">Actions</span></th>' : ''}</tr></thead><tbody>${visible(
         d.buildings,
       )
         .map(
           b =>
-            `<tr><td><strong>${escape(b.name)}</strong>${archivedTag(b)}</td><td>${escape(b.address) || '—'}</td><td>${d.assets.filter(a => a.building_id === b.id && !a.archived_at).length}</td><td>${d.summary.activeByBuilding[b.id] || 0}</td>${manage() ? `<td class="row-actions">${editButton('building', b.id, 'Edit ' + b.name)}</td>` : ''}</tr>`,
+            `<tr><td><strong>${escape(b.name)}</strong>${archivedTag(b)}</td><td>${escape(b.address) || '—'}</td><td>${d.assets.filter(a => a.building_id === b.id && !a.archived_at).length}</td><td>${d.summary.activeByBuilding[b.id] || 0}</td>${can('records.manage') ? `<td class="row-actions">${b.archived_at ? '' : `<a class="quiet-button" href="/labels?building=${encodeURIComponent(b.id)}" target="_blank" rel="noopener" aria-label="Print QR labels for ${escape(b.name)}">${icon('qr')}QR labels</a>`}${editButton('building', b.id, 'Edit ' + b.name)}</td>` : ''}</tr>`,
         )
         .join(
           '',
@@ -83,16 +82,16 @@ export function recordsPage(page) {
       heading(
         'Assets',
         'Equipment, locations, and the work that keeps them reliable.',
-        manage() ? 'asset' : null,
+        can('records.manage') ? 'asset' : null,
         'Add asset',
         archivedToggle(d.assets) + exportLink('assets.csv', 'Export'),
       ) +
-      `<div class="work-panel"><div class="table-wrap"><table><thead><tr><th>Asset</th><th>Category</th><th>Building</th><th>Serial / identifier</th>${manage() ? '<th><span class="visually-hidden">Actions</span></th>' : ''}</tr></thead><tbody>${visible(
+      `<div class="work-panel"><div class="table-wrap"><table><thead><tr><th>Asset</th><th>Category</th><th>Building</th><th>Serial / identifier</th>${can('records.manage') ? '<th><span class="visually-hidden">Actions</span></th>' : ''}</tr></thead><tbody>${visible(
         d.assets,
       )
         .map(
           a =>
-            `<tr><td><strong>${escape(a.name)}</strong>${archivedTag(a)}</td><td>${escape(a.category)}</td><td>${escape(d.buildings.find(b => b.id === a.building_id)?.name)}</td><td>${escape(a.serial) || '—'}</td>${manage() ? `<td class="row-actions">${editButton('asset', a.id, 'Edit ' + a.name)}</td>` : ''}</tr>`,
+            `<tr><td><strong>${escape(a.name)}</strong>${archivedTag(a)}</td><td>${escape(a.category)}</td><td>${escape(d.buildings.find(b => b.id === a.building_id)?.name)}</td><td>${escape(a.serial) || '—'}</td>${can('records.manage') ? `<td class="row-actions">${editButton('asset', a.id, 'Edit ' + a.name)}</td>` : ''}</tr>`,
         )
         .join(
           '',
@@ -102,11 +101,11 @@ export function recordsPage(page) {
     heading(
       'Preventive maintenance',
       'Recurring work, planned before it becomes urgent.',
-      manage() ? 'maintenance' : null,
+      can('maintenance.manage') ? 'maintenance' : null,
       'New maintenance plan',
       exportLink('maintenance.csv', 'Export'),
     ) +
-    `<div class="section-head"><p>Due plans generate requests automatically every hour in production. Paused plans are skipped.</p>${manage() ? '<button id="generate" class="secondary">Generate due requests</button>' : ''}</div><div class="work-panel"><div class="table-wrap"><table><thead><tr><th>Maintenance plan</th><th>Building / asset</th><th>Recurrence</th><th>Next due</th>${manage() ? '<th><span class="visually-hidden">Actions</span></th>' : ''}</tr></thead><tbody>${d.maintenance.map(p => `<tr><td><strong>${escape(p.title)}</strong>${Number(p.active) ? '' : ' ' + tag('on-hold', 'Paused')}</td><td>${escape(p.building)}<div class="order-sub">${escape(p.asset) || 'Building maintenance'}</div></td><td>Every ${p.interval_days} days</td><td>${fmt(p.next_due)}</td>${manage() ? `<td class="row-actions">${editButton('maintenance', p.id, 'Edit ' + p.title)}</td>` : ''}</tr>`).join('')}</tbody></table></div>${d.maintenance.length ? '' : '<div class="empty">No maintenance plans yet. Create a recurring inspection or service task.</div>'}</div>`
+    `<div class="section-head"><p>Due plans generate requests automatically every hour in production. Paused plans are skipped.</p>${can('maintenance.manage') ? '<button id="generate" class="secondary">Generate due requests</button>' : ''}</div><div class="work-panel"><div class="table-wrap"><table><thead><tr><th>Maintenance plan</th><th>Building / asset</th><th>Recurrence</th><th>Next due</th>${can('maintenance.manage') ? '<th><span class="visually-hidden">Actions</span></th>' : ''}</tr></thead><tbody>${d.maintenance.map(p => `<tr><td><strong>${escape(p.title)}</strong>${Number(p.active) ? '' : ' ' + tag('on-hold', 'Paused')}</td><td>${escape(p.building)}<div class="order-sub">${escape(p.asset) || 'Building maintenance'}</div></td><td>Every ${p.interval_days} days</td><td>${fmt(p.next_due)}</td>${can('maintenance.manage') ? `<td class="row-actions">${editButton('maintenance', p.id, 'Edit ' + p.title)}</td>` : ''}</tr>`).join('')}</tbody></table></div>${d.maintenance.length ? '' : '<div class="empty">No maintenance plans yet. Create a recurring inspection or service task.</div>'}</div>`
   );
 }
 

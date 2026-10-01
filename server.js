@@ -14,6 +14,7 @@ import {setupSpaces} from './reservations.js';
 import {setupAttachments} from './attachments.js';
 import {setupInventory, listParts} from './inventory.js';
 import {setupReports} from './reports.js';
+import {setupLabels} from './labels.js';
 import {setupEmail, emailConfigured} from './email.js';
 import {setupAudit, audit, systemActor} from './audit.js';
 import {
@@ -26,6 +27,7 @@ import {
   limitFromEnv,
 } from './observability.js';
 import {latestMigration} from './migrations.js';
+import {can, loadRoles, sqlRoleList, rolesWith} from './permissions.js';
 
 const today = () => dateInTimezone();
 
@@ -34,6 +36,7 @@ export async function createApp(env = process.env, dbOverride, options = {}) {
   const logger = options.logger || createLogger(defaultLogLevel(env));
   const metrics = createMetrics();
   const db = dbOverride || (await openDatabase(env.DATABASE_URL, env.SQLITE_PATH));
+  await loadRoles(db);
   const q = db.query;
   if (env.AUTH_MODE === 'demo' && env.NODE_ENV !== 'production') {
     await q('INSERT INTO users(id,subject,name,email,role) VALUES($1,$2,$3,$4,$5) ON CONFLICT(subject) DO NOTHING', [
@@ -106,24 +109,27 @@ export async function createApp(env = process.env, dbOverride, options = {}) {
   setupAttachments(app, db, env, {accessibleOrder, uploadLimiter});
   setupInventory(app, db, {accessibleOrder});
   setupReports(app, db, env);
+  setupLabels(app, db, env);
   // Reference data and counts. Requests themselves are paged through /api/orders.
   app.get('/api/data', async (req, res) => {
-    const restricted = req.user.role === 'requester';
     const modules = await moduleSettings(db);
+    const assignable = new Set(rolesWith(db, 'requests.assignable'));
     const [buildings, assets, maintenance, users, spaces, parts, counts] = await Promise.all([
       q('SELECT * FROM buildings ORDER BY name'),
       q('SELECT * FROM assets ORDER BY name'),
-      restricted || !modules.maintenance
+      !can(req.user, 'maintenance.view') || !modules.maintenance
         ? []
         : q(
             'SELECT m.*,b.name AS building,a.name AS asset FROM maintenance m JOIN buildings b ON b.id=m.building_id LEFT JOIN assets a ON a.id=m.asset_id ORDER BY m.next_due',
           ),
-      restricted ? [] : q('SELECT id,name,role FROM users WHERE active=1 ORDER BY name'),
-      modules.schedule ? q('SELECT * FROM spaces ORDER BY name') : [],
-      restricted || !modules.inventory ? [] : listParts(db),
-      req.user.role === 'admin'
-        ? q('SELECT request_type,COUNT(*) AS count FROM work_orders GROUP BY request_type')
+      can(req.user, 'requests.view_all')
+        ? q('SELECT id,name,role FROM users WHERE active=1 ORDER BY name').then(rows =>
+            rows.map(u => ({...u, assignable: assignable.has(u.role)})),
+          )
         : [],
+      modules.schedule ? q('SELECT * FROM spaces ORDER BY name') : [],
+      !can(req.user, 'inventory.view') || !modules.inventory ? [] : listParts(db),
+      can(req.user, 'admin') ? q('SELECT request_type,COUNT(*) AS count FROM work_orders GROUP BY request_type') : [],
     ]);
     res.json({
       buildings,
@@ -141,8 +147,8 @@ export async function createApp(env = process.env, dbOverride, options = {}) {
     });
   });
   app.post('/api/maintenance/generate', async (req, res, next) => {
-    if (!['admin', 'manager'].includes(req.user.role))
-      return res.status(403).json({error: 'A manager or administrator must make this change.'});
+    if (!can(req.user, 'maintenance.manage'))
+      return res.status(403).json({error: 'Your role cannot manage maintenance plans.'});
     if (!(await moduleSettings(db)).maintenance)
       return res.status(403).json({error: 'This request type is disabled. Contact your administrator.'});
     try {
@@ -216,7 +222,8 @@ export async function generateMaintenance(db, actor = systemActor) {
         id,
         `Generated maintenance request “${plan.title}” due ${plan.next_due}`,
       );
-      const recipients = await db.query("SELECT id FROM users WHERE role IN ('admin','manager') AND active=1");
+      const notified = sqlRoleList(db, 'requests.notified');
+      const recipients = await db.query(`SELECT id FROM users WHERE ${notified.sql} AND active=1`, notified.values);
       await notify(
         db,
         {id, title: plan.title},

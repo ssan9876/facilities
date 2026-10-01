@@ -1,5 +1,9 @@
 import {randomUUID} from 'node:crypto';
-import {error, text, integer, bool, manager, staff, canManage} from './validation.js';
+import {error, text, integer, bool} from './validation.js';
+import {can, requireCap} from './permissions.js';
+
+const view = requireCap('inventory.view', 'Your role cannot see inventory.');
+const manage = requireCap('inventory.manage', 'Your role cannot manage parts and stock.');
 import {requireFeature} from './requests.js';
 import {audit, changes} from './audit.js';
 
@@ -42,11 +46,11 @@ export function setupInventory(app, db, {accessibleOrder}) {
       unit_cost_cents: pick('unit_cost_cents', () => cents(body.unit_cost)),
     };
   };
-  app.get('/api/parts', staff, async (req, res) => {
+  app.get('/api/parts', view, async (req, res) => {
     await enabled();
     res.json(await listParts(db));
   });
-  app.post('/api/parts', manager, async (req, res) => {
+  app.post('/api/parts', manage, async (req, res) => {
     await enabled();
     const body = req.body || {},
       row = {
@@ -73,7 +77,7 @@ export function setupInventory(app, db, {accessibleOrder}) {
     await audit(db, req.user, 'part.create', 'part', row.id, `Added part ${row.name} with ${row.quantity} on hand`);
     res.status(201).json(row);
   });
-  app.patch('/api/parts/:id', manager, async (req, res) => {
+  app.patch('/api/parts/:id', manage, async (req, res) => {
     await enabled();
     const existing = await find(req.params.id),
       body = req.body || {};
@@ -117,7 +121,7 @@ export function setupInventory(app, db, {accessibleOrder}) {
     );
     res.json({ok: true});
   });
-  app.post('/api/parts/:id/adjust', manager, async (req, res) => {
+  app.post('/api/parts/:id/adjust', manage, async (req, res) => {
     await enabled();
     const delta = integer(req.body?.delta, 'Adjustment', -1000000, 1000000);
     if (!delta) throw error('Enter a non-zero adjustment.');
@@ -139,7 +143,7 @@ export function setupInventory(app, db, {accessibleOrder}) {
     );
     res.json({quantity: Number(updated[0].quantity)});
   });
-  app.delete('/api/parts/:id', manager, async (req, res) => {
+  app.delete('/api/parts/:id', manage, async (req, res) => {
     await enabled();
     const part = await find(req.params.id);
     if ((await q('SELECT id FROM part_usage WHERE part_id=$1 LIMIT 1', [part.id])).length)
@@ -153,7 +157,8 @@ export function setupInventory(app, db, {accessibleOrder}) {
   });
 
   const canRecord = (req, order) =>
-    canManage(req.user) || (req.user.role === 'technician' && order.assignee_id === req.user.id);
+    can(req.user, 'parts.record_any') ||
+    (can(req.user, 'requests.update_assigned') && order.assignee_id === req.user.id);
   app.post('/api/orders/:id/parts', async (req, res) => {
     await enabled();
     const order = await accessibleOrder(req);

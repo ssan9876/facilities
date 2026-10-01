@@ -5,8 +5,7 @@ import {
   $$,
   escape,
   icon,
-  manage,
-  staffRole,
+  can,
   fmt,
   fmtTime,
   fmtStamp,
@@ -77,20 +76,24 @@ export async function orderEditor(id) {
   }
   const me = state.me.user,
     owner = o.requester_id === me.id;
-  const canUpdate = manage() || (me.role === 'technician' && o.assignee_id === me.id);
-  const canEditDetails = manage() || (owner && o.status === 'Open');
-  const canRecordParts = state.data.modules.inventory && canUpdate;
+  const canStamp = can('requests.update_any') || (can('requests.update_assigned') && o.assignee_id === me.id);
+  const canAssign = can('requests.assign');
+  const canUpdate = canStamp || canAssign;
+  const canEditDetails = can('requests.edit_any') || (owner && o.status === 'Open');
+  const canRecordParts =
+    state.data.modules.inventory &&
+    (can('parts.record_any') || (can('requests.update_assigned') && o.assignee_id === me.id));
   const when =
     o.request_type === 'schedule'
       ? `${fmtTime(o.starts_at)} – ${fmtTime(o.ends_at)} · ${escape(state.me.timezone)}`
       : 'Due ' + fmt(o.due_date);
   const reservation = o.space_id
-    ? `<section class="detail-section reservation"><div><strong>${icon('door')}${escape(o.space)}</strong> ${reservationTag(o.reservation_status)}<p>${o.reservation_status === 'pending' ? 'This space reservation is waiting for a manager.' : o.reservation_status === 'approved' ? 'The space is reserved for this time.' : 'The space is not reserved for this request.'}</p></div><div class="inline-actions">${manage() && o.reservation_status === 'pending' ? '<button class="primary" data-reservation="approved">Approve</button><button class="secondary" data-reservation="declined">Decline</button>' : ''}${(manage() || owner) && ['pending', 'approved'].includes(o.reservation_status) ? '<button class="quiet-button" data-reservation="cancelled">Cancel reservation</button>' : ''}</div></section>`
+    ? `<section class="detail-section reservation"><div><strong>${icon('door')}${escape(o.space)}</strong> ${reservationTag(o.reservation_status)}<p>${o.reservation_status === 'pending' ? 'This space reservation is waiting for a manager.' : o.reservation_status === 'approved' ? 'The space is reserved for this time.' : 'The space is not reserved for this request.'}</p></div><div class="inline-actions">${can('reservations.approve') && o.reservation_status === 'pending' ? '<button class="primary" data-reservation="approved">Approve</button><button class="secondary" data-reservation="declined">Decline</button>' : ''}${(can('reservations.approve') || owner) && ['pending', 'approved'].includes(o.reservation_status) ? '<button class="quiet-button" data-reservation="cancelled">Cancel reservation</button>' : ''}</div></section>`
     : '';
-  const attachments = `<section class="detail-section"><div class="section-head compact"><h2>Attachments</h2></div>${o.attachments.length ? `<ul class="attachment-list">${o.attachments.map(a => `<li>${a.content_type.startsWith('image/') && a.content_type !== 'image/heic' ? `<a href="/api/attachments/${escape(a.id)}" target="_blank" rel="noopener" tabindex="-1" aria-hidden="true"><img src="/api/attachments/${escape(a.id)}" alt="" loading="lazy"></a>` : `<span class="file-symbol">${icon('clip')}</span>`}<div><a href="/api/attachments/${escape(a.id)}?download" download>${escape(a.file_name)}</a><small>${bytes(a.size)} · ${escape(a.uploader)} · ${fmtStamp(a.created_at)}</small></div>${a.uploaded_by === me.id || manage() ? `<button class="quiet-button" data-remove-attachment="${escape(a.id)}">Remove</button>` : ''}</li>`).join('')}</ul>` : '<p class="muted-line">No photos or files yet.</p>'}<label class="upload-button secondary">${icon('clip')}Add photos or files<input type="file" id="attach-input" multiple accept="image/jpeg,image/png,image/gif,image/webp,image/heic,application/pdf,text/plain,text/csv,.docx,.xlsx"></label></section>`;
+  const attachments = `<section class="detail-section"><div class="section-head compact"><h2>Attachments</h2></div>${o.attachments.length ? `<ul class="attachment-list">${o.attachments.map(a => `<li>${a.content_type.startsWith('image/') && a.content_type !== 'image/heic' ? `<a href="/api/attachments/${escape(a.id)}" target="_blank" rel="noopener" tabindex="-1" aria-hidden="true"><img src="/api/attachments/${escape(a.id)}" alt="" loading="lazy"></a>` : `<span class="file-symbol">${icon('clip')}</span>`}<div><a href="/api/attachments/${escape(a.id)}?download" download>${escape(a.file_name)}</a><small>${bytes(a.size)} · ${escape(a.uploader)} · ${fmtStamp(a.created_at)}</small></div>${a.uploaded_by === me.id || can('requests.moderate') ? `<button class="quiet-button" data-remove-attachment="${escape(a.id)}">Remove</button>` : ''}</li>`).join('')}</ul>` : '<p class="muted-line">No photos or files yet.</p>'}<label class="upload-button secondary">${icon('clip')}Add photos or files<input type="file" id="attach-input" multiple accept="image/jpeg,image/png,image/gif,image/webp,image/heic,application/pdf,text/plain,text/csv,.docx,.xlsx"></label></section>`;
   const activeParts = (state.data.parts || []).filter(p => !p.archived_at);
   const parts =
-    state.data.modules.inventory && staffRole()
+    state.data.modules.inventory && can('inventory.view')
       ? `<section class="detail-section"><div class="section-head compact"><h2>Parts used</h2></div>${o.parts.length ? `<table class="mini-table"><tbody>${o.parts.map(p => `<tr><td>${p.quantity} × ${escape(p.name)}<div class="order-sub">${escape(p.sku) || 'No SKU'} · ${escape(p.used_by)}</div></td><td>${money(p.unit_cost_cents == null ? null : p.unit_cost_cents * p.quantity)}</td><td>${canRecordParts ? `<button class="quiet-button" data-return-part="${escape(p.id)}">Return to stock</button>` : ''}</td></tr>`).join('')}</tbody></table>` : '<p class="muted-line">No parts recorded.</p>'}${canRecordParts && activeParts.length ? `<form id="part-form" class="inline-form">${select('Part', 'part_id', [['', 'Choose part'], ...activeParts.map(p => [p.id, `${p.name} (${p.quantity} on hand)`])])}${field('Quantity', 'quantity', 'number', '1', false, 'min="1"')}<button class="secondary" type="submit">Record part</button><div class="form-error" role="alert"></div></form>` : ''}</section>`
       : '';
   const stampBar = canUpdate
@@ -108,9 +111,9 @@ export async function orderEditor(id) {
         'status',
         statuses.map(x => [x, x]),
         o.status,
-      )}${manage() ? select('Assigned to', 'assignee_id', [['', 'Unassigned'], ...state.data.users.filter(u => u.role !== 'requester').map(u => [u.id, u.name])], o.assignee_id || '') : ''}</div><div class="form-error" role="alert"></div><div class="editor-actions"><button class="secondary" type="submit">Save changes</button></div></form>`
+      )}${canAssign ? select('Assigned to', 'assignee_id', [['', 'Unassigned'], ...state.data.users.filter(u => u.assignable).map(u => [u.id, u.name])], o.assignee_id || '') : ''}</div><div class="form-error" role="alert"></div><div class="editor-actions"><button class="secondary" type="submit">Save changes</button></div></form>`
     : '';
-  const copy = me.role === 'requester' ? 'requester' : me.role === 'technician' ? 'technician' : 'office';
+  const copy = !can('requests.view_all') ? 'requester' : canAssign ? 'office' : 'technician';
   const fields = [
     cell(
       'Type',
@@ -139,7 +142,7 @@ export async function orderEditor(id) {
   ].join('');
   dialog(
     o.title,
-    `<div id="lifecycle-slot">${lifecycle(o.status)}</div>${stampBar}<div class="ticket-fields">${fields}${cell('Description of work', `<span class="detail-description">${escape(o.description) || 'No additional details.'}</span>`, 'wide')}</div><div class="detail-toolbar">${canEditDetails ? `<button class="secondary" id="edit-order">${icon('edit')}Edit details</button>` : ''}<button class="secondary" id="show-history">${icon('history')}Activity</button>${manage() ? '<button class="secondary danger" id="delete-order">Delete request</button>' : ''}</div>${reservation}${canUpdate ? `<section class="detail-section stamp-forward"><div class="section-head compact"><h2>${manage() ? 'Reassign or correct' : 'Correct the status'}</h2></div>${update}</section>` : `<p class="muted-line">Assigned to ${escape(o.assignee) || 'no one yet'}.</p>`}<div id="history" hidden></div>${attachments}${parts}<section class="detail-section"><div class="section-head compact"><h2>Conversation</h2></div><div id="comments" aria-live="polite">Loading comments…</div><form id="comment-form">${field('Add a comment', 'body', 'textarea')}<div class="form-error" role="alert"></div><div class="editor-actions"><button class="secondary" type="submit">Post comment</button></div></form></section>`,
+    `<div id="lifecycle-slot">${lifecycle(o.status)}</div>${stampBar}<div class="ticket-fields">${fields}${cell('Description of work', `<span class="detail-description">${escape(o.description) || 'No additional details.'}</span>`, 'wide')}</div><div class="detail-toolbar">${canEditDetails ? `<button class="secondary" id="edit-order">${icon('edit')}Edit details</button>` : ''}<button class="secondary" id="show-history">${icon('history')}Activity</button>${can('requests.delete') ? '<button class="secondary danger" id="delete-order">Delete request</button>' : ''}</div>${reservation}${canUpdate ? `<section class="detail-section stamp-forward"><div class="section-head compact"><h2>${canAssign ? 'Reassign or correct' : 'Correct the status'}</h2></div>${update}</section>` : `<p class="muted-line">Assigned to ${escape(o.assignee) || 'no one yet'}.</p>`}<div id="history" hidden></div>${attachments}${parts}<section class="detail-section"><div class="section-head compact"><h2>Conversation</h2></div><div id="comments" aria-live="polite">Loading comments…</div><form id="comment-form">${field('Add a comment', 'body', 'textarea')}<div class="form-error" role="alert"></div><div class="editor-actions"><button class="secondary" type="submit">Post comment</button></div></form></section>`,
     {number: ticketNo(o.number), copy, kind: 'ticket'},
   );
   const reopen = async message => {
@@ -300,7 +303,7 @@ export async function orderEditor(id) {
       comments
         .map(
           c =>
-            `<div class="comment" data-comment="${escape(c.id)}"><strong>${escape(c.author)}</strong><small>${new Date(c.created_at).toLocaleString()}${c.edited_at ? ' · edited' : ''}</small>${c.user_id === me.id || manage() ? `<span class="comment-actions">${c.user_id === me.id ? `<button class="quiet-button" data-edit-comment="${escape(c.id)}">Edit</button>` : ''}<button class="quiet-button" data-delete-comment="${escape(c.id)}">Delete</button></span>` : ''}<p>${escape(c.body)}</p></div>`,
+            `<div class="comment" data-comment="${escape(c.id)}"><strong>${escape(c.author)}</strong><small>${new Date(c.created_at).toLocaleString()}${c.edited_at ? ' · edited' : ''}</small>${c.user_id === me.id || can('requests.moderate') ? `<span class="comment-actions">${c.user_id === me.id ? `<button class="quiet-button" data-edit-comment="${escape(c.id)}">Edit</button>` : ''}<button class="quiet-button" data-delete-comment="${escape(c.id)}">Delete</button></span>` : ''}<p>${escape(c.body)}</p></div>`,
         )
         .join('') || '<p>No comments yet. Keep your team in the loop.</p>';
     $$('[data-edit-comment]').forEach(

@@ -1,6 +1,7 @@
 import {randomUUID} from 'node:crypto';
 import {queueNotificationEmail, emailConfigured} from './email.js';
 import {audit, changes} from './audit.js';
+import {can} from './permissions.js';
 
 export const requestTypes = ['maintenance', 'schedule', 'technology'];
 export const features = [...requestTypes, 'notifications', 'email', 'inventory'];
@@ -45,11 +46,11 @@ export async function visibleNotifications(db, user) {
     'SELECT n.*,w.title,w.request_type,w.requester_id FROM notifications n JOIN work_orders w ON w.id=n.order_id WHERE n.user_id=$1 ORDER BY n.created_at DESC LIMIT 100',
     [user.id],
   );
-  return rows.filter(n => enabled[n.request_type] && (user.role !== 'requester' || n.requester_id === user.id));
+  return rows.filter(n => enabled[n.request_type] && (can(user, 'requests.view_all') || n.requester_id === user.id));
 }
 export function setupSettings(app, db) {
   const admin = (req, res, next) =>
-    req.user.role === 'admin'
+    can(req.user, 'admin')
       ? next()
       : res.status(403).json({error: 'Only an administrator can change workspace settings.'});
   app.patch('/api/settings', admin, async (req, res) => {

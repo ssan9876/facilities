@@ -12,7 +12,8 @@ export function setupReleases(app, env) {
   const repository = env.RELEASE_REPOSITORY || 'ssan9876/go-fmx-clone';
   let cache;
   app.get('/api/releases', async (req, res) => {
-    if (req.user.role !== 'admin') return res.status(403).json({error: 'An administrator must check releases.'});
+    if (!req.user.capabilities?.includes('admin'))
+      return res.status(403).json({error: 'An administrator must check releases.'});
     if (!/^[a-zA-Z0-9_.-]+\/[a-zA-Z0-9_.-]+$/.test(repository))
       return res.status(503).json({error: 'Release repository is invalid.'});
     if (cache && Date.now() - cache.at < 60000) return res.json(cache.body);

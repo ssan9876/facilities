@@ -165,6 +165,16 @@ export const migrations = [
       await q('CREATE UNIQUE INDEX IF NOT EXISTS work_orders_number ON work_orders(number)');
     },
   },
+  {
+    id: 10,
+    name: 'roles',
+    async up(q) {
+      // Custom roles, and overrides of the built-in role defaults defined in permissions.js.
+      await q(
+        'CREATE TABLE IF NOT EXISTS roles (id TEXT PRIMARY KEY, name TEXT NOT NULL, description TEXT NOT NULL, capabilities TEXT NOT NULL, created_at TEXT NOT NULL)',
+      );
+    },
+  },
 ];
 
 export async function migrate(db, list = migrations) {

@@ -19,9 +19,9 @@ export function locationFields(building = '', asset = '', withAsset = true) {
       : '')
   );
 }
-export function bindLocation(onChange) {
-  const building = $('[name=building_id]'),
-    asset = $('[name=asset_id]');
+export function bindLocation(onChange, root = $('#editor')) {
+  const building = root.querySelector('[name=building_id]'),
+    asset = root.querySelector('[name=asset_id]');
   if (building)
     building.addEventListener('change', () => {
       if (asset)
@@ -37,10 +37,10 @@ export function requestTiming(type, order = {}) {
   return `<p class="form-context">Event times · ${escape(state.me.timezone)}</p><div class="form-grid">${field('Starts', 'starts_at', 'datetime-local', order.starts_at || today() + 'T09:00')}${field('Ends', 'ends_at', 'datetime-local', order.ends_at || today() + 'T10:00')}${spaces.length ? select('Space (optional)', 'space_id', [['', 'No space reservation'], ...spaces.map(s => [s.id, s.name + (s.requires_approval ? ' · needs approval' : '')])], order.space_id || '') : ''}<div class="availability" id="availability" aria-live="polite"></div></div>`;
 }
 // Space options follow the chosen building, and the selected day's bookings are shown before submitting.
-export function bindTiming(excludeId) {
-  const building = $('[name=building_id]'),
-    space = $('[name=space_id]'),
-    starts = $('[name=starts_at]');
+export function bindTiming(excludeId, root = $('#editor')) {
+  const building = root.querySelector('[name=building_id]'),
+    space = root.querySelector('[name=space_id]'),
+    starts = root.querySelector('[name=starts_at]');
   if (!space) return;
   const filter = () => {
     const current = space.value;
@@ -54,7 +54,7 @@ export function bindTiming(excludeId) {
       .join('');
   };
   const show = async () => {
-    const box = $('#availability');
+    const box = root.querySelector('#availability');
     if (!box) return;
     if (!space.value || !starts.value) {
       box.textContent = '';

@@ -1,5 +1,5 @@
 // Pure markup helpers keep request configuration separate from the workspace renderer.
-import {adminUI, bindAdmin} from './admin-settings.js';
+import {adminUI, bindAdmin, isAdminTab} from './admin-settings.js';
 import {auditUI, bindAudit} from './audit.js';
 function updatesUI(state, escape) {
   const release = state.release;
@@ -19,6 +19,7 @@ export function settingsUI(state, escape, icon, heading) {
     ['branding', 'Identity'],
     ['people', 'People'],
     ['groups', 'Groups'],
+    ['roles', 'Roles'],
     ['provisioning', 'Provisioning'],
     ['workspace', 'Workspace'],
     ['audit', 'Audit log'],
@@ -26,7 +27,7 @@ export function settingsUI(state, escape, icon, heading) {
   ];
   const tabBar = `<div class="settings-tabs">${tabs.map(([key, label]) => `<button data-settings-tab="${key}" class="${state.settingsTab === key ? 'selected' : ''}">${label}</button>`).join('')}</div>`;
   let body;
-  if (['branding', 'people', 'groups', 'provisioning'].includes(state.settingsTab)) body = adminUI(state, escape);
+  if (isAdminTab(state.settingsTab)) body = adminUI(state, escape);
   else if (state.settingsTab === 'updates') body = updatesUI(state, escape);
   else if (state.settingsTab === 'audit') body = auditUI(state, escape);
   else if (state.settingsTab === 'workspace')
