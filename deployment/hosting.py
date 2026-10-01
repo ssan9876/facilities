@@ -75,6 +75,33 @@ server {{
 '''
 
 
+def connector_address(value):
+    address = ipaddress.ip_address(value)
+    if (address.version != 4 or not address.is_private or address.is_loopback or
+            address.is_unspecified or address.is_link_local or address.is_multicast):
+        raise ValueError('Use the existing connector\'s private IPv4 LAN address.')
+    return str(address)
+
+
+def external_tunnel_config(url, connector):
+    host = urlsplit(url).hostname
+    return f'''# Managed by Facilities hosting selector
+server {{
+  listen 80;
+  server_name {host};
+  allow {connector};
+  deny all;
+  location / {{
+    proxy_pass http://127.0.0.1:3000;
+    proxy_set_header Host {host};
+    proxy_set_header X-Forwarded-Proto https;
+    proxy_set_header X-Forwarded-For $remote_addr;
+    proxy_set_header X-Real-IP $remote_addr;
+  }}
+}}
+'''
+
+
 def private_write(path, content, mode=0o600):
     path.parent.mkdir(parents=True, exist_ok=True)
     handle, name = tempfile.mkstemp(dir=path.parent, prefix='.' + path.name)
@@ -109,9 +136,13 @@ def main():
     parser.add_argument('mode', choices=['lan', 'cloud', 'tunnel'])
     parser.add_argument('url', type=canonical_url)
     parser.add_argument('--home', type=Path, default=Path('/opt/facilities'))
-    parser.add_argument('--token-file', type=Path)
+    tunnel = parser.add_mutually_exclusive_group()
+    tunnel.add_argument('--token-file', type=Path)
+    tunnel.add_argument('--connector-address', type=connector_address, help='Reuse a connector already running on this LAN.')
     parser.add_argument('--apply', action='store_true', help='Apply after registering the callback at your IdP.')
     args = parser.parse_args()
+    if args.mode != 'tunnel' and (args.token_file or args.connector_address):
+        parser.error('Connector options apply only to tunnel mode.')
     home = args.home.resolve()
     print(json.dumps({'mode': args.mode, 'url': args.url, 'oidcCallback': args.url + '/auth/callback',
                       'origin': 'http://127.0.0.1:3000', 'apply': args.apply}, indent=2))
@@ -133,7 +164,33 @@ def main():
     env_text = env.read_text()
     env_new = update_environment(env_text, {'APP_URL': args.url, 'HOSTING_MODE': args.mode})
     rollback_proxy = lambda: None
-    if args.mode == 'tunnel':
+    if args.mode == 'tunnel' and args.connector_address:
+        config = Path('/etc/nginx/sites-available/facilities-tunnel')
+        link = Path('/etc/nginx/sites-enabled/facilities-tunnel')
+        old_config = config.read_text() if config.is_file() else None
+        old_link = os.readlink(link) if link.is_symlink() else None
+        if (old_config and not old_config.startswith('# Managed by Facilities hosting selector')) or (link.exists() and not link.is_symlink()):
+            parser.error('A custom facilities-tunnel nginx configuration already exists; inspect it first.')
+        def restore_external_proxy():
+            if link.is_symlink():
+                link.unlink()
+            if old_link:
+                link.symlink_to(old_link)
+            if old_config is not None:
+                private_write(config, old_config, 0o644)
+            subprocess.run(['systemctl', 'reload', 'nginx'], check=False)
+        rollback_proxy = restore_external_proxy
+        private_write(config, external_tunnel_config(args.url, args.connector_address), 0o644)
+        if link.is_symlink():
+            link.unlink()
+        link.symlink_to(config)
+        try:
+            subprocess.run(['nginx', '-t'], check=True)
+            subprocess.run(['systemctl', 'reload', 'nginx'], check=True)
+        except Exception:
+            restore_external_proxy()
+            raise
+    elif args.mode == 'tunnel':
         if not args.token_file or not args.token_file.is_file():
             parser.error('Supply --token-file containing a remotely-managed Cloudflare Tunnel token.')
         token = args.token_file.read_text().strip()
@@ -204,6 +261,13 @@ def main():
     if args.mode != 'tunnel' and (home / 'cloudflare-token').is_file():
         subprocess.run(['docker', 'compose', '--project-name', 'facilities-edge', '-f', str(current / 'deployment/tunnel.yaml'), 'stop', 'cloudflared'],
                        env={**os.environ, 'CLOUDFLARE_TUNNEL_TOKEN_FILE': str(home / 'cloudflare-token')}, check=True)
+    if args.mode != 'tunnel' or not args.connector_address:
+        external_link = Path('/etc/nginx/sites-enabled/facilities-tunnel')
+        external_config = Path('/etc/nginx/sites-available/facilities-tunnel')
+        if external_link.is_symlink() and external_config.is_file() and external_config.read_text().startswith('# Managed by Facilities hosting selector'):
+            external_link.unlink()
+            subprocess.run(['nginx', '-t'], check=True)
+            subprocess.run(['systemctl', 'reload', 'nginx'], check=True)
     print('Applied. Verify HTTPS /health and complete a real SSO sign-in. Data remains in the existing database volume.')
 
 

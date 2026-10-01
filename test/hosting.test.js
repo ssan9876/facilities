@@ -15,7 +15,7 @@ test('production redirects alternate LAN hosts before SSO and keeps loopback hea
     assert.equal(redirect.headers.get('location'),'https://fmx.example.test/auth/login?next=work');
     assert.equal(redirect.headers.get('set-cookie'),null);
     assert.equal((await fetch(base+'/health')).status,200);
-    const status=await new Promise((resolve,reject)=>http.get(base+'/api/data',{headers:{Host:'fmx.example.test'}},response=>{response.resume();resolve(response.statusCode);}).on('error',reject));
+    const status=await new Promise((resolve,reject)=>http.get(base+'/api/data',{headers:{Host:'fmx.example.test'}},response=>{assert.equal(response.headers['cache-control'],'no-store');response.resume();resolve(response.statusCode);}).on('error',reject));
     assert.equal(status,401);
   } finally {await new Promise(resolve=>server.close(resolve));await db.close();}
 });

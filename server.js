@@ -38,6 +38,7 @@ export async function createApp(env=process.env, dbOverride) {
   app.use(helmet({contentSecurityPolicy:{directives:{'script-src':["'self'"], 'style-src':["'self'"], 'font-src':["'self'"], 'img-src':["'self'","data:"]}}}));
   app.use(express.json({limit:'64kb'}));
   app.get('/health', async (req,res) => {await q('SELECT 1');res.json({ok:true,version:installedVersion});});
+  app.use(['/api','/auth'],(req,res,next)=>{res.set('Cache-Control','no-store');next();});
   await setupAuth(app,db,env);
   setupSettings(app,db);
   setupReleases(app,env);

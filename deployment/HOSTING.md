@@ -61,4 +61,15 @@ Switching back to LAN/cloud stops the connector managed by this selector. Remove
 
 Cloudflare dashboard access and a domain you control are required to publish a permanent hostname. Quick tunnels do not provide a stable SSO callback. The hosting script configures the server; it does not create Cloudflare accounts, DNS records or tunnels for you.
 
+### Reuse a connector already on your LAN
+
+If Cloudflare already has a working connector on another trusted LAN machine, keep that connector. Point the published route at **HTTP → the Facilities server's IP, port 80**, then use its source LAN address:
+
+```sh
+sudo python3 /opt/facilities/current/deployment/hosting.py tunnel https://fmx.ssander.xyz \
+  --connector-address 192.168.88.200 --apply
+```
+
+This adds a hostname-specific nginx ingress that accepts only that connector's IPv4 address and sets the expected HTTPS forwarded scheme. It avoids the LAN listener's redirect while keeping the application and database on loopback. No new tunnel token or connector is created. The hop from an external connector across your trusted LAN to nginx is HTTP; Cloudflare's public browser certificate does not encrypt that LAN hop. Use the same-host connector above to keep that hop on loopback, or configure and verify HTTPS at the origin if you need LAN-hop encryption. Switching to LAN/cloud mode removes this selector-managed ingress; remove the published Cloudflare route separately.
+
 Official references: [Tunnel setup](https://developers.cloudflare.com/tunnel/get-started/), [run parameters](https://developers.cloudflare.com/tunnel/reference/run-parameters/), [Universal SSL](https://developers.cloudflare.com/ssl/edge-certificates/universal-ssl/), [HTTPS origin troubleshooting](https://developers.cloudflare.com/tunnel/troubleshooting/https-origins/).

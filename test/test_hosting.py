@@ -34,6 +34,16 @@ class HostingTests(unittest.TestCase):
         self.assertIn('return 301 https://fmx.ssander.xyz$request_uri;', config)
         self.assertIn('proxy_pass http://127.0.0.1:3000;', config)
 
+    def test_existing_connector_ingress_is_scoped_to_its_address(self):
+        self.assertEqual(hosting.connector_address('192.168.88.200'), '192.168.88.200')
+        for address in ['8.8.8.8', '0.0.0.0', '127.0.0.1', '192.168.88.0/24', '::1']:
+            with self.subTest(address=address), self.assertRaises(ValueError):
+                hosting.connector_address(address)
+        config = hosting.external_tunnel_config('https://fmx.ssander.xyz', '192.168.88.200')
+        self.assertIn('allow 192.168.88.200;\n  deny all;', config)
+        self.assertIn('proxy_set_header X-Forwarded-Proto https;', config)
+        self.assertIn('server_name fmx.ssander.xyz;', config)
+
 
 if __name__ == '__main__':
     unittest.main()
