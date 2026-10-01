@@ -4,6 +4,9 @@ services:
     environment:
       RELEASE_REPOSITORY: ${RELEASE_REPOSITORY:-ssan9876/facilities}
       UPDATE_DIR: /updates
+      ACCESS_FILE: /config/access.yaml
     # Shared with the host update agent: the app writes request.json and reads status.json.
+    # config/ holds the optional access file (roles, groups, SSO mapping, assignment rules); read-only.
     volumes:
       - ${FACILITIES_HOME:-/opt/facilities}/run:/updates
+      - ${FACILITIES_HOME:-/opt/facilities}/config:/config:ro

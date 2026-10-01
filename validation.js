@@ -41,7 +41,8 @@ export const optionalInteger = (value, label, min, max) =>
   value == null || value === '' ? null : integer(value, label, min, max);
 export const bool = value => value === true || value === 'true' || value === 'on' || value === 1 || value === '1';
 import {requireCap} from './permissions.js';
-export const admin = requireCap('admin', 'Administrator access required.');
+// Administration is split into sections; the Administrator role holds them all.
+export const section = name => requireCap(`admin.${name}`, 'Your role cannot manage this part of the workspace.');
 // Escape LIKE wildcards so search text is matched literally (used with ESCAPE '\').
 export const likePattern = value =>
   '%' +

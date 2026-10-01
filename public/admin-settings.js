@@ -21,6 +21,18 @@ const adminTabs = ['branding', 'people', 'groups', 'roles', 'provisioning'];
 export const isAdminTab = tab => adminTabs.includes(tab);
 const roleName = (a, id) => a.roles.find(r => r.id === id)?.name || id;
 const assignableRoles = a => a.roles.filter(r => !r.locked);
+const codeBadge = '<span class="source-badge">Access file</span>';
+const typeLabels = {maintenance: 'Maintenance', schedule: 'Schedule', technology: 'Technology'};
+// "Maintenance · North Campus" style summary of where a role's ticket permissions apply.
+const scopeSummary = (state, r) => {
+  const parts = [
+    r.scope?.request_types?.length ? r.scope.request_types.map(t => typeLabels[t] || t).join(', ') : '',
+    r.scope?.buildings?.length
+      ? r.scope.buildings.map(b => state.data.buildings.find(x => x.id === b)?.name || b).join(', ')
+      : '',
+  ].filter(Boolean);
+  return parts.length ? parts.join(' · ') : 'Everywhere';
+};
 
 export function adminUI(state, e) {
   const a = state.admin;
@@ -45,12 +57,12 @@ export function adminUI(state, e) {
     return `<section class="settings-sheet wide-sheet"><div class="sheet-heading sheet-toolbar"><div><h2>People and access</h2><p>${a.users.length} ${a.users.length === 1 ? 'person' : 'people'}. Disabling an account ends its sessions immediately.</p></div><button class="primary" data-provision>${icon('plus')}Provision person</button></div><div class="ledger-tools"><label class="search">${icon('search')}<input id="people-search" type="search" aria-label="Search people" placeholder="Search name or email" value="${e(f.q)}"></label><select id="people-role" aria-label="Filter by role"><option value="">All roles</option>${a.roles.map(r => `<option value="${e(r.id)}" ${f.role === r.id ? 'selected' : ''}>${e(r.name)}</option>`).join('')}</select><select id="people-status" aria-label="Filter by status"><option value="">Enabled and disabled</option><option value="enabled" ${f.status === 'enabled' ? 'selected' : ''}>Enabled</option><option value="disabled" ${f.status === 'disabled' ? 'selected' : ''}>Disabled</option></select></div><div id="people-table">${peopleTable(a, f, e)}</div></section>`;
   }
   if (state.settingsTab === 'groups')
-    return `<section class="settings-sheet wide-sheet"><div class="sheet-heading sheet-toolbar"><div><h2>Groups</h2><p>Organize people by hand, through SCIM, or automatically when they are first provisioned. Groups do not grant permissions; roles do.</p></div><button class="primary" data-new-group>${icon('plus')}Create group</button></div>${
+    return `<section class="settings-sheet wide-sheet"><div class="sheet-heading sheet-toolbar"><div><h2>Groups</h2><p>Organize people by hand, through SCIM, from SSO group claims, or automatically when they are first provisioned. A group can grant roles: members get those permissions on top of their own role.</p></div><button class="primary" data-new-group>${icon('plus')}Create group</button></div>${
       a.groups.length
-        ? `<div class="table-wrap"><table><thead><tr><th>Group</th><th>Description</th><th>Members</th><th>New people</th><th><span class="visually-hidden">Actions</span></th></tr></thead><tbody>${a.groups
+        ? `<div class="table-wrap"><table><thead><tr><th>Group</th><th>Grants</th><th>Members</th><th>Joins from</th><th><span class="visually-hidden">Actions</span></th></tr></thead><tbody>${a.groups
             .map(
               g =>
-                `<tr><td><strong>${e(g.name)}</strong></td><td>${e(g.description) || '—'}</td><td>${new Set(a.members.filter(m => m.group_id === g.id).map(m => m.user_id)).size}</td><td>${g.auto_assign ? 'Added automatically' : 'Manual'}</td><td class="row-actions"><button class="quiet-button" data-edit-group="${e(g.id)}" aria-label="Edit ${e(g.name)}">${icon('edit')}Edit</button></td></tr>`,
+                `<tr><td><strong>${e(g.name)}</strong>${g.source === 'code' ? ` ${codeBadge}` : ''}<div class="order-sub">${e(g.description) || ''}</div></td><td>${e(g.roles.map(r => roleName(a, r)).join(', ')) || '—'}</td><td>${new Set(a.members.filter(m => m.group_id === g.id).map(m => m.user_id)).size}</td><td>${e([g.sso.length ? 'SSO: ' + g.sso.join(', ') : '', g.auto_assign ? 'New people' : '', g.members_managed ? 'Access file' : ''].filter(Boolean).join(' · ')) || 'Added by hand'}</td><td class="row-actions"><button class="quiet-button" data-edit-group="${e(g.id)}" aria-label="${g.source === 'code' ? 'View' : 'Edit'} ${e(g.name)}">${icon('edit')}${g.source === 'code' ? 'View' : 'Edit'}</button></td></tr>`,
             )
             .join('')}</tbody></table></div>`
         : '<div class="empty">No groups yet. Create your first team.</div>'
@@ -86,7 +98,7 @@ function rolesUI(state, a, e) {
   const head = a.roles
     .map(
       r =>
-        `<th class="role-col"><span class="role-name">${e(r.name)}</span><small>${r.people} ${r.people === 1 ? 'person' : 'people'}${r.overridden ? ' · customized' : r.builtin ? '' : ' · custom'}</small>${r.locked ? '<small>Always everything</small>' : r.builtin ? (r.overridden ? `<button type="button" class="quiet-button" data-reset-role="${e(r.id)}">Reset to defaults</button>` : '') : `<button type="button" class="quiet-button danger-text" data-delete-role="${e(r.id)}">Delete role</button>`}</th>`,
+        `<th class="role-col"><span class="role-name">${e(r.name)}</span><small>${r.people} ${r.people === 1 ? 'person' : 'people'}${r.source === 'code' ? '' : r.overridden ? ' · customized' : r.builtin ? '' : ' · custom'}</small>${r.source === 'code' ? codeBadge : ''}${r.locked ? '<small>Always everything</small>' : `<small class="role-scope">Applies: ${e(scopeSummary(state, r))}${r.submit ? ` · Opens ${e(r.submit.map(t => typeLabels[t]).join(', ') || 'no requests')}` : ''}</small>${r.source === 'code' ? '' : `<button type="button" class="quiet-button" data-scope-role="${e(r.id)}">Scope</button>${r.builtin ? (r.overridden ? `<button type="button" class="quiet-button" data-reset-role="${e(r.id)}">Reset to defaults</button>` : '') : `<button type="button" class="quiet-button danger-text" data-delete-role="${e(r.id)}">Delete role</button>`}`}`}</th>`,
     )
     .join('');
   const body = groups
@@ -99,14 +111,14 @@ function rolesUI(state, a, e) {
               `<tr><th scope="row" class="cap"><strong>${e(c.label)}</strong><small>${e(c.description)}</small></th>${a.roles
                 .map(
                   r =>
-                    `<td class="matrix-cell"><input type="checkbox" aria-label="${e(r.name)}: ${e(c.label)}" data-role="${e(r.id)}" data-cap="${e(c.id)}" ${r.capabilities.includes(c.id) ? 'checked' : ''} ${r.locked || c.id === 'admin' ? 'disabled' : ''}></td>`,
+                    `<td class="matrix-cell"><input type="checkbox" aria-label="${e(r.name)}: ${e(c.label)}" data-role="${e(r.id)}" data-cap="${e(c.id)}" ${r.capabilities.includes(c.id) ? 'checked' : ''} ${r.locked || c.id === 'admin' || r.source === 'code' ? 'disabled' : ''}></td>`,
                 )
                 .join('')}</tr>`,
           )
           .join('')}`,
     )
     .join('');
-  return `<form id="roles-form" class="settings-sheet wide-sheet"><div class="sheet-heading sheet-toolbar"><div><h2>Roles and permissions</h2><p>Defaults for the built-in roles are defined in <code>permissions.js</code>. Changes here override them for this workspace and are recorded in the audit log. Administrators always keep every permission.</p></div><button class="primary" type="button" data-new-role>${icon('plus')}New role</button></div><div class="table-wrap matrix-wrap" data-no-stack><table class="matrix"><thead><tr><th class="cap">Permission</th>${head}</tr></thead><tbody>${body}</tbody></table></div><div class="settings-footer"><p>Everyone can submit requests, follow their own, comment on them, and edit their own request while it is Open.</p><div class="form-error" role="alert"></div><button type="submit" class="primary">Save roles</button></div></form>`;
+  return `<form id="roles-form" class="settings-sheet wide-sheet"><div class="sheet-heading sheet-toolbar"><div><h2>Roles and permissions</h2><p>Defaults for the built-in roles are defined in <code>permissions.js</code>. Changes here override them for this workspace and are recorded in the audit log. A role's <strong>scope</strong> limits its request permissions to some request types or buildings. Roles marked “Access file” are managed in <a href="#" data-goto-access>Access as code</a>. Administrators always keep every permission.</p></div><button class="primary" type="button" data-new-role>${icon('plus')}New role</button></div><div class="table-wrap matrix-wrap" data-no-stack><table class="matrix"><thead><tr><th class="cap">Permission</th>${head}</tr></thead><tbody>${body}</tbody></table></div><div class="settings-footer"><p>Everyone can submit requests, follow their own, comment on them, and edit their own request while it is Open.</p><div class="form-error" role="alert"></div><button type="submit" class="primary">Save roles</button></div></form>`;
 }
 
 export function bindAdmin(state, api, refresh, render, toast) {
@@ -199,31 +211,50 @@ export function bindAdmin(state, api, refresh, render, toast) {
   // Groups
   const groupSheet = g => {
     const memberIds = new Set(a.members.filter(m => m.group_id === g?.id).map(m => m.user_id));
+    const fromFile = g?.source === 'code',
+      lockedMembers = !!g?.members_managed;
+    const grantable = a.roles.filter(r => !r.locked);
+    const grants = `<fieldset class="field full check-group"><legend>Grants these roles to members</legend>${grantable
+      .map(
+        r =>
+          `<label class="field-check inline"><input type="checkbox" name="grant" value="${escapeHtml(r.id)}" ${g?.roles?.includes(r.id) ? 'checked' : ''}>${escapeHtml(r.name)}</label>`,
+      )
+      .join('')}</fieldset>`;
     dialog(
       g ? g.name : 'Create group',
-      `<form id="${g ? 'group-form' : 'group-create'}"><div class="form-grid">${field('Group name', 'name', 'text', g?.name || '').replace('class="field ', 'class="field full ')}${field('Description', 'description', 'text', g?.description || '', true).replace('class="field ', 'class="field full ')}${checkbox('Add newly provisioned users automatically', 'auto_assign', g?.auto_assign)}</div>${formActions(g ? 'Save group' : 'Create group')}</form>${
+      `${fromFile ? '<p class="notice">This group is managed by the access file. Change it there and reload in Access as code.</p>' : ''}<form id="${g ? 'group-form' : 'group-create'}"><fieldset class="plain-fieldset" ${fromFile ? 'disabled' : ''}><div class="form-grid">${field('Group name', 'name', 'text', g?.name || '').replace('class="field ', 'class="field full ')}${field('Description', 'description', 'text', g?.description || '', true).replace('class="field ', 'class="field full ')}${grants}${field('SSO group claims (one per line)', 'sso', 'textarea', (g?.sso || []).join('\n'), true, 'rows="3" placeholder="facilities-plumbers"')}${checkbox('Add newly provisioned users automatically', 'auto_assign', g?.auto_assign)}</div></fieldset>${fromFile ? '' : formActions(g ? 'Save group' : 'Create group')}</form>${
         g
           ? `<section class="detail-section"><div class="section-head compact"><h2>Members · Changes save immediately</h2><p>${memberIds.size} of ${a.users.length}</p></div><label class="search member-search">${icon('search')}<input id="member-search" type="search" aria-label="Search people" placeholder="Search people"></label><div class="check-list" id="member-list">${a.users
               .map(
                 u =>
-                  `<label class="admin-check" data-person="${escapeHtml(`${u.name} ${u.email}`.toLowerCase())}"><input type="checkbox" data-membership="${escapeHtml(g.id)}" data-member="${escapeHtml(u.id)}" ${memberIds.has(u.id) ? 'checked' : ''}>${escapeHtml(u.name)}</label>`,
+                  `<label class="admin-check" data-person="${escapeHtml(`${u.name} ${u.email}`.toLowerCase())}"><input type="checkbox" data-membership="${escapeHtml(g.id)}" data-member="${escapeHtml(u.id)}" ${memberIds.has(u.id) ? 'checked' : ''} ${lockedMembers ? 'disabled' : ''}>${escapeHtml(u.name)}</label>`,
               )
               .join(
                 '',
-              )}</div><p class="muted-line">Removing a member clears current assignments. A later provider sync may add them again.</p></section>`
+              )}</div><p class="muted-line">${lockedMembers ? 'The access file lists the members of this group.' : 'Removing a member clears current assignments. A later provider or SSO sync may add them again.'}</p></section>`
           : ''
       }`,
     );
     bindCancel();
-    bindForm($(g ? '#group-form' : '#group-create'), async (data, f) => {
-      await api(g ? '/admin/groups/' + g.id : '/admin/groups', {
-        method: g ? 'PATCH' : 'POST',
-        body: JSON.stringify({...data, auto_assign: f.auto_assign.checked}),
+    if (!fromFile)
+      bindForm($(g ? '#group-form' : '#group-create'), async (data, f) => {
+        await api(g ? '/admin/groups/' + g.id : '/admin/groups', {
+          method: g ? 'PATCH' : 'POST',
+          body: JSON.stringify({
+            name: data.name,
+            description: data.description,
+            auto_assign: f.auto_assign.checked,
+            roles: $$(`#${f.id} [name=grant]:checked`).map(i => i.value),
+            sso: String(data.sso || '')
+              .split('\n')
+              .map(x => x.trim())
+              .filter(Boolean),
+          }),
+        });
+        if (!g) closeDialog();
+        await after(g ? 'Group saved.' : 'Group created.');
+        if (g) groupSheet(state.admin.groups.find(x => x.id === g.id));
       });
-      if (!g) closeDialog();
-      await after(g ? 'Group saved.' : 'Group created.');
-      if (g) groupSheet(state.admin.groups.find(x => x.id === g.id));
-    });
     const search = $('#member-search');
     if (search)
       search.oninput = () =>
@@ -262,7 +293,7 @@ export function bindAdmin(state, api, refresh, render, toast) {
   const rolesForm = $('#roles-form');
   if (rolesForm) {
     bindForm(rolesForm, async () => {
-      const changed = a.roles.filter(r => !r.locked);
+      const changed = a.roles.filter(r => !r.locked && r.source !== 'code');
       let saved = 0;
       for (const r of changed) {
         const caps = $$(`[data-role="${CSS.escape(r.id)}"]:checked`).map(i => i.dataset.cap);
@@ -303,6 +334,45 @@ export function bindAdmin(state, api, refresh, render, toast) {
         },
         'Delete?',
       ),
+    );
+    const goto = $('[data-goto-access]');
+    if (goto)
+      goto.onclick = ev => {
+        ev.preventDefault();
+        state.settingsTab = 'access';
+        render();
+      };
+    $$('[data-scope-role]').forEach(
+      b =>
+        (b.onclick = () => {
+          const r = a.roles.find(x => x.id === b.dataset.scopeRole);
+          const types = Object.entries(typeLabels);
+          const box = (name, value, label, checked) =>
+            `<label class="field-check inline"><input type="checkbox" name="${name}" value="${escapeHtml(value)}" ${checked ? 'checked' : ''}>${escapeHtml(label)}</label>`;
+          dialog(
+            `${r.name}: scope`,
+            `<form id="scope-form"><p class="form-context">Leave a list empty to cover everything. The scope applies to this role's request permissions (seeing, working, assigning and deleting tickets, approving reservations and recording parts); other permissions are unaffected.</p><div class="form-grid"><fieldset class="field full check-group"><legend>Request types</legend>${types.map(([k, l]) => box('type', k, l, r.scope.request_types.includes(k))).join('')}</fieldset><fieldset class="field full check-group"><legend>Buildings</legend>${state.data.buildings
+              .filter(x => !x.archived_at || r.scope.buildings.includes(x.id))
+              .map(x => box('building', x.id, x.name, r.scope.buildings.includes(x.id)))
+              .join(
+                '',
+              )}</fieldset><fieldset class="field full check-group"><legend>Can open these request types</legend>${types.map(([k, l]) => box('submit', k, l, !r.submit || r.submit.includes(k))).join('')}</fieldset></div>${formActions('Save scope')}</form>`,
+          );
+          bindCancel();
+          bindForm($('#scope-form'), async () => {
+            const picked = name => $$(`#scope-form [name=${name}]:checked`).map(i => i.value);
+            const submit = picked('submit');
+            await api('/admin/roles/' + encodeURIComponent(r.id), {
+              method: 'PATCH',
+              body: JSON.stringify({
+                scope: {request_types: picked('type'), buildings: picked('building')},
+                submit: submit.length === types.length ? null : submit,
+              }),
+            });
+            closeDialog();
+            await after(`Scope for ${r.name} saved.`);
+          });
+        }),
     );
     $('[data-new-role]').onclick = () => {
       dialog(

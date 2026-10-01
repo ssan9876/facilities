@@ -1,7 +1,7 @@
 import {promises as fs, constants} from 'node:fs';
 import {join} from 'node:path';
 import {randomUUID} from 'node:crypto';
-import {admin, error} from './validation.js';
+import {section, error} from './validation.js';
 import {audit, systemActor} from './audit.js';
 
 // Data retention: how long notifications, audit entries and finished emails are kept. 0 keeps forever.
@@ -47,8 +47,8 @@ export async function purgeOldData(db) {
 }
 
 export function setupHousekeeping(app, db, env) {
-  app.get('/api/admin/retention', admin, async (req, res) => res.json(await retentionSettings(db)));
-  app.put('/api/admin/retention', admin, async (req, res) => {
+  app.get('/api/admin/retention', section('data'), async (req, res) => res.json(await retentionSettings(db)));
+  app.put('/api/admin/retention', section('data'), async (req, res) => {
     const before = await retentionSettings(db);
     const next = {};
     for (const key of Object.keys(retentionDefaults)) {
@@ -98,8 +98,8 @@ export function setupHousekeeping(app, db, env) {
     }
     return {agent: true, status, pending};
   };
-  app.get('/api/admin/backups', admin, async (req, res) => res.json(await backupState()));
-  app.post('/api/admin/backups', admin, async (req, res) => {
+  app.get('/api/admin/backups', section('data'), async (req, res) => res.json(await backupState()));
+  app.post('/api/admin/backups', section('data'), async (req, res) => {
     const state = await backupState();
     if (!state.agent)
       return res.status(503).json({

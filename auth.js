@@ -6,29 +6,45 @@ import {randomUUID, randomBytes} from 'node:crypto';
 import {defaultTimezone} from './dates.js';
 import {setupProvisioning, workspaceSettings} from './administration.js';
 import {audit} from './audit.js';
-import {capabilitiesFor} from './permissions.js';
+import {applyGrants, memberships} from './permissions.js';
 
 // Only same-origin paths are honoured after sign-in, so a link cannot redirect elsewhere.
 export const safeReturn = value =>
   typeof value === 'string' && /^\/(?![/\\])[\w\-./?=&%]*$/.test(value) && value.length < 500 ? value : '/';
 
-export function roleForClaims(claims, env = process.env) {
-  const groups = Array.isArray(claims.groups)
+export const claimGroups = claims =>
+  Array.isArray(claims.groups)
     ? claims.groups.filter(x => typeof x === 'string')
     : typeof claims.groups === 'string'
       ? [claims.groups]
       : [];
+// The sign-in role comes from the access file's sso.roles map when it has one (first match in file
+// order), otherwise from the OIDC_*_GROUP variables. The bootstrap subject is always an administrator.
+export function roleForClaims(claims, env = process.env, sso = null) {
+  const groups = claimGroups(claims);
   const allowed = (env.OIDC_ALLOWED_GROUPS || '').split(/\s+/).filter(Boolean);
   if (allowed.length && !allowed.some(g => groups.includes(g)))
     throw Object.assign(new Error('Your account is not in an allowed organization group.'), {status: 403});
-  if (
-    (env.OIDC_ADMIN_SUBJECT && claims.sub === env.OIDC_ADMIN_SUBJECT) ||
-    groups.includes(env.OIDC_ADMIN_GROUP || 'facilities-admins')
-  )
-    return 'admin';
+  if (env.OIDC_ADMIN_SUBJECT && claims.sub === env.OIDC_ADMIN_SUBJECT) return 'admin';
+  if (sso?.roles && Object.keys(sso.roles).length) {
+    for (const [role, claimValues] of Object.entries(sso.roles))
+      if (claimValues.some(g => groups.includes(g))) return role;
+    return sso.default_role || 'requester';
+  }
+  if (groups.includes(env.OIDC_ADMIN_GROUP || 'facilities-admins')) return 'admin';
   if (groups.includes(env.OIDC_MANAGER_GROUP || 'facilities-managers')) return 'manager';
   if (groups.includes(env.OIDC_TECHNICIAN_GROUP || 'facilities-technicians')) return 'technician';
   return 'requester';
+}
+// Groups that list SSO claim values gain and lose members at each sign-in.
+export async function syncSsoGroups(db, userId, claims) {
+  const groups = claimGroups(claims);
+  for (const g of Object.values(db.groups || {})) {
+    if (!g.sso.length) continue;
+    if (g.sso.some(c => groups.includes(c)))
+      await db.query("INSERT INTO group_members VALUES($1,$2,'sso') ON CONFLICT DO NOTHING", [g.id, userId]);
+    else await db.query("DELETE FROM group_members WHERE group_id=$1 AND user_id=$2 AND source='sso'", [g.id, userId]);
+  }
 }
 
 // Microsoft Entra ID omits the groups claim when a user is in too many groups ("overage") and
@@ -278,7 +294,7 @@ export async function setupAuth(app, db, env, {logger, logoutKeys} = {}) {
     if (groups !== undefined) claims.groups = groups;
     let role;
     try {
-      role = roleForClaims(claims, env);
+      role = roleForClaims(claims, env, db.access?.sso);
     } catch (err) {
       logger?.warn('sign-in denied', {reason: err.message, sub: claims.sub});
       throw err;
@@ -317,6 +333,7 @@ export async function setupAuth(app, db, env, {logger, logoutKeys} = {}) {
         user.id,
       ]);
     }
+    await syncSsoGroups(db, user.id, claims);
     await regenerate(req);
     req.session.userId = user.id;
     req.session.oidcIdentity = {subject, sid: typeof claims.sid === 'string' ? claims.sid : null};
@@ -331,7 +348,7 @@ export async function setupAuth(app, db, env, {logger, logoutKeys} = {}) {
       )[0];
     // Capabilities are resolved per request, so role changes apply immediately.
     if (req.user) {
-      req.user.capabilities = capabilitiesFor(db, req.user.role);
+      applyGrants(db, req.user, await memberships(db, req.user.id));
       req.user.role_name = db.roles?.[req.user.role]?.name || req.user.role;
     }
     next();

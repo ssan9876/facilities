@@ -17,3 +17,4 @@ cloudflare-token
 *.key
 facilities.tar.gz
 SHA256SUMS
+config/access.yaml

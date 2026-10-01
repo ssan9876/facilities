@@ -132,7 +132,7 @@ function navGroups() {
       [
         ...(can('reports.view') ? [['reports', 'chart', 'Reports']] : []),
         ['notifications', 'bell', 'Notifications'],
-        ...(can('admin') ? [['settings', 'settings', 'Settings']] : []),
+        ...(state.me.user.capabilities.some(c => c.startsWith('admin.')) ? [['settings', 'settings', 'Settings']] : []),
       ],
     ],
   ];
@@ -258,7 +258,10 @@ function render() {
 }
 
 // Requesters: report a problem on the page itself, then follow their own tickets below.
-const quickTypes = () => enabledTypes().filter(t => t !== 'schedule');
+// Request types this person may open (a role can limit them); navigation still shows every enabled type.
+const submitTypes = () =>
+  enabledTypes().filter(t => !state.me.user.submit_types || state.me.user.submit_types.includes(t));
+const quickTypes = () => submitTypes().filter(t => t !== 'schedule');
 function requesterHome() {
   const types = quickTypes();
   const type = types.includes(state.quickType) ? state.quickType : types[0];
@@ -672,7 +675,7 @@ const fileTypes =
 // The new-ticket fields for one request type, honouring the administrator's form rules.
 function ticketFields(type, {prefill = {}, quick = false, values = {}} = {}) {
   const r = key => ruleFor(type, key);
-  const types = quick ? quickTypes() : enabledTypes();
+  const types = quick ? quickTypes() : submitTypes();
   const typeSelect =
     types.length > 1
       ? select(
@@ -750,8 +753,10 @@ async function submitTicket(form, data) {
 }
 
 function createOrder(prefill = {}) {
-  if (!enabledTypes().length) {
-    toast('An administrator must enable a request type first.');
+  if (!submitTypes().length) {
+    toast(
+      enabledTypes().length ? 'Your role cannot open requests.' : 'An administrator must enable a request type first.',
+    );
     return;
   }
   if (!activeBuildings().length) {
@@ -764,9 +769,10 @@ function createOrder(prefill = {}) {
   }
   const type =
     prefill.type ||
-    (prefill.space && enabledTypes().includes('schedule')
+    (prefill.space && submitTypes().includes('schedule')
       ? 'schedule'
-      : pageType() || (prefill.building ? quickTypes()[0] || enabledTypes()[0] : enabledTypes()[0]));
+      : (submitTypes().includes(pageType()) && pageType()) ||
+        (prefill.building ? quickTypes()[0] || submitTypes()[0] : submitTypes()[0]));
   dialog(
     'New request',
     `<form id="create-form"><div class="form-grid">${ticketFields(type, {prefill, values: prefill.values})}</div>${formActions('Create request')}</form>`,

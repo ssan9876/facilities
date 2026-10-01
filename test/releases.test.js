@@ -26,7 +26,7 @@ test('release checks are admin-only and repository configuration cannot change t
   };
   await handler({user: {role: 'manager', capabilities: []}}, res);
   assert.equal(status, 403);
-  await handler({user: {role: 'admin', capabilities: ['admin']}}, res);
+  await handler({user: {role: 'admin', capabilities: ['admin', 'admin.updates']}}, res);
   assert.equal(status, 503);
   assert.match(body.error, /repository/);
 });

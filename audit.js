@@ -1,5 +1,5 @@
 import {randomUUID} from 'node:crypto';
-import {admin, error, likePattern} from './validation.js';
+import {section, error, likePattern} from './validation.js';
 import {csv} from './csv.js';
 
 export const systemActor = {id: null, name: 'System'};
@@ -86,8 +86,8 @@ export function setupAudit(app, db) {
       limit,
     };
   };
-  app.get('/api/admin/audit', admin, async (req, res) => res.json(await auditQuery(db, filters(req))));
-  app.get('/api/admin/audit.csv', admin, async (req, res) => {
+  app.get('/api/admin/audit', section('audit'), async (req, res) => res.json(await auditQuery(db, filters(req))));
+  app.get('/api/admin/audit.csv', section('audit'), async (req, res) => {
     const {entries} = await auditQuery(db, {...filters(req), limit: 50000});
     res
       .attachment(`audit-${new Date().toISOString().slice(0, 10)}.csv`)

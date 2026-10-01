@@ -1,5 +1,6 @@
 import {randomUUID} from 'node:crypto';
-import {admin, error, text, date} from './validation.js';
+import {section, error, text, date} from './validation.js';
+const admin = section('forms');
 import {audit, changes} from './audit.js';
 import {requestTypes} from './requests.js';
 
@@ -139,7 +140,7 @@ export function setupRequestForms(app, db) {
   };
   app.get('/api/forms', async (req, res) =>
     res.json(
-      await formConfig(db, {includeArchived: req.query.all === '1' && req.user.capabilities?.includes('admin')}),
+      await formConfig(db, {includeArchived: req.query.all === '1' && req.user.capabilities?.includes('admin.forms')}),
     ),
   );
   app.put('/api/admin/forms/:type/rules', admin, async (req, res) => {

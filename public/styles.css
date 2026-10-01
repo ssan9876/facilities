@@ -3949,3 +3949,81 @@ tr.picked td {
     padding: 16px;
   }
 }
+
+/* Access as code */
+.source-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 12px;
+  font-weight: 650;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: var(--carbon-wash);
+  color: var(--carbon-deep);
+  white-space: nowrap;
+  vertical-align: middle;
+}
+.role-col .source-badge {
+  margin-top: 4px;
+}
+.role-scope {
+  display: block;
+  margin-top: 4px;
+  color: var(--ink-2);
+  font-weight: 400;
+  text-transform: none;
+  letter-spacing: 0;
+}
+.problem-list {
+  margin: 10px 0 0;
+  padding: 12px 12px 12px 30px;
+  background: var(--stamp-wash);
+  border-radius: var(--radius);
+  font-size: 14px;
+  line-height: 1.5;
+  display: grid;
+  gap: 4px;
+  font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
+}
+.access-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  justify-content: flex-end;
+}
+.steps {
+  margin: 10px 0 0;
+  padding-left: 22px;
+  display: grid;
+  gap: 8px;
+  font-size: 15px;
+  line-height: 1.5;
+}
+.check-group {
+  border: 1px solid var(--rule);
+  border-radius: var(--radius);
+  padding: 10px 14px 12px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 18px;
+  margin: 0;
+}
+.check-group legend {
+  font-size: 14px;
+  font-weight: 650;
+  padding: 0 4px;
+}
+.plain-fieldset {
+  border: 0;
+  padding: 0;
+  margin: 0;
+  min-width: 0;
+}
+.role-col small {
+  font-size: 12px;
+}
+.role-col .quiet-button {
+  font-size: 13px;
+  min-height: 32px;
+}

@@ -3,6 +3,7 @@ import {adminUI, bindAdmin, isAdminTab} from './admin-settings.js';
 import {auditUI, bindAudit} from './audit.js';
 import {formsUI, bindForms} from './settings-forms.js';
 import {dataUI, bindData} from './settings-data.js';
+import {accessUI, bindAccess} from './access-settings.js';
 function updatesUI(state, escape) {
   const release = state.release,
     agent = state.updateAgent,
@@ -28,6 +29,22 @@ export const requestTypes = {
   schedule: {label: 'Schedule', icon: 'calendar', description: 'Events, meetings, and use of your buildings.'},
   technology: {label: 'Technology', icon: 'technology', description: 'Devices, connectivity, and technical support.'},
 };
+const sectionCapability = {
+  modules: 'admin.settings',
+  delivery: 'admin.settings',
+  branding: 'admin.settings',
+  workspace: 'admin.settings',
+  forms: 'admin.forms',
+  people: 'admin.people',
+  groups: 'admin.people',
+  provisioning: 'admin.people',
+  roles: 'admin.roles',
+  assignment: 'admin.roles',
+  access: 'admin.roles',
+  data: 'admin.data',
+  audit: 'admin.audit',
+  updates: 'admin.updates',
+};
 export function settingsUI(state, escape, icon, heading) {
   const types = requestTypes,
     modules = state.data.modules;
@@ -49,6 +66,8 @@ export function settingsUI(state, escape, icon, heading) {
         ['people', 'People'],
         ['groups', 'Groups'],
         ['roles', 'Roles'],
+        ['assignment', 'Auto-assignment'],
+        ['access', 'Access as code'],
         ['provisioning', 'Provisioning'],
       ],
     ],
@@ -61,14 +80,22 @@ export function settingsUI(state, escape, icon, heading) {
       ],
     ],
   ];
-  const tabBar = `<nav class="settings-nav" aria-label="Settings sections">${groups
+  // Each section needs its own administration capability; the Administrator role holds them all.
+  const caps = state.me.user.capabilities;
+  const visible = groups
+    .map(([label, items]) => [label, items.filter(([key]) => caps.includes(sectionCapability[key]))])
+    .filter(([, items]) => items.length);
+  const allowed = visible.flatMap(([, items]) => items.map(([key]) => key));
+  if (!allowed.includes(state.settingsTab)) state.settingsTab = allowed[0];
+  const tabBar = `<nav class="settings-nav" aria-label="Settings sections">${visible
     .map(
       ([label, items]) =>
         `<div class="settings-group"><h2>${label}</h2>${items.map(([key, name]) => `<button type="button" data-settings-tab="${key}" class="${state.settingsTab === key ? 'selected' : ''}" ${state.settingsTab === key ? 'aria-current="page"' : ''}>${name}</button>`).join('')}</div>`,
     )
     .join('')}</nav>`;
   let body;
-  if (isAdminTab(state.settingsTab)) body = adminUI(state, escape);
+  if (['access', 'assignment'].includes(state.settingsTab)) body = accessUI(state);
+  else if (isAdminTab(state.settingsTab)) body = adminUI(state, escape);
   else if (state.settingsTab === 'updates') body = updatesUI(state, escape);
   else if (state.settingsTab === 'audit') body = auditUI(state, escape);
   else if (state.settingsTab === 'forms') body = formsUI(state);
@@ -172,6 +199,7 @@ export function bindSettings(state, api, refresh, render, toast, openOrder) {
   bindAudit(state, api, render, toast);
   bindForms(state, render, refresh);
   bindData(state, render);
+  bindAccess(state, render);
   const status = document.querySelector('[data-email-status]');
   if (status)
     status.onclick = async () => {

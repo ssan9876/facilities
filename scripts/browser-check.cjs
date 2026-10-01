@@ -283,6 +283,41 @@ const assert = require('node:assert/strict');
   await page.getByRole('button', {name: 'Reset?', exact: true}).click();
   await page.getByText('Role reset to the defaults in permissions.js.', {exact: true}).waitFor();
   assert.equal(await page.getByLabel('Technician: See inventory', {exact: true}).isChecked(), true);
+  // Scope: a role's request permissions can be limited to request types and buildings.
+  await page.locator('[data-scope-role="technician"]').click();
+  await page.locator('#scope-form').getByLabel('North Campus', {exact: true}).check();
+  await page.screenshot({path: '.impeccable/review/role-scope-desktop.png'});
+  await page.locator('#scope-form').getByRole('button', {name: 'Save scope'}).click();
+  await page.getByText('Scope for Technician saved.', {exact: true}).waitFor();
+  await page.getByText('Applies: North Campus', {exact: true}).waitFor();
+  await page.screenshot({path: '.impeccable/review/roles-desktop.png', fullPage: true});
+  await page.locator('[data-scope-role="technician"]').click();
+  await page.locator('#scope-form').getByLabel('North Campus', {exact: true}).uncheck();
+  await page.locator('#scope-form').getByRole('button', {name: 'Save scope'}).click();
+  await page.getByText('Scope for Technician saved.', {exact: true}).waitFor();
+  // Groups grant roles and can follow SSO group claims.
+  await page.getByRole('button', {name: 'Groups', exact: true}).click();
+  await page.locator('[data-new-group]').click();
+  await page.locator('#group-create').getByLabel('Group name').fill('Plumbers');
+  await page.locator('#group-create').getByLabel('Technician', {exact: true}).check();
+  await page.locator('#group-create').getByLabel('SSO group claims (one per line)').fill('facilities-plumbers');
+  await page.locator('#group-create').getByRole('button', {name: 'Create group'}).click();
+  await page.getByRole('cell', {name: 'Technician', exact: true}).waitFor();
+  await page.getByText('SSO: facilities-plumbers', {exact: true}).waitFor();
+  // Auto-assignment rules.
+  await page.getByRole('button', {name: 'Auto-assignment', exact: true}).click();
+  await page.locator('[data-new-rule]').click();
+  await page.locator('#rule-form').getByLabel('Rule name').fill('Community Center plumbing');
+  await page.locator('#rule-form').getByLabel('Community Center', {exact: true}).check();
+  await page.locator('#rule-form').getByLabel('Who').selectOption({label: 'Plumbers'});
+  await page.screenshot({path: '.impeccable/review/assignment-rule-desktop.png'});
+  await page.locator('#rule-form').getByRole('button', {name: 'Create rule'}).click();
+  await page.getByRole('cell', {name: 'Community Center plumbing', exact: true}).waitFor();
+  await page.screenshot({path: '.impeccable/review/assignment-desktop.png', fullPage: true});
+  // Access as code: no file in this workspace, so the page explains how to add one.
+  await page.getByRole('button', {name: 'Access as code', exact: true}).click();
+  await page.getByText('No file yet', {exact: true}).waitFor();
+  await page.screenshot({path: '.impeccable/review/access-desktop.png', fullPage: true});
   await page.getByRole('button', {name: 'Provisioning', exact: true}).click();
   await page.getByLabel('Connection name').fill('Browser integration');
   await page.getByRole('button', {name: 'Create token', exact: true}).click();
@@ -295,7 +330,7 @@ const assert = require('node:assert/strict');
   await mobile.getByRole('button', {name: 'Menu', exact: true}).click();
   await mobile.locator('#workspace-nav').getByRole('button', {name: 'Settings', exact: true}).click();
   await mobile.getByRole('button', {name: 'Groups', exact: true}).click();
-  await mobile.locator('[data-edit-group]').waitFor();
+  await mobile.locator('[data-edit-group]').first().waitFor();
   await mobile.screenshot({path: '.impeccable/review/groups-mobile.png', fullPage: true});
   assert.equal(
     await mobile.evaluate(() => document.documentElement.scrollWidth > innerWidth),
