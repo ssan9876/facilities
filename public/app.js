@@ -41,6 +41,7 @@ import {reportsPage, bindReports} from './reports.js';
 import {connectLive} from './live.js';
 import {readUrl, syncUrl, viewsNav, viewTools, bindViews, openView} from './views.js';
 import {bindShortcuts} from './keys.js';
+import {timerBadge, bindTimerBadge} from './ticket-extras.js';
 
 // Theme and contrast are per device; apply them before the first render.
 applyAppearance();
@@ -209,7 +210,7 @@ function render() {
     ? [['dashboard', 'home', 'Requests']]
     : [['dashboard', 'home', 'Today'], ...(enabledTypes().length ? [['orders', 'work', 'Requests']] : [])];
   $('#app').innerHTML =
-    `<div class="shell"><aside class="rail"><div class="brand"><span class="brand-mark">${icon(me.branding?.icon || 'building')}</span><span class="brand-name">${escape(me.branding?.name || 'Facilities')}<small>${escape(me.organization)}</small></span></div><nav id="workspace-nav" aria-label="Main navigation">${groups.map(([label, items]) => `<section class="nav-group"><h2 class="nav-tab">${label}</h2>${items.map(navButton).join('')}</section>`).join('')}${viewsNav()}</nav><div class="rail-foot"><div class="user-line"><span class="avatar">${escape(initials)}</span><div><strong>${escape(me.user.name)}</strong><small>${escape(me.user.role_name || me.user.role)}</small></div></div><button class="logout" id="logout">Sign out</button></div></aside><main class="workspace"><header class="topbar"><span class="crumb"><span class="brand-mark small">${icon(me.branding?.icon || 'building')}</span><span class="crumb-path">${escape(me.branding?.name || 'Facilities')} <span aria-hidden="true">/</span></span> <strong>${title}</strong></span><form class="top-search" id="top-search-form" role="search"><label class="search">${icon('search')}<input id="top-search" type="search" aria-label="Find a ticket" placeholder="Find a ticket" title="Type a WO number to open it, or words to search" autocomplete="off" enterkeyhint="search"></label><kbd aria-hidden="true">/</kbd></form><div class="top-right"><span class="top-date">${new Date().toLocaleDateString(undefined, {weekday: 'long', month: 'long', day: 'numeric'})}</span><button class="notification-button" id="bell" type="button" aria-haspopup="true" aria-controls="notif-pop" aria-expanded="${state.notifOpen ? 'true' : 'false'}" aria-label="Open notifications${unread ? `, ${unread} unread` : ''}">${icon('bell')}${unread ? `<span>${unread}</span>` : ''}</button>${state.notifOpen ? notifPanel() : ''}</div></header><div class="content">${me.mode === 'demo' ? '<div class="notice demo-notice">Demo workspace — these records are illustrative. SSO and an empty database are used in the production deployment.</div>' : ''}${pageContent()}</div></main><div class="dock">${dock.map(([p, i, t]) => `<button data-page="${p}" class="${state.page === p ? 'active' : ''}">${icon(i)}<span>${t}</span></button>`).join('')}${enabledTypes().length ? `<button class="dock-new" data-create="order" aria-label="New request">${icon('plus')}<span>New</span></button>` : ''}<button data-page="notifications" class="${state.page === 'notifications' ? 'active' : ''}">${icon('bell')}<span>Inbox</span>${unread ? `<span class="count">${unread}</span>` : ''}</button><button id="nav-toggle" type="button" aria-controls="workspace-nav" aria-expanded="false">${icon('menu')}<span>Menu</span></button></div></div>`;
+    `<div class="shell"><aside class="rail"><div class="brand"><span class="brand-mark">${icon(me.branding?.icon || 'building')}</span><span class="brand-name">${escape(me.branding?.name || 'Facilities')}<small>${escape(me.organization)}</small></span></div><nav id="workspace-nav" aria-label="Main navigation">${groups.map(([label, items]) => `<section class="nav-group"><h2 class="nav-tab">${label}</h2>${items.map(navButton).join('')}</section>`).join('')}${viewsNav()}</nav><div class="rail-foot"><div class="user-line"><span class="avatar">${escape(initials)}</span><div><strong>${escape(me.user.name)}</strong><small>${escape(me.user.role_name || me.user.role)}</small></div></div><button class="logout" id="logout">Sign out</button></div></aside><main class="workspace"><header class="topbar"><span class="crumb"><span class="brand-mark small">${icon(me.branding?.icon || 'building')}</span><span class="crumb-path">${escape(me.branding?.name || 'Facilities')} <span aria-hidden="true">/</span></span> <strong>${title}</strong></span><form class="top-search" id="top-search-form" role="search"><label class="search">${icon('search')}<input id="top-search" type="search" aria-label="Find a ticket" placeholder="Find a ticket" title="Type a WO number to open it, or words to search" autocomplete="off" enterkeyhint="search"></label><kbd aria-hidden="true">/</kbd></form><div class="top-right">${timerBadge()}<span class="top-date">${new Date().toLocaleDateString(undefined, {weekday: 'long', month: 'long', day: 'numeric'})}</span><button class="notification-button" id="bell" type="button" aria-haspopup="true" aria-controls="notif-pop" aria-expanded="${state.notifOpen ? 'true' : 'false'}" aria-label="Open notifications${unread ? `, ${unread} unread` : ''}">${icon('bell')}${unread ? `<span>${unread}</span>` : ''}</button>${state.notifOpen ? notifPanel() : ''}</div></header><div class="content">${me.mode === 'demo' ? '<div class="notice demo-notice">Demo workspace — these records are illustrative. SSO and an empty database are used in the production deployment.</div>' : ''}${pageContent()}</div></main><div class="dock">${dock.map(([p, i, t]) => `<button data-page="${p}" class="${state.page === p ? 'active' : ''}">${icon(i)}<span>${t}</span></button>`).join('')}${enabledTypes().length ? `<button class="dock-new" data-create="order" aria-label="New request">${icon('plus')}<span>New</span></button>` : ''}<button data-page="notifications" class="${state.page === 'notifications' ? 'active' : ''}">${icon('bell')}<span>Inbox</span>${unread ? `<span class="count">${unread}</span>` : ''}</button><button id="nav-toggle" type="button" aria-controls="workspace-nav" aria-expanded="false">${icon('menu')}<span>Menu</span></button></div></div>`;
   $$('[data-page]').forEach(
     b =>
       (b.onclick = () => {
@@ -219,6 +220,7 @@ function render() {
   );
   bindNotifPanel();
   bindViews(render);
+  bindTimerBadge();
   $$('[data-goto]').forEach(b => (b.onclick = () => go(b.dataset.goto, b.dataset.filter)));
   $$('[data-create]').forEach(
     b =>
@@ -770,9 +772,90 @@ function ticketFields(type, {prefill = {}, quick = false, values = {}} = {}) {
       ? ''
       : `<label class="field full">Photos or files${r('photos') === 'required' ? '' : ' (optional)'}<input type="file" name="files" multiple accept="${fileTypes}" ${r('photos') === 'required' ? 'required' : ''}></label>`;
   const configurable = `<div class="configurable" id="configurable">${configurableFields(type, {category: prefill.category || ''})}</div>`;
-  return typeSelect + priority + title + configurable + location + timing + details + photos;
+  const similar = quick ? '' : '<div id="similar" class="similar full" aria-live="polite" hidden></div>';
+  return typeSelect + priority + title + similar + configurable + location + timing + details + photos;
+}
+// While someone describes a new request, open tickets in the same building that sound alike are offered
+// with "Me too", which follows that ticket instead of filing a duplicate.
+function bindSimilar(root, type) {
+  const box = root.querySelector('#similar');
+  if (!box) return;
+  let timer,
+    asked = 0;
+  const check = () => {
+    clearTimeout(timer);
+    timer = setTimeout(async () => {
+      const title = root.querySelector('[name=title]')?.value.trim() || '';
+      const building = root.querySelector('[name=building_id]')?.value || '';
+      if (title.length < 4 || !building) {
+        box.hidden = true;
+        return;
+      }
+      const ticket = ++asked;
+      const params = new URLSearchParams({
+        building_id: building,
+        title,
+        request_type: type,
+        asset_id: root.querySelector('[name=asset_id]')?.value || '',
+        category_id: root.querySelector('[name=category_id]')?.value || '',
+      });
+      let rows = [];
+      try {
+        rows = await api('/orders-similar?' + params);
+      } catch {
+        return;
+      }
+      if (ticket !== asked) return;
+      box.hidden = !rows.length;
+      box.innerHTML = rows.length
+        ? `<strong>Already reported?</strong><ul>${rows
+            .map(
+              o =>
+                `<li><span><span class="ticket-no">${escape(ticketNo(o.number))}</span> ${escape(o.title)}<small>${escape(o.status)}${o.asset ? ' · ' + escape(o.asset) : ''} · reported ${escape(fmt(o.created_at.slice(0, 10)))}</small></span>${o.mine || o.following ? `<small>${o.mine ? 'You reported this' : 'You follow this'}</small>` : `<button type="button" class="secondary" data-me-too="${escape(o.id)}">Me too</button>`}</li>`,
+            )
+            .join('')}</ul><p class="muted-line">“Me too” follows that request instead of opening a new one.</p>`
+        : '';
+      box.querySelectorAll('[data-me-too]').forEach(
+        b =>
+          (b.onclick = async () => {
+            b.disabled = true;
+            const o = rows.find(r => r.id === b.dataset.meToo);
+            try {
+              await api(`/orders/${encodeURIComponent(o.id)}/follow`, {
+                method: 'POST',
+                body: JSON.stringify({me_too: true}),
+              });
+              try {
+                localStorage.removeItem('facilities.draft.new-request');
+              } catch {
+                /* nothing saved */
+              }
+              closeDialog();
+              await refresh();
+              toast(`You'll get updates on ${ticketNo(o.number)}.`, {
+                undo: async () => {
+                  await api(`/orders/${encodeURIComponent(o.id)}/follow`, {method: 'DELETE'});
+                  await refresh();
+                },
+              });
+            } catch (err) {
+              toast(err.message);
+              b.disabled = false;
+            }
+          }),
+      );
+    }, 450);
+  };
+  root.addEventListener('input', e => {
+    if (e.target.name === 'title') check();
+  });
+  root.addEventListener('change', e => {
+    if (['building_id', 'asset_id', 'category_id'].includes(e.target.name)) check();
+  });
+  check();
 }
 function bindTicketFields(root, type, onTypeChange) {
+  bindSimilar(root, type);
   bindLocation(undefined, root);
   bindTiming(undefined, root);
   bindConfigurable(root, type, root.querySelector('#configurable'));

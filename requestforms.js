@@ -105,7 +105,8 @@ export async function checkSubmission(db, type, body, {today, existing} = {}) {
     if (rules.description === 'required' && !String(body.description || '').trim())
       throw error('Describe the request in Details.');
     if (rules.priority === 'hidden') body.priority = 'Normal';
-    if (rules.due_date === 'hidden' && type !== 'schedule') body.due_date = today;
+    // A hidden due date comes from the priority's due-date target (ticket-tools.js).
+    if (rules.due_date === 'hidden' && type !== 'schedule') delete body.due_date;
   }
   const applicable = form.fields.filter(f => !f.category_id || f.category_id === category);
   const answers = [];

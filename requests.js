@@ -5,8 +5,17 @@ import {can, canOn} from './permissions.js';
 
 export const requestTypes = ['maintenance', 'schedule', 'technology'];
 export const features = [...requestTypes, 'notifications', 'email', 'inventory'];
-export const defaultPreferences = {created: true, assigned: true, status: true, comment: true, email: true};
+export const defaultPreferences = {
+  created: true,
+  assigned: true,
+  status: true,
+  comment: true,
+  mention: true,
+  due: true,
+  email: true,
+};
 const eventKeys = ['created', 'assigned', 'status', 'comment'];
+const optionalKeys = ['mention', 'due', 'email'];
 export async function moduleSettings(db) {
   return Object.fromEntries((await db.query('SELECT * FROM modules')).map(row => [row.id, Number(row.enabled) === 1]));
 }
@@ -110,7 +119,7 @@ export function setupSettings(app, db) {
       Array.isArray(body) ||
       eventKeys.some(k => typeof body[k] !== 'boolean') ||
       Object.keys(body).some(k => !(k in defaultPreferences)) ||
-      (body.email !== undefined && typeof body.email !== 'boolean')
+      optionalKeys.some(k => body[k] !== undefined && typeof body[k] !== 'boolean')
     )
       return res.status(400).json({error: 'Provide true or false for all four notification preferences.'});
     const saved = {...(await preferences(db, req.user.id)), ...body};
