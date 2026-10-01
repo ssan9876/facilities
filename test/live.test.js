@@ -3,9 +3,9 @@ import assert from 'node:assert/strict';
 import {startWorkspace} from './helpers.js';
 
 // Opens /api/stream with the workspace's current session and collects events.
-async function listen(w) {
+async function listen(w, query = '') {
   const controller = new AbortController();
-  const res = await fetch(w.base + '/api/stream', {headers: {cookie: w.cookie}, signal: controller.signal});
+  const res = await fetch(w.base + '/api/stream' + query, {headers: {cookie: w.cookie}, signal: controller.signal});
   assert.equal(res.status, 200);
   assert.match(res.headers.get('content-type'), /text\/event-stream/);
   const events = [];
@@ -86,6 +86,23 @@ test('notifications and ticket changes stream to the people allowed to see them'
     await riley.next(e => e.event === 'notification' && e.data.read === 'all');
     riley.close();
     admin.close();
+  } finally {
+    await w.close();
+  }
+});
+
+test('a change is not echoed back to the tab that made it', async () => {
+  const w = await startWorkspace();
+  const {call} = w;
+  try {
+    const mine = await listen(w, '?client=tab-mine-123456');
+    const other = await listen(w, '?client=tab-other-123456');
+    await call('/api/orders/demo-3', 'PATCH', {priority: 'Low'}, {'x-live-client': 'tab-mine-123456'});
+    await other.next(e => e.event === 'order' && e.data.id === 'demo-3');
+    await new Promise(r => setTimeout(r, 400));
+    assert.ok(!mine.events.some(e => e.event === 'order'), 'the tab that made the change already shows it');
+    mine.close();
+    other.close();
   } finally {
     await w.close();
   }

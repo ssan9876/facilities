@@ -8,14 +8,20 @@
 // committed; bursts are coalesced. Events carry ids, not content: clients fetch through the normal,
 // permission-checked API. One process holds the streams, which matches the single-container install.
 import {stat} from 'node:fs/promises';
+import {AsyncLocalStorage} from 'node:async_hooks';
 import {join} from 'node:path';
 import {applyGrants, memberships, canOn, can} from './permissions.js';
 
 const heartbeatMs = 25000;
+// Each browser tab sends its own id (X-Live-Client) with API calls and on its stream, so a change is not
+// echoed back to the tab that made it; that tab already shows the result.
+const origin = new AsyncLocalStorage();
+const tabId = value => (typeof value === 'string' && /^[\w-]{8,64}$/.test(value) ? value : null);
 const maxStreamsPerUser = 8;
 
 export function setupLive(app, db, env, {logger} = {}) {
   const clients = new Set();
+  app.use((req, res, next) => origin.run({tab: tabId(req.get('x-live-client'))}, next));
   const send = (client, event, data) => {
     try {
       client.res.write(`event: ${event}\ndata: ${JSON.stringify(data ?? {})}\n\n`);
@@ -38,27 +44,31 @@ export function setupLive(app, db, env, {logger} = {}) {
     }
   };
 
-  const pendingOrders = new Set();
-  let pendingData = false,
+  // Pending changes, each with the tabs that caused them (null: no tab, so everyone is told).
+  const pendingOrders = new Map();
+  let pendingData = null,
     timer = null;
+  const note = (set, tab) => (set.add(tab), set);
+  const echo = (tabs, client) => tabs.size === 1 && client.tab && tabs.has(client.tab);
   const flush = async () => {
     timer = null;
     const orders = [...pendingOrders];
     pendingOrders.clear();
     const data = pendingData;
-    pendingData = false;
+    pendingData = null;
     try {
       if (data) {
         await refreshGrants();
-        for (const c of clients) send(c, 'data', {});
+        for (const c of clients) if (!echo(data, c)) send(c, 'data', {});
       }
-      for (const id of orders) {
+      for (const [id, tabs] of orders) {
         const order = (
           await db.query('SELECT id,request_type,building_id,requester_id,assignee_id FROM work_orders WHERE id=$1', [
             id,
           ])
         )[0];
         for (const c of clients) {
+          if (echo(tabs, c)) continue;
           if (!order) send(c, 'order', {id, deleted: true});
           else if (
             order.requester_id === c.user.id ||
@@ -79,8 +89,10 @@ export function setupLive(app, db, env, {logger} = {}) {
   db.live = {
     changed(entityType, entityId) {
       if (!clients.size) return;
-      if (entityType === 'work_order' && entityId) pendingOrders.add(entityId);
-      else pendingData = true;
+      const tab = origin.getStore()?.tab ?? null;
+      if (entityType === 'work_order' && entityId)
+        pendingOrders.set(entityId, note(pendingOrders.get(entityId) || new Set(), tab));
+      else pendingData = note(pendingData || new Set(), tab);
       schedule();
     },
     toUsers(ids, event, data) {
@@ -132,7 +144,7 @@ export function setupLive(app, db, env, {logger} = {}) {
       'X-Accel-Buffering': 'no',
     });
     res.flushHeaders?.();
-    const client = {res, user: req.user};
+    const client = {res, user: req.user, tab: tabId(req.query.client)};
     // Keep the newest few streams per person (several tabs); older ones are closed.
     const mine = [...clients].filter(c => c.user.id === req.user.id);
     for (const old of mine.slice(0, Math.max(0, mine.length - maxStreamsPerUser + 1))) {
