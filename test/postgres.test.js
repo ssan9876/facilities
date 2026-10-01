@@ -206,3 +206,68 @@ test(
     }
   },
 );
+
+test(
+  'PostgreSQL runs request forms, register filters, the calendar and retention SQL',
+  {skip: !process.env.TEST_DATABASE_URL},
+  async () => {
+    const db = await openDatabase(process.env.TEST_DATABASE_URL);
+    const {app} = await createApp(
+      {AUTH_MODE: 'demo', SEED_DEMO: 'true', SESSION_SECRET: 'postgres-integration-test-secret', LOG_LEVEL: 'silent'},
+      db,
+    );
+    const server = app.listen(0, '127.0.0.1');
+    await new Promise(resolve => server.once('listening', resolve));
+    const base = `http://127.0.0.1:${server.address().port}`;
+    let cookie = '',
+      csrf = '';
+    const call = async (path, method = 'GET', body) => {
+      const response = await fetch(base + path, {
+        method,
+        redirect: 'manual',
+        headers: {cookie, 'x-csrf-token': csrf, 'Content-Type': 'application/json'},
+        body: body === undefined ? undefined : JSON.stringify(body),
+      });
+      if (response.headers.get('set-cookie')) cookie = response.headers.get('set-cookie').split(';')[0];
+      const type = response.headers.get('content-type') || '';
+      return {status: response.status, body: type.includes('json') ? await response.json() : await response.text()};
+    };
+    try {
+      await call('/auth/login');
+      csrf = (await call('/api/me')).body.csrf;
+      const marker = 'pgf' + Date.now();
+      const cat = (await call('/api/admin/forms/technology/categories', 'POST', {name: marker})).body;
+      const q = (
+        await call('/api/admin/forms/technology/fields', 'POST', {
+          label: marker + ' room',
+          kind: 'select',
+          options: ['A', 'B'],
+        })
+      ).body;
+      const made = await call('/api/orders', 'POST', {
+        request_type: 'technology',
+        title: marker,
+        building_id: 'b1',
+        due_date: '2026-10-05',
+        category_id: cat.id,
+        answers: {[q.id]: 'B'},
+      });
+      assert.equal(made.status, 201);
+      assert.equal((await call(`/api/orders?category=${cat.id}&f_${q.id}=B`)).body.total, 1);
+      assert.ok((await call('/api/orders?sort=priority&priority=High,Urgent&statuses=Open,On%20hold')).status === 200);
+      assert.ok(
+        (await call('/api/orders?sort=updated&due_from=2020-01-01&due_to=2030-01-01&overdue=1')).status === 200,
+      );
+      assert.equal((await call(`/api/orders?q=${marker}`)).body.total, 1);
+      const cal = await call('/api/calendar?from=2026-10-01&to=2026-10-31');
+      assert.equal(cal.status, 200);
+      assert.ok(cal.body.orders.some(o => o.title === marker));
+      assert.match((await call(`/api/reports/orders.csv?category=${cat.id}`)).body, new RegExp(`${marker} room: B`));
+      assert.equal((await call('/api/admin/retention', 'PUT', {notifications_days: 120})).status, 200);
+      assert.equal((await call('/api/orders/' + made.body.id, 'DELETE')).status, 200);
+    } finally {
+      await new Promise(resolve => server.close(resolve));
+      await db.close();
+    }
+  },
+);

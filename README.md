@@ -4,7 +4,9 @@ A working first version of an FMX-inspired facilities-management application, bu
 
 ## Included
 
-- Overview with live counts, search and status filters; the request register is paged and filtered on the server
+- Overview with live counts; request registers paged and filtered on the server by status, type, category, priority, building, assignee, due dates and custom answers, with sorting and remembered filters
+- A calendar of tickets by due day (month grid or agenda) with projected preventive maintenance
+- Per request type: administrator-defined categories, required/optional/hidden built-in fields, and custom questions
 - Work orders: create, edit details, assign, change status, reopen, delete, comment (authors edit/delete their comments); each ticket has its own page at `/tickets/WO-0042`, and the assignee can edit its title and description
 - Photo and file attachments on requests (JPEG, PNG, GIF, WebP, HEIC, PDF, text, CSV, Word, Excel)
 - Activity history on every request and an organization-wide audit log with CSV export
@@ -85,6 +87,28 @@ Every change to requests, comments, attachments, buildings, spaces, assets, plan
 ## Email notifications
 
 Email is optional and off by default. Configure SMTP with `SMTP_URL` (for example `smtps://user:password@mail.example.org:465`) or `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASSWORD`, plus `SMTP_FROM`. Port 465 uses implicit TLS; other ports require STARTTLS unless `SMTP_REQUIRE_TLS=false`. Then turn on **Settings → Notifications → Email notifications** and use **Send test email**. Each in-app notification is also emailed to recipients who keep **Also send by email** on in their preferences. Messages go through a database outbox and are retried after 1, 5, 30 and 120 minutes; the settings page shows sent, waiting and failed counts and the last error. Links in emails open the request at `APP_URL`.
+
+## Request forms
+
+**Settings → Request forms** configures each request type (Maintenance, Schedule, Technology):
+
+- **Built-in fields:** category, asset, details and photos can be *required*, *asked, optional* or *not asked*; priority and due date can be asked or not asked (not asked means Normal priority and due today). Title and building are always required.
+- **Categories** such as Plumbing, HVAC or Electrical. Archive a category to stop offering it while keeping its history; categories used on requests cannot be deleted.
+- **Questions** of type short text, long text, number, date, dropdown, yes/no or checkbox, asked on every request of the type or only for one category, optionally required. Answers appear on the ticket page, can be edited with the ticket's details, and export to CSV in an *Answers* column.
+
+Required fields are enforced by the server, except required photos, which the form enforces because files upload after the request is created. Categories and dropdown or yes/no answers are filters in the request registers.
+
+## Calendar and filters
+
+**Calendar** shows every ticket on its due day (schedule requests on their start day) as a month grid, or as an agenda list on phones, with projected preventive-maintenance occurrences. Filter by type or to your own work; click a ticket to open its page.
+
+Request registers have a **Filters** bar for large volumes: type, category, priority (including "High or urgent"), building, assignee, due-date range, answers to dropdown and yes/no questions, sort order (newest, oldest, due soonest or latest, most urgent, recently updated, ticket number) and 50/100/200 per page. Active filters show as removable chips and are remembered per page in the browser. CSV export follows the same filters.
+
+## Backups and data retention
+
+With the host agent installed (`sudo /opt/facilities/bin/facilities-update --install-agent`), a systemd timer backs up the database every night to `/opt/facilities/backups/nightly-*.sql.gz`, keeps `BACKUP_KEEP_DAYS` (default 14) days of nightly backups, and, when `BACKUP_COPY_TO` is set (`user@host:/path`, using root's SSH key), copies each backup off the server with rsync. Backups taken before updates are never pruned. **Settings → Backups & data** shows the last successful backup, recent files and whether the off-site copy worked, and has **Back up now**. Change the schedule with `BACKUP_SCHEDULE` (systemd `OnCalendar` syntax) and rerun `--install-agent`.
+
+The same page sets **data retention**, applied hourly: notifications (default 180 days), the audit log (default 730 days, minimum 90) and sent or failed emails (default 30 days); 0 keeps a record type forever. Requests, comments and attachments are never removed by retention, and trimming the audit log is itself recorded.
 
 ## Operations
 

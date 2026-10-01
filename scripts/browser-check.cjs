@@ -347,6 +347,79 @@ const assert = require('node:assert/strict');
   await page.locator('.order-title').filter({hasText: 'Flickering light in room 12'}).waitFor();
   await page.screenshot({path: '.impeccable/review/requester-desktop.png', fullPage: true});
   await db.query("UPDATE users SET role='admin' WHERE id='demo-admin'");
+  // Request forms: a required category and a dropdown question shape new tickets.
+  await page.reload();
+  await page.getByRole('heading', {name: 'Today', exact: true}).waitFor();
+  await page.locator('nav').getByRole('button', {name: 'Settings', exact: true}).click();
+  await page.getByRole('button', {name: 'Request forms', exact: true}).click();
+  await page.locator('#rules-form').waitFor();
+  await page.locator('[data-new-category]').click();
+  await page.locator('#category-form').getByLabel('Category name').fill('Plumbing');
+  await page.locator('#category-form').getByRole('button', {name: 'Add category'}).click();
+  await page.getByRole('cell', {name: 'Plumbing', exact: true}).waitFor();
+  await page.locator('[data-new-field]').click();
+  await page.locator('#field-form').getByLabel('Question', {exact: true}).fill('Floor');
+  await page.locator('#field-form [name=kind]').selectOption('select');
+  await page.locator('#field-form [name=options]').fill('Ground\nFirst\nSecond');
+  await page.locator('#field-form').getByLabel('People must answer this question').check();
+  await page.locator('#field-form').getByRole('button', {name: 'Add question'}).click();
+  await page.getByRole('cell', {name: 'Floor', exact: true}).waitFor();
+  await page.locator('#rules-form [name=category]').selectOption('required');
+  await page.getByRole('button', {name: 'Save form rules', exact: true}).click();
+  await page.getByText('Form rules saved.', {exact: true}).waitFor();
+  await page.screenshot({path: '.impeccable/review/request-forms-desktop.png', fullPage: true});
+  await page.locator('nav').getByRole('button', {name: 'Overview', exact: true}).click();
+  await page.getByRole('button', {name: 'New request', exact: true}).click();
+  await page.locator('#create-form').getByLabel('What do you need?').fill('Dripping tap in staff room');
+  await page.locator('#create-form [name=building_id]').selectOption('b1');
+  await page.locator('#create-form [name=category_id]').selectOption({label: 'Plumbing'});
+  await page.locator('#create-form').getByLabel('Floor').selectOption('First');
+  await page.screenshot({path: '.impeccable/review/new-request-form.png'});
+  await page.getByRole('button', {name: 'Create request', exact: true}).click();
+  await page.locator('#editor').waitFor({state: 'hidden'});
+  await page.locator('.order-title').filter({hasText: 'Dripping tap in staff room'}).click();
+  await page.locator('#ticket-page').getByText('Plumbing', {exact: true}).waitFor();
+  await page.locator('#ticket-page').getByText('First', {exact: true}).waitFor();
+  await page.getByRole('button', {name: 'Back', exact: true}).click();
+  // Filters narrow a large register and show what is applied.
+  await page.locator('nav').getByRole('button', {name: 'All requests', exact: true}).click();
+  await page.locator('[data-filters-toggle]').click();
+  await page.locator('[data-adv=category]').selectOption({label: 'Maintenance · Plumbing'});
+  await page.getByRole('button', {name: /^Remove filter Category/}).waitFor();
+  await page.waitForFunction(() => document.querySelectorAll('#order-table tbody tr').length === 1);
+  await page.locator('[data-adv=sort]').selectOption('priority');
+  await page.screenshot({path: '.impeccable/review/filters-desktop.png', fullPage: true});
+  await page.getByRole('button', {name: 'Clear all', exact: true}).click();
+  await page.waitForFunction(() => document.querySelectorAll('#order-table tbody tr').length > 1);
+  // Calendar: tickets on their due days.
+  await page.locator('nav').getByRole('button', {name: 'Calendar', exact: true}).click();
+  await page.locator('.cal-grid .cal-chip').first().waitFor();
+  await page.screenshot({path: '.impeccable/review/calendar-desktop.png', fullPage: true});
+  await page.getByRole('button', {name: 'Agenda', exact: true}).click();
+  await page.locator('.agenda').waitFor();
+  await page.getByRole('button', {name: 'Month', exact: true}).click();
+  await page.locator('.cal-grid').waitFor();
+  await page.locator('.cal-grid .cal-chip').filter({hasText: 'Dripping tap'}).click();
+  await page.getByRole('heading', {name: 'Dripping tap in staff room', exact: true}).waitFor();
+  await page.getByRole('button', {name: 'Back', exact: true}).click();
+  // Backups and retention.
+  await page.locator('nav').getByRole('button', {name: 'Settings', exact: true}).click();
+  await page.getByRole('button', {name: 'Backups & data', exact: true}).click();
+  await page.getByText('sudo /opt/facilities/bin/facilities-update --install-agent', {exact: true}).waitFor();
+  await page.locator('#retention-form').getByLabel('Notifications (days)').fill('90');
+  await page.getByRole('button', {name: 'Save retention', exact: true}).click();
+  await page.getByText('Retention saved.', {exact: true}).waitFor();
+  await page.screenshot({path: '.impeccable/review/backups-desktop.png', fullPage: true});
+  await mobile.reload();
+  await mobile.getByRole('button', {name: 'Menu', exact: true}).click();
+  await mobile.locator('nav').getByRole('button', {name: 'Calendar', exact: true}).click();
+  await mobile.locator('.agenda').waitFor();
+  await mobile.screenshot({path: '.impeccable/review/calendar-mobile.png', fullPage: true});
+  assert.equal(
+    await mobile.evaluate(() => document.documentElement.scrollWidth > innerWidth),
+    false,
+    'Calendar must fit on mobile',
+  );
   assert.deepEqual(errors, [], 'Browser console must not contain JavaScript errors');
   console.log(
     'Browser checks passed: create, complete, comment, edit, reservations, attachments, parts, inventory, reports, audit, navigation, desktop and mobile.',

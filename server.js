@@ -15,6 +15,8 @@ import {setupAttachments} from './attachments.js';
 import {setupInventory, listParts} from './inventory.js';
 import {setupReports} from './reports.js';
 import {setupLabels} from './labels.js';
+import {setupHousekeeping, purgeOldData} from './housekeeping.js';
+import {setupRequestForms, formConfig} from './requestforms.js';
 import {setupEmail, emailConfigured} from './email.js';
 import {setupAudit, audit, systemActor} from './audit.js';
 import {
@@ -110,6 +112,8 @@ export async function createApp(env = process.env, dbOverride, options = {}) {
   setupInventory(app, db, {accessibleOrder});
   setupReports(app, db, env);
   setupLabels(app, db, env);
+  setupHousekeeping(app, db, env);
+  setupRequestForms(app, db);
   // Reference data and counts. Requests themselves are paged through /api/orders.
   app.get('/api/data', async (req, res) => {
     const modules = await moduleSettings(db);
@@ -144,6 +148,7 @@ export async function createApp(env = process.env, dbOverride, options = {}) {
       summary: await orderSummary(db, req.user, env.ORG_TIMEZONE || 'America/Phoenix'),
       preferences: await preferences(db, req.user.id),
       notifications: await visibleNotifications(db, req.user),
+      forms: await formConfig(db),
     });
   });
   app.post('/api/maintenance/generate', async (req, res, next) => {
@@ -347,7 +352,14 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
     const timer = setInterval(tick, 3600000);
     timer.unref();
   }
-  const purge = () => purgeExpiredSessions(db).catch(e => logger.error('session cleanup failed', {error: e.message}));
+  // Hourly: expired sessions, then anything past the retention settings.
+  const purge = () =>
+    purgeExpiredSessions(db)
+      .then(() => purgeOldData(db))
+      .then(removed => {
+        if (removed.notifications || removed.audit || removed.email) logger.info('retention cleanup', removed);
+      })
+      .catch(e => logger.error('cleanup failed', {error: e.message}));
   await purge();
   setInterval(purge, 3600000).unref();
   email.start();
