@@ -1,4 +1,8 @@
-import {error, date, manager, staff} from './validation.js';
+import {error, date} from './validation.js';
+import {can, requireCap} from './permissions.js';
+
+const viewReports = requireCap('reports.view', 'Your role cannot view reports.');
+const exportCsv = requireCap('reports.export', 'Your role cannot download exports.');
 import {dateInTimezone, startOfDayUtc, addDays} from './dates.js';
 import {moduleSettings} from './requests.js';
 import {orderFilter, listOrders, ticketLabel} from './orders.js';
@@ -51,7 +55,7 @@ export async function buildReport(db, user, timezone, {from, to}) {
   ).map(r => ({key: r.key, label: r.label || 'Unassigned', count: n(r.count)}));
   // Preventive maintenance compliance: generated occurrences due in the range, completed by their due date.
   let maintenance = null;
-  if (modules.maintenance && user.role !== 'requester') {
+  if (modules.maintenance && can(user, 'maintenance.view')) {
     const [pm] = await db.query(
       "SELECT COUNT(*) AS due, SUM(CASE WHEN w.status='Completed' THEN 1 ELSE 0 END) AS completed FROM maintenance_runs m JOIN work_orders w ON w.id=m.work_order_id WHERE m.due_date>=$1 AND m.due_date<=$2",
       [from, to],
@@ -65,7 +69,7 @@ export async function buildReport(db, user, timezone, {from, to}) {
     maintenance = {due: n(pm.due), completed: n(pm.completed), onTime};
   }
   let parts = null;
-  if (modules.inventory && user.role !== 'requester') {
+  if (modules.inventory && can(user, 'inventory.view')) {
     const rows = await db.query(
       'SELECT t.id,t.name,t.sku,SUM(p.quantity) AS quantity,SUM(p.quantity*COALESCE(t.unit_cost_cents,0)) AS cost FROM part_usage p JOIN parts t ON t.id=p.part_id WHERE p.created_at>=$1 AND p.created_at<$2 GROUP BY t.id,t.name,t.sku ORDER BY quantity DESC',
       [startUtc, endUtc],
@@ -103,12 +107,12 @@ export function setupReports(app, db, env) {
     if (Date.parse(to) - Date.parse(from) > 3660 * 86400000) throw error('Choose a range of ten years or less.');
     return {from, to};
   };
-  app.get('/api/reports/summary', manager, async (req, res) =>
+  app.get('/api/reports/summary', viewReports, async (req, res) =>
     res.json(await buildReport(db, req.user, timezone, range(req))),
   );
   const stamp = () => dateInTimezone(timezone);
   // The order export honours the same filters as the register, so "export what I see" is exact.
-  app.get('/api/reports/orders.csv', staff, async (req, res) => {
+  app.get('/api/reports/orders.csv', exportCsv, async (req, res) => {
     const {orders} = await listOrders(db, req.user, req.query, timezone, {limit: 100000, offset: 0});
     res
       .attachment(`requests-${stamp()}.csv`)
@@ -158,7 +162,7 @@ export function setupReports(app, db, env) {
         ),
       );
   });
-  app.get('/api/reports/assets.csv', staff, async (req, res) => {
+  app.get('/api/reports/assets.csv', exportCsv, async (req, res) => {
     const rows = await db.query(
       'SELECT a.*,b.name AS building FROM assets a JOIN buildings b ON b.id=a.building_id ORDER BY b.name,a.name',
     );
@@ -172,7 +176,7 @@ export function setupReports(app, db, env) {
         ),
       );
   });
-  app.get('/api/reports/maintenance.csv', staff, async (req, res) => {
+  app.get('/api/reports/maintenance.csv', exportCsv, async (req, res) => {
     const rows = await db.query(
       'SELECT m.*,b.name AS building,a.name AS asset FROM maintenance m JOIN buildings b ON b.id=m.building_id LEFT JOIN assets a ON a.id=m.asset_id ORDER BY m.next_due',
     );
@@ -194,7 +198,7 @@ export function setupReports(app, db, env) {
         ),
       );
   });
-  app.get('/api/reports/parts.csv', staff, async (req, res) => {
+  app.get('/api/reports/parts.csv', exportCsv, async (req, res) => {
     const rows = await listParts(db);
     res
       .attachment(`parts-${stamp()}.csv`)

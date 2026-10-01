@@ -5,10 +5,10 @@ import {
   $$,
   escape,
   icon,
-  manage,
-  staffRole,
+  can,
   fmt,
   fmtTime,
+  today,
   overdue,
   ticketNo,
   tag,
@@ -37,6 +37,12 @@ import {reportsPage, bindReports} from './reports.js';
 const enabledTypes = () => Object.keys(requestTypes).filter(key => state.data.modules[key]);
 const pageType = () => (state.page.endsWith('Requests') ? state.page.replace('Requests', '') : null);
 const pageSize = 50;
+const reportLink = (() => {
+  if (location.pathname !== '/report') return null;
+  const p = new URLSearchParams(location.search);
+  return {building: p.get('building') || '', asset: p.get('asset') || '', space: p.get('space') || ''};
+})();
+const requesterView = () => !can('requests.view_all');
 
 async function refresh() {
   state.me = await api('/me');
@@ -51,8 +57,12 @@ hooks.reloadOrders = () => loadOrders(true);
 
 // Destinations are grouped like the tab dividers of a work-order pad.
 function navGroups() {
-  const d = state.data,
-    me = state.me;
+  const d = state.data;
+  if (requesterView())
+    return [
+      ['Requests', [['dashboard', 'home', 'Your requests']]],
+      ['Office', [['notifications', 'bell', 'Notifications']]],
+    ];
   const groups = [
     [
       'Requests',
@@ -60,7 +70,9 @@ function navGroups() {
         ['dashboard', 'home', 'Overview'],
         ...(enabledTypes().length ? [['orders', 'work', 'All requests']] : []),
         ...enabledTypes().map(key => [key + 'Requests', requestTypes[key].icon, requestTypes[key].label + ' requests']),
-        ...(d.modules.maintenance && staffRole() ? [['maintenance', 'calendar', 'Preventive maintenance']] : []),
+        ...(d.modules.maintenance && can('maintenance.view')
+          ? [['maintenance', 'calendar', 'Preventive maintenance']]
+          : []),
       ],
     ],
     [
@@ -70,13 +82,13 @@ function navGroups() {
         ['assets', 'asset', 'Assets'],
       ],
     ],
-    ['Stock', d.modules.inventory && staffRole() ? [['inventory', 'box', 'Inventory']] : []],
+    ['Stock', d.modules.inventory && can('inventory.view') ? [['inventory', 'box', 'Inventory']] : []],
     [
       'Office',
       [
-        ...(manage() ? [['reports', 'chart', 'Reports']] : []),
+        ...(can('reports.view') ? [['reports', 'chart', 'Reports']] : []),
         ['notifications', 'bell', 'Notifications'],
-        ...(me.user.role === 'admin' ? [['settings', 'settings', 'Settings']] : []),
+        ...(can('admin') ? [['settings', 'settings', 'Settings']] : []),
       ],
     ],
   ];
@@ -95,7 +107,7 @@ function render() {
   document.title = (me.branding?.name || 'Facilities') + ' · Work order pad';
   if (!me.user) {
     $('#app').innerHTML =
-      `<main class="login"><div class="login-ticket"><div class="login-head"><span class="brand-mark">${icon(me.branding?.icon || 'building')}</span><span class="brand-name">${escape(me.branding?.name || 'Facilities')}</span><span class="ticket-no">WO-0000</span></div><div class="login-body"><h1>${escape(me.branding?.welcome || 'Your facilities. One connected workspace.')}</h1><p>Maintenance, schedules, equipment and the places your organization depends on, kept on one shared pad.</p><a class="login-link" href="/auth/login">${me.mode === 'demo' ? 'Enter demo workspace' : 'Sign in with your organization'} ${icon('arrow')}</a></div><div class="login-foot"><span>${me.mode === 'demo' ? 'Local demo · Illustrative records · Administrator access' : escape(me.organization) + ' · Secure organization sign-in'}</span></div></div></main>`;
+      `<main class="login"><div class="login-ticket">${reportLink ? '<p class="login-context">Sign in to report a problem. The location from the label is kept.</p>' : ''}<div class="login-head"><span class="brand-mark">${icon(me.branding?.icon || 'building')}</span><span class="brand-name">${escape(me.branding?.name || 'Facilities')}</span><span class="ticket-no">WO-0000</span></div><div class="login-body"><h1>${escape(me.branding?.welcome || 'Your facilities. One connected workspace.')}</h1><p>Maintenance, schedules, equipment and the places your organization depends on, kept on one shared pad.</p><a class="login-link" href="/auth/login${reportLink ? '?return=' + encodeURIComponent(location.pathname + location.search) : ''}">${me.mode === 'demo' ? 'Enter demo workspace' : 'Sign in with your organization'} ${icon('arrow')}</a></div><div class="login-foot"><span>${me.mode === 'demo' ? 'Local demo · Illustrative records · Administrator access' : escape(me.organization) + ' · Secure organization sign-in'}</span></div></div></main>`;
     return;
   }
   const d = state.data;
@@ -124,9 +136,11 @@ function render() {
     const n = count(p);
     return `<button data-page="${p}" aria-label="${t}" class="${state.page === p ? 'active' : ''}" ${state.page === p ? 'aria-current="page"' : ''}>${icon(i)}<span>${t}</span>${n != null ? `<span class="count">${n}</span>` : ''}</button>`;
   };
-  const dock = [['dashboard', 'home', 'Today'], ...(enabledTypes().length ? [['orders', 'work', 'Requests']] : [])];
+  const dock = requesterView()
+    ? [['dashboard', 'home', 'Requests']]
+    : [['dashboard', 'home', 'Today'], ...(enabledTypes().length ? [['orders', 'work', 'Requests']] : [])];
   $('#app').innerHTML =
-    `<div class="shell"><aside class="rail"><div class="brand"><span class="brand-mark">${icon(me.branding?.icon || 'building')}</span><span class="brand-name">${escape(me.branding?.name || 'Facilities')}<small>${escape(me.organization)}</small></span></div><nav id="workspace-nav" aria-label="Main navigation">${groups.map(([label, items]) => `<section class="nav-group"><h2 class="nav-tab">${label}</h2>${items.map(navButton).join('')}</section>`).join('')}</nav><div class="rail-foot"><div class="user-line"><span class="avatar">${escape(initials)}</span><div><strong>${escape(me.user.name)}</strong><small>${escape(me.user.role)}</small></div></div><button class="logout" id="logout">Sign out</button></div></aside><main class="workspace"><header class="topbar"><span class="crumb"><span class="brand-mark small">${icon(me.branding?.icon || 'building')}</span><span class="crumb-path">${escape(me.branding?.name || 'Facilities')} <span aria-hidden="true">/</span></span> <strong>${title}</strong></span><div class="top-right"><span class="top-date">${new Date().toLocaleDateString(undefined, {weekday: 'long', month: 'long', day: 'numeric'})}</span><button class="notification-button" data-page="notifications" aria-label="Open notifications">${icon('bell')}${unread ? `<span>${unread}</span>` : ''}</button></div></header><div class="content">${me.mode === 'demo' ? '<div class="notice demo-notice">Demo workspace — these records are illustrative. SSO and an empty database are used in the production deployment.</div>' : ''}${pageContent()}</div></main><div class="dock">${dock.map(([p, i, t]) => `<button data-page="${p}" class="${state.page === p ? 'active' : ''}">${icon(i)}<span>${t}</span></button>`).join('')}${enabledTypes().length ? `<button class="dock-new" data-create="order" aria-label="New request">${icon('plus')}<span>New</span></button>` : ''}<button data-page="notifications" class="${state.page === 'notifications' ? 'active' : ''}">${icon('bell')}<span>Inbox</span>${unread ? `<span class="count">${unread}</span>` : ''}</button><button id="nav-toggle" type="button" aria-controls="workspace-nav" aria-expanded="false">${icon('menu')}<span>Menu</span></button></div></div>`;
+    `<div class="shell"><aside class="rail"><div class="brand"><span class="brand-mark">${icon(me.branding?.icon || 'building')}</span><span class="brand-name">${escape(me.branding?.name || 'Facilities')}<small>${escape(me.organization)}</small></span></div><nav id="workspace-nav" aria-label="Main navigation">${groups.map(([label, items]) => `<section class="nav-group"><h2 class="nav-tab">${label}</h2>${items.map(navButton).join('')}</section>`).join('')}</nav><div class="rail-foot"><div class="user-line"><span class="avatar">${escape(initials)}</span><div><strong>${escape(me.user.name)}</strong><small>${escape(me.user.role_name || me.user.role)}</small></div></div><button class="logout" id="logout">Sign out</button></div></aside><main class="workspace"><header class="topbar"><span class="crumb"><span class="brand-mark small">${icon(me.branding?.icon || 'building')}</span><span class="crumb-path">${escape(me.branding?.name || 'Facilities')} <span aria-hidden="true">/</span></span> <strong>${title}</strong></span><div class="top-right"><span class="top-date">${new Date().toLocaleDateString(undefined, {weekday: 'long', month: 'long', day: 'numeric'})}</span><button class="notification-button" data-page="notifications" aria-label="Open notifications">${icon('bell')}${unread ? `<span>${unread}</span>` : ''}</button></div></header><div class="content">${me.mode === 'demo' ? '<div class="notice demo-notice">Demo workspace — these records are illustrative. SSO and an empty database are used in the production deployment.</div>' : ''}${pageContent()}</div></main><div class="dock">${dock.map(([p, i, t]) => `<button data-page="${p}" class="${state.page === p ? 'active' : ''}">${icon(i)}<span>${t}</span></button>`).join('')}${enabledTypes().length ? `<button class="dock-new" data-create="order" aria-label="New request">${icon('plus')}<span>New</span></button>` : ''}<button data-page="notifications" class="${state.page === 'notifications' ? 'active' : ''}">${icon('bell')}<span>Inbox</span>${unread ? `<span class="count">${unread}</span>` : ''}</button><button id="nav-toggle" type="button" aria-controls="workspace-nav" aria-expanded="false">${icon('menu')}<span>Menu</span></button></div></div>`;
   $$('[data-page]').forEach(b => (b.onclick = () => go(b.dataset.page)));
   $$('[data-goto]').forEach(b => (b.onclick = () => go(b.dataset.goto, b.dataset.filter)));
   $$('[data-create]').forEach(
@@ -173,7 +187,64 @@ function render() {
     document.body.classList.toggle('menu-locked', open);
   };
   labelTables();
+  if ($('#quick-form')) bindQuickForm();
   if ($('#order-table')) loadOrders(false);
+}
+
+// Requesters: report a problem on the page itself, then follow their own tickets below.
+const quickTypes = () => enabledTypes().filter(t => t !== 'schedule');
+function requesterHome() {
+  const types = quickTypes();
+  const form = types.length
+    ? `<section class="quick-report"><div class="section-head compact"><h2>Report a problem</h2></div><form id="quick-form"><div class="form-grid">${
+        types.length > 1
+          ? select(
+              'Request type',
+              'request_type',
+              types.map(key => [key, requestTypes[key].label]),
+              types[0],
+            )
+          : `<input type="hidden" name="request_type" value="${types[0]}">`
+      }${field('What needs attention?', 'title').replace('class="field ', `class="field ${types.length > 1 ? '' : 'full '}`)}${locationFields()}${field('Details', 'description', 'textarea', '', true)}<label class="field full">Photos (optional)<input type="file" name="files" multiple accept="image/jpeg,image/png,image/gif,image/webp,image/heic,application/pdf"></label></div><div class="form-error" role="alert"></div><div class="editor-actions">${enabledTypes().includes('schedule') ? '<button type="button" class="secondary" data-create="order">Book a space or event</button>' : ''}<span class="spacer"></span><button class="primary" type="submit">Submit request</button></div></form></section>`
+    : '';
+  return (
+    heading(
+      'Your requests',
+      'Report a problem in a few seconds and follow every ticket you have submitted.',
+      types.length ? null : 'order',
+      'New request',
+    ) +
+    form +
+    `<div class="section-head"><h2>Your tickets</h2></div>` +
+    ordersPanel()
+  );
+}
+function bindQuickForm() {
+  const form = $('#quick-form');
+  bindLocation(undefined, form);
+  bindForm(form, async (data, f) => {
+    const files = [...f.elements.files.files];
+    delete data.files;
+    const created = await api('/orders', {
+      method: 'POST',
+      body: JSON.stringify({...data, priority: 'Normal', due_date: today()}),
+    });
+    const failed = [];
+    for (const file of files) {
+      try {
+        await upload(created.id, file);
+      } catch (e) {
+        failed.push(file.name);
+      }
+    }
+    f.reset();
+    await refresh();
+    toast(
+      failed.length
+        ? `Request submitted, but ${failed.length} file${failed.length === 1 ? '' : 's'} could not be attached.`
+        : 'Request submitted. You will be notified as it moves forward.',
+    );
+  });
 }
 
 function pageContent() {
@@ -204,13 +275,14 @@ function pageContent() {
       ordersPanel()
     );
   }
+  if (requesterView()) return requesterHome();
   const lowParts = (d.parts || []).filter(p => !p.archived_at && p.quantity <= p.min_quantity);
-  const requester = state.me.user.role === 'requester';
+  const requester = !can('requests.view_all');
   const tally = [
     ['orders', 'Active', s.active, 'Active', requester ? 'Your open tickets' : 'Not yet completed'],
     ['orders', 'Overdue', s.overdue, 'Overdue', 'Past their due date', s.overdue ? 'alert' : ''],
     ['orders', 'In progress', s.inProgress, 'In progress', 'Work underway'],
-    manage() && d.modules.schedule
+    can('reservations.approve') && d.modules.schedule
       ? [
           'scheduleRequests',
           'Awaiting approval',
@@ -231,7 +303,7 @@ function pageContent() {
         )
         .join('')}</section>`,
     );
-  if (d.modules.maintenance && staffRole()) {
+  if (d.modules.maintenance && can('maintenance.view')) {
     const plans = d.maintenance.filter(p => Number(p.active)).slice(0, 4);
     side.push(
       `<section class="panel"><h2>Upcoming maintenance</h2>${
@@ -293,8 +365,8 @@ const filterTabs = compact => [
   'In progress',
   'Overdue',
   ...(compact ? [] : ['Completed']),
-  ...(staffRole() ? ['Assigned to me'] : []),
-  ...(pageType() === 'schedule' && manage() ? ['Awaiting approval'] : []),
+  ...(can('requests.assignable') ? ['Assigned to me'] : []),
+  ...(pageType() === 'schedule' && can('reservations.approve') ? ['Awaiting approval'] : []),
 ];
 // The overview ledger shows unfinished work soonest-due first; registers show everything newest first.
 function listParams(compact = false) {
@@ -313,7 +385,7 @@ function listParams(compact = false) {
 function ordersPanel(compact = false) {
   if (!filterTabs(compact).includes(state.filter)) state.filter = 'All';
   const exportLink =
-    staffRole() && !compact
+    can('reports.export') && !compact
       ? `<a class="quiet-button export-link" id="export-orders" href="/api/reports/orders.csv?${listParams()}" download>${icon('download')}Export CSV</a>`
       : '';
   return `<section class="work-panel ledger"><div class="filters"><div class="tabs" aria-label="Filter requests">${filterTabs(
@@ -369,7 +441,7 @@ function ordersTable(compact) {
     )
     .join(
       '',
-    )}</tbody></table></div>${error ? `<div class="empty">${escape(error)}</div>` : rows.length ? '' : `<div class="empty">${enabledTypes().length ? (compact ? 'Nothing open. Every ticket on the pad is completed.' : 'No requests match. Try a different filter or create a new request.') : 'Request types are disabled. Your existing records are preserved.'}${!enabledTypes().length && state.me.user.role === 'admin' ? '<p><button class="quiet-button" data-page="settings">Configure request types</button></p>' : ''}</div>`}<div class="table-footer">Showing ${rows.length} of ${total} ${compact ? 'open tickets' : 'requests'}${!compact && rows.length < total ? ' <button class="quiet-button" id="load-more">Load more</button>' : ''}</div>`;
+    )}</tbody></table></div>${error ? `<div class="empty">${escape(error)}</div>` : rows.length ? '' : `<div class="empty">${enabledTypes().length ? (compact ? 'Nothing open. Every ticket on the pad is completed.' : 'No requests match. Try a different filter or create a new request.') : 'Request types are disabled. Your existing records are preserved.'}${!enabledTypes().length && can('admin') ? '<p><button class="quiet-button" data-page="settings">Configure request types</button></p>' : ''}</div>`}<div class="table-footer">Showing ${rows.length} of ${total} ${compact ? 'open tickets' : 'requests'}${!compact && rows.length < total ? ' <button class="quiet-button" id="load-more">Load more</button>' : ''}</div>`;
 }
 function bindTable() {
   $$('#order-table [data-order]').forEach(b => {
@@ -390,20 +462,23 @@ function bindTable() {
   $$('#order-table [data-page]').forEach(b => (b.onclick = () => go(b.dataset.page)));
 }
 
-function createOrder() {
+function createOrder(prefill = {}) {
   if (!enabledTypes().length) {
     toast('An administrator must enable a request type first.');
     return;
   }
   if (!activeBuildings().length) {
     toast('Add a building before creating requests.');
-    if (manage()) {
+    if (can('records.manage')) {
       state.page = 'buildings';
       render();
     }
     return;
   }
-  const type = pageType() || enabledTypes()[0];
+  const type =
+    prefill.space && enabledTypes().includes('schedule')
+      ? 'schedule'
+      : pageType() || (prefill.building ? quickTypes()[0] || enabledTypes()[0] : enabledTypes()[0]);
   const fields =
     select(
       'Request type',
@@ -417,8 +492,8 @@ function createOrder() {
       ['Normal', 'Low', 'High', 'Urgent'].map(x => [x, x]),
     ) +
     field('What do you need?', 'title').replace('class="field ', 'class="field full ') +
-    locationFields() +
-    `<div class="timing" id="request-timing">${requestTiming(type)}</div>` +
+    locationFields(prefill.building || '', prefill.asset || '') +
+    `<div class="timing" id="request-timing">${requestTiming(type, {space_id: prefill.space})}</div>` +
     field('Details', 'description', 'textarea', '', true) +
     `<label class="field full">Photos or files (optional)<input type="file" name="files" multiple accept="image/jpeg,image/png,image/gif,image/webp,image/heic,application/pdf,text/plain,text/csv,.docx,.xlsx"></label>`;
   dialog(
@@ -458,6 +533,21 @@ function createOrder() {
   });
 }
 
+const openReportLink = () => {
+  if (!reportLink || !state.me?.user) return;
+  history.replaceState(null, '', '/');
+  const building = state.data.buildings.find(b => b.id === reportLink.building && !b.archived_at);
+  if (!building) return toast('That label points to a place that no longer exists. Choose the location yourself.');
+  createOrder({
+    building: building.id,
+    asset: state.data.assets.some(a => a.id === reportLink.asset && a.building_id === building.id)
+      ? reportLink.asset
+      : '',
+    space: state.data.spaces.some(s => s.id === reportLink.space && s.building_id === building.id)
+      ? reportLink.space
+      : '',
+  });
+};
 const openFromHash = () => {
   const m = location.hash.match(/^#order=(.+)$/);
   if (m && state.me?.user) {
@@ -470,6 +560,7 @@ try {
   if (state.me.user) {
     await refresh();
     openFromHash();
+    openReportLink();
   } else render();
 } catch (err) {
   $('#app').innerHTML =

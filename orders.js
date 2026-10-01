@@ -1,5 +1,6 @@
 import {randomUUID} from 'node:crypto';
-import {statuses, priorities, error, text, date, localTime, canManage, manager, likePattern} from './validation.js';
+import {statuses, priorities, error, text, date, localTime, likePattern} from './validation.js';
+import {can, requireCap, sqlRoleList} from './permissions.js';
 import {dateInTimezone, startOfDayUtc, addDays} from './dates.js';
 import {moduleSettings, requireModule, notify} from './requests.js';
 import {audit, auditQuery, changes} from './audit.js';
@@ -44,7 +45,7 @@ export function orderFilter(user, modules, params, timezone) {
   const enabled = ['maintenance', 'schedule', 'technology'].filter(t => modules[t]);
   if (!enabled.length) where.push('1=0');
   else add(`w.request_type IN (${enabled.map(() => '?').join(',')})`, ...enabled);
-  if (user.role === 'requester') add('w.requester_id=?', user.id);
+  if (!can(user, 'requests.view_all')) add('w.requester_id=?', user.id);
   if (params.type) {
     if (!enabled.includes(params.type)) where.push('1=0');
     else add('w.request_type=?', params.type);
@@ -154,7 +155,7 @@ export function setupOrders(app, db, env) {
   };
   const accessibleOrder = async (req, id = req.params.id) => {
     const order = (await q('SELECT * FROM work_orders WHERE id=$1', [id]))[0];
-    if (!order || (req.user.role === 'requester' && order.requester_id !== req.user.id))
+    if (!order || (!can(req.user, 'requests.view_all') && order.requester_id !== req.user.id))
       throw error('Work order not found.', 404);
     await requireModule(db, order.request_type);
     return order;
@@ -183,7 +184,7 @@ export function setupOrders(app, db, env) {
         'SELECT t.id,t.file_name,t.content_type,t.size,t.created_at,t.uploaded_by,u.name AS uploader FROM attachments t JOIN users u ON u.id=t.uploaded_by WHERE t.work_order_id=$1 ORDER BY t.created_at',
         [order.id],
       ),
-      modules.inventory && req.user.role !== 'requester'
+      modules.inventory && can(req.user, 'inventory.view')
         ? q(
             'SELECT p.id,p.quantity,p.created_at,p.part_id,t.name,t.sku,t.unit_cost_cents,u.name AS used_by FROM part_usage p JOIN parts t ON t.id=p.part_id JOIN users u ON u.id=p.user_id WHERE p.work_order_id=$1 ORDER BY p.created_at',
             [order.id],
@@ -246,7 +247,8 @@ export function setupOrders(app, db, env) {
       );
       return reserved;
     });
-    const recipients = await q("SELECT id FROM users WHERE role IN ('admin','manager') AND active=1");
+    const notified = sqlRoleList(db, 'requests.notified');
+    const recipients = await q(`SELECT id FROM users WHERE ${notified.sql} AND active=1`, notified.values);
     await notify(
       db,
       {id},
@@ -263,34 +265,36 @@ export function setupOrders(app, db, env) {
     const body = req.body || {};
     const editsDetails = detailFields.some(k => k in body);
     const owner = row.requester_id === req.user.id;
-    const managerial = canManage(req.user);
-    if (editsDetails && !(managerial || (owner && row.status === 'Open')))
+    if (editsDetails && !(can(req.user, 'requests.edit_any') || (owner && row.status === 'Open')))
       throw error(
         owner
           ? 'Requests can be edited by the requester only while they are Open.'
-          : 'Only managers or the requester can edit request details.',
+          : 'Your role cannot edit the details of this request.',
         403,
       );
-    if (
-      ('status' in body || 'assignee_id' in body) &&
-      !(managerial || (req.user.role === 'technician' && row.assignee_id === req.user.id))
-    )
-      throw error('Only managers or the assigned technician can update this work order.', 403);
+    const mayStamp =
+      can(req.user, 'requests.update_any') ||
+      (can(req.user, 'requests.update_assigned') && row.assignee_id === req.user.id);
+    if ('status' in body && body.status !== row.status && !mayStamp)
+      throw error('Your role cannot change the status of this request.', 403);
     const status = body.status ?? row.status;
     if (!statuses.includes(status)) throw error('Choose a valid status.');
     let assignee = row.assignee_id;
     if ('assignee_id' in body) {
-      if (!managerial) throw error('A manager must assign work orders.', 403);
       assignee = body.assignee_id || null;
+      if (assignee !== row.assignee_id && !can(req.user, 'requests.assign'))
+        throw error('Your role cannot assign work.', 403);
+      const assignable = sqlRoleList(db, 'requests.assignable', 2);
       if (
         assignee &&
         !(
-          await q("SELECT id FROM users WHERE id=$1 AND active=1 AND role IN ('admin','manager','technician')", [
+          await q(`SELECT id FROM users WHERE id=$1 AND active=1 AND ${assignable.sql}`, [
             assignee,
+            ...assignable.values,
           ])
         ).length
       )
-        throw error('Choose an enabled technician or manager.');
+        throw error('Choose an enabled person whose role can be assigned work.');
     }
     const next = {...row, status, assignee_id: assignee};
     if (editsDetails) {
@@ -409,31 +413,35 @@ export function setupOrders(app, db, env) {
     res.json({ok: true, reservation_status: next.reservation_status});
   });
 
-  app.delete('/api/orders/:id', manager, async (req, res) => {
-    const row = await accessibleOrder(req);
-    await db.transaction(async tx => {
-      const used = await tx.query('SELECT part_id,quantity FROM part_usage WHERE work_order_id=$1', [row.id]);
-      for (const table of [
-        'notifications WHERE order_id',
-        'comments WHERE work_order_id',
-        'attachments WHERE work_order_id',
-        'part_usage WHERE work_order_id',
-        'maintenance_runs WHERE work_order_id',
-      ])
-        await tx.query(`DELETE FROM ${table}=$1`, [row.id]);
-      await tx.query('DELETE FROM work_orders WHERE id=$1', [row.id]);
-      await audit(
-        tx,
-        req.user,
-        'order.delete',
-        'work_order',
-        row.id,
-        `Deleted ${row.request_type} request “${row.title}”`,
-        {title: [row.title, null], status: [row.status, null], ...(used.length ? {parts_used: [used, null]} : {})},
-      );
-    });
-    res.json({ok: true});
-  });
+  app.delete(
+    '/api/orders/:id',
+    requireCap('requests.delete', 'Your role cannot delete requests.'),
+    async (req, res) => {
+      const row = await accessibleOrder(req);
+      await db.transaction(async tx => {
+        const used = await tx.query('SELECT part_id,quantity FROM part_usage WHERE work_order_id=$1', [row.id]);
+        for (const table of [
+          'notifications WHERE order_id',
+          'comments WHERE work_order_id',
+          'attachments WHERE work_order_id',
+          'part_usage WHERE work_order_id',
+          'maintenance_runs WHERE work_order_id',
+        ])
+          await tx.query(`DELETE FROM ${table}=$1`, [row.id]);
+        await tx.query('DELETE FROM work_orders WHERE id=$1', [row.id]);
+        await audit(
+          tx,
+          req.user,
+          'order.delete',
+          'work_order',
+          row.id,
+          `Deleted ${row.request_type} request “${row.title}”`,
+          {title: [row.title, null], status: [row.status, null], ...(used.length ? {parts_used: [used, null]} : {})},
+        );
+      });
+      res.json({ok: true});
+    },
+  );
 
   app.get('/api/orders/:id/history', async (req, res) => {
     await accessibleOrder(req);
@@ -477,7 +485,7 @@ export function setupOrders(app, db, env) {
       await q('SELECT * FROM comments WHERE id=$1 AND work_order_id=$2', [req.params.comment, row.id])
     )[0];
     if (!comment) throw error('Comment not found.', 404);
-    if (comment.user_id !== req.user.id && !(allowManager && canManage(req.user)))
+    if (comment.user_id !== req.user.id && !(allowManager && can(req.user, 'requests.moderate')))
       throw error(
         allowManager
           ? 'Only the author or a manager can delete this comment.'

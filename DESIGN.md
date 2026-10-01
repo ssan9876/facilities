@@ -314,6 +314,12 @@ The rail is a column of pad tab dividers. Each group (Requests, Places, Stock, O
 ### Notices and Settings
 Notices are paper with a dashed strong-rule outline at 13px ink-2, never tinted banners. Settings and notifications use index tabs over a white sheet with an ink border. The selected tab is paper with an ink outline that joins the sheet. Toggles are square-cornered tracks that fill carbon when on.
 
+### Administration ledgers and the role grid
+
+People and Groups are ruled ledgers on a full-width settings sheet with a toolbar (heading left, primary action right) and a filter row (search plus selects); rows open edit sheets rather than inline forms. Group membership lives in the group's sheet as a searchable checkbox list that saves immediately. Roles is a permission grid: capabilities as sticky row headers (label plus one-line description) grouped by area, roles as columns with person counts and a quiet Reset or Delete action, carbon checkboxes, and the administrator column locked. Requesters see a single ruled "Report a problem" panel above their ticket register. QR report labels print as dashed-edge cards, two per row, with the kind in label caps, the place name, and a carbon "Scan to report a problem" line.
+
+Pad polish: ticket sheets carry a perforated left edge, the No. column of every request ledger is set off by a double margin rule, and phone ledger stubs are separated by dashed tear lines.
+
 ## Do's and Don'ts
 
 ### Do:

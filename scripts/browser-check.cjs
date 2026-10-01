@@ -164,7 +164,6 @@ const assert = require('node:assert/strict');
     'Update settings must not overflow',
   );
   await page.getByRole('button', {name: 'Identity', exact: true}).click();
-  await page.getByRole('button', {name: 'Load administration'}).click();
   await page.getByLabel('Workspace name', {exact: true}).fill('Campus Operations');
   await page.getByLabel('Welcome message').fill('Welcome to your campus.');
   await page.getByLabel('Workspace icon').selectOption('calendar');
@@ -172,22 +171,45 @@ const assert = require('node:assert/strict');
   await page.getByText('Administration settings saved.', {exact: true}).waitFor();
   assert.equal(await page.title(), 'Campus Operations · Work order pad');
   await page.screenshot({path: '.impeccable/review/identity-desktop.png', fullPage: true});
+  // Administration loads on its own; people and groups are ledgers edited in sheets.
   await page.getByRole('button', {name: 'Groups', exact: true}).click();
-  await page.getByLabel('Group name', {exact: true}).fill('Facilities team');
-  await page.getByLabel('Add newly provisioned users automatically').check();
-  await page.getByRole('button', {name: 'Create group', exact: true}).click();
-  await page.getByText('Members · Changes save immediately', {exact: true}).waitFor();
+  await page.locator('[data-new-group]').click();
+  await page.locator('#group-create').getByLabel('Group name').fill('Facilities team');
+  await page.locator('#group-create').getByLabel('Add newly provisioned users automatically').check();
+  await page.locator('#group-create').getByRole('button', {name: 'Create group'}).click();
+  await page.getByRole('cell', {name: 'Facilities team', exact: true}).waitFor();
   await page.getByRole('button', {name: 'People', exact: true}).click();
-  await page.getByLabel('Immutable SSO subject').fill('browser-user-id');
+  await page.locator('[data-provision]').click();
+  await page.locator('#user-create').getByLabel('Immutable SSO subject').fill('browser-user-id');
   await page.locator('#user-create').getByLabel('Display name').fill('Browser Member');
   await page.locator('#user-create').getByRole('button', {name: 'Provision person'}).click();
-  await page.getByText('Browser Member', {exact: true}).waitFor();
+  await page.locator('#people-table').getByText('Browser Member', {exact: true}).waitFor();
+  await page.getByLabel('Search people').fill('browser');
+  assert.equal(await page.locator('#people-table tbody tr').count(), 1, 'people search filters the ledger');
+  await page.getByLabel('Search people').fill('');
   await page.screenshot({path: '.impeccable/review/people-desktop.png', fullPage: true});
+  await page.getByRole('button', {name: 'Edit Browser Member', exact: true}).click();
+  await page.locator('#person-form').getByLabel('Role').selectOption('technician');
+  await page.locator('#person-form').getByRole('button', {name: 'Save changes'}).click();
+  await page.locator('#editor').waitFor({state: 'hidden'});
   await page.getByRole('button', {name: 'Groups', exact: true}).click();
-  assert.equal(await page.getByLabel('Browser Member', {exact: true}).isChecked(), true);
-  await page.getByLabel('Alex Morgan', {exact: true}).check();
+  await page.getByRole('button', {name: 'Edit Facilities team', exact: true}).click();
+  await page.getByText('Members · Changes save immediately', {exact: true}).waitFor();
+  assert.equal(await page.locator('#member-list').getByLabel('Browser Member', {exact: true}).isChecked(), true);
+  await page.locator('#member-list').getByLabel('Alex Morgan', {exact: true}).check();
   await page.getByText('Group membership saved.', {exact: true}).waitFor();
   await page.screenshot({path: '.impeccable/review/groups-desktop.png', fullPage: true});
+  await page.getByRole('button', {name: 'Close dialog'}).click();
+  // Roles: take inventory away from technicians, then restore the defaults.
+  await page.getByRole('button', {name: 'Roles', exact: true}).click();
+  await page.getByLabel('Technician: See inventory', {exact: true}).uncheck();
+  await page.getByRole('button', {name: 'Save roles', exact: true}).click();
+  await page.getByText('1 role updated.', {exact: true}).waitFor();
+  await page.screenshot({path: '.impeccable/review/roles-desktop.png', fullPage: true});
+  await page.getByRole('button', {name: 'Reset to defaults', exact: true}).click();
+  await page.getByRole('button', {name: 'Reset?', exact: true}).click();
+  await page.getByText('Role reset to the defaults in permissions.js.', {exact: true}).waitFor();
+  assert.equal(await page.getByLabel('Technician: See inventory', {exact: true}).isChecked(), true);
   await page.getByRole('button', {name: 'Provisioning', exact: true}).click();
   await page.getByLabel('Connection name').fill('Browser integration');
   await page.getByRole('button', {name: 'Create token', exact: true}).click();
@@ -200,8 +222,7 @@ const assert = require('node:assert/strict');
   await mobile.getByRole('button', {name: 'Menu', exact: true}).click();
   await mobile.locator('nav').getByRole('button', {name: 'Settings', exact: true}).click();
   await mobile.getByRole('button', {name: 'Groups', exact: true}).click();
-  await mobile.getByRole('button', {name: 'Load administration'}).click();
-  await mobile.locator('[data-group]').waitFor();
+  await mobile.locator('[data-edit-group]').waitFor();
   await mobile.screenshot({path: '.impeccable/review/groups-mobile.png', fullPage: true});
   assert.equal(
     await mobile.evaluate(() => document.documentElement.scrollWidth > innerWidth),
@@ -283,6 +304,32 @@ const assert = require('node:assert/strict');
       `${name} must fit on mobile`,
     );
   }
+  await page.goto(base + '/report?building=b2&asset=a3');
+  await page.locator('#create-form').waitFor();
+  assert.equal(await page.locator('#create-form [name=building_id]').inputValue(), 'b2');
+  assert.equal(await page.locator('#create-form [name=asset_id]').inputValue(), 'a3');
+  assert.equal(new URL(page.url()).pathname, '/', 'the report link is consumed');
+  await page.screenshot({path: '.impeccable/review/report-link-desktop.png'});
+  await page.getByRole('button', {name: 'Close dialog'}).click();
+  const labels = await browser.newPage({viewport: {width: 1000, height: 900}});
+  await labels.context().addCookies(await page.context().cookies());
+  await labels.goto(base + '/labels?building=b2');
+  await labels.getByRole('button', {name: 'Print labels'}).waitFor();
+  assert.ok((await labels.locator('.label').count()) >= 2);
+  await labels.screenshot({path: '.impeccable/review/labels.png', fullPage: true});
+  await labels.close();
+  // Requester view: report on the page, then follow the ticket.
+  await db.query("UPDATE users SET role='requester' WHERE id='demo-admin'");
+  await page.reload();
+  await page.getByRole('heading', {name: 'Your requests', exact: true}).waitFor();
+  assert.equal(await page.locator('nav').getByRole('button', {name: 'Buildings', exact: true}).count(), 0);
+  await page.locator('#quick-form').getByLabel('What needs attention?').fill('Flickering light in room 12');
+  await page.locator('#quick-form [name=building_id]').selectOption('b1');
+  await page.locator('#quick-form').getByRole('button', {name: 'Submit request'}).click();
+  await page.getByText('Request submitted. You will be notified as it moves forward.', {exact: true}).waitFor();
+  await page.locator('.order-title').filter({hasText: 'Flickering light in room 12'}).waitFor();
+  await page.screenshot({path: '.impeccable/review/requester-desktop.png', fullPage: true});
+  await db.query("UPDATE users SET role='admin' WHERE id='demo-admin'");
   assert.deepEqual(errors, [], 'Browser console must not contain JavaScript errors');
   console.log(
     'Browser checks passed: create, complete, comment, edit, reservations, attachments, parts, inventory, reports, audit, navigation, desktop and mobile.',

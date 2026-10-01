@@ -36,11 +36,12 @@ export const paths = {
   history: 'M3 12a9 9 0 1 0 3-6.7 M3 4v5h5 M12 7v5l3 2',
   edit: 'M4 20h4L19 9l-4-4L4 16z M13 7l4 4',
   door: 'M5 21V3h11v18 M16 6h3v15 M12 12h.01 M2 21h20',
+  qr: 'M4 4h6v6H4z M14 4h6v6h-6z M4 14h6v6H4z M14 14h2v2h-2z M18 18h2v2h-2z M14 18h2 M18 14h2',
 };
 export const icon = k =>
   `<svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="${paths[k] || paths.work}"/></svg>`;
-export const manage = () => ['admin', 'manager'].includes(state.me.user.role);
-export const staffRole = () => state.me.user.role !== 'requester';
+// Capability checks mirror the server's permissions.js; the server enforces, the UI only hides.
+export const can = capability => !!state.me?.user?.capabilities?.includes(capability);
 export const fmt = d =>
   d ? new Date(d + 'T12:00:00').toLocaleDateString(undefined, {month: 'short', day: 'numeric'}) : '—';
 export const fmtTime = value => (value ? fmt(value.slice(0, 10)) + ', ' + value.slice(11) : '—');
@@ -198,7 +199,7 @@ export function bindCancel() {
 // Register tables stack into labelled ruled rows on phones; each cell carries its column name.
 export function labelTables(root = document) {
   root.querySelectorAll('.table-wrap').forEach(wrap => {
-    if (wrap.closest('#order-table')) return;
+    if (wrap.closest('#order-table') || wrap.hasAttribute('data-no-stack')) return;
     const table = wrap.querySelector('table');
     const heads = [...(table?.querySelectorAll('thead th') || [])].map(th =>
       th.querySelector('.visually-hidden') ? '' : th.textContent.trim(),

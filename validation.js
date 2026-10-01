@@ -40,13 +40,8 @@ export const integer = (value, label, min, max) => {
 export const optionalInteger = (value, label, min, max) =>
   value == null || value === '' ? null : integer(value, label, min, max);
 export const bool = value => value === true || value === 'true' || value === 'on' || value === 1 || value === '1';
-export const canManage = user => ['admin', 'manager'].includes(user.role);
-export const manager = (req, res, next) =>
-  canManage(req.user) ? next() : res.status(403).json({error: 'A manager or administrator must make this change.'});
-export const admin = (req, res, next) =>
-  req.user?.role === 'admin' ? next() : res.status(403).json({error: 'Administrator access required.'});
-export const staff = (req, res, next) =>
-  req.user.role !== 'requester' ? next() : res.status(403).json({error: 'Your role cannot access this area.'});
+import {requireCap} from './permissions.js';
+export const admin = requireCap('admin', 'Administrator access required.');
 // Escape LIKE wildcards so search text is matched literally (used with ESCAPE '\').
 export const likePattern = value =>
   '%' +

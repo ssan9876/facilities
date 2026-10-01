@@ -2,6 +2,7 @@ import {randomUUID, randomBytes, createHash, timingSafeEqual} from 'node:crypto'
 import express from 'express';
 import {scimRouter} from './scim.js';
 import {audit, changes} from './audit.js';
+import {can, capabilityCatalog, createRole, updateRole, removeRole} from './permissions.js';
 
 const fail = (message, status = 400) => Object.assign(new Error(message), {status});
 const clean = (value, max = 200) => {
@@ -10,7 +11,7 @@ const clean = (value, max = 200) => {
   return value.trim();
 };
 const admin = (req, res, next) =>
-  req.user?.role === 'admin' ? next() : res.status(403).json({error: 'Administrator access required.'});
+  can(req.user, 'admin') ? next() : res.status(403).json({error: 'Administrator access required.'});
 export async function workspaceSettings(db) {
   return JSON.parse((await db.query("SELECT body FROM admin_settings WHERE id='workspace'"))[0]?.body || '{}');
 }
@@ -48,7 +49,7 @@ export async function saveProvisionedUser(db, env, body, id, actor) {
   const collision = (await db.query('SELECT id FROM users WHERE subject=$1', [subject]))[0];
   if (collision && collision.id !== id) throw fail('This SSO identity already exists. Update it by ID.', 409);
   const role = body.role ?? existing?.role ?? 'requester';
-  if (!['requester', 'technician', 'manager'].includes(role)) throw fail('Choose requester, technician or manager.');
+  if (role === 'admin' || !db.roles?.[role]) throw fail('Choose an existing role other than administrator.');
   if (body.active !== undefined && typeof body.active !== 'boolean') throw fail('active must be a boolean.');
   const name = clean(body.name ?? existing?.name, 120),
     email = body.email ?? existing?.email ?? '';
@@ -121,8 +122,57 @@ export function setupAdministration(app, db, env) {
       groups: await db.query('SELECT * FROM user_groups ORDER BY name'),
       members: await db.query('SELECT * FROM group_members'),
       keys: await db.query('SELECT id,name,expires_at,revoked FROM provisioning_keys ORDER BY expires_at'),
+      roles: await rolesPayload(),
+      capabilities: capabilityCatalog.map(([id, group, label, description]) => ({id, group, label, description})),
     }),
   );
+  // Roles: built-in defaults come from permissions.js; overrides and custom roles live in the database.
+  const rolesPayload = async () => {
+    const counts = Object.fromEntries(
+      (await db.query('SELECT role, COUNT(*) AS n FROM users GROUP BY role')).map(r => [r.role, Number(r.n)]),
+    );
+    const order = ['requester', 'technician', 'manager', 'admin'];
+    return Object.values(db.roles)
+      .map(r => ({...r, people: counts[r.id] || 0}))
+      .sort(
+        (a, b) => (order.indexOf(a.id) + 1 || 99) - (order.indexOf(b.id) + 1 || 99) || a.name.localeCompare(b.name),
+      );
+  };
+  app.get('/api/admin/roles', admin, async (req, res) => res.json(await rolesPayload()));
+  app.post('/api/admin/roles', admin, async (req, res) => {
+    const role = await createRole(db, req.body || {});
+    await audit(db, req.user, 'role.create', 'role', role.id, `Created role ${role.name}`, {
+      capabilities: [null, role.capabilities.join(', ')],
+    });
+    res.status(201).json(role);
+  });
+  app.patch('/api/admin/roles/:id', admin, async (req, res) => {
+    const {before, after} = await updateRole(db, req.params.id, req.body || {});
+    const added = after.capabilities.filter(c => !before.capabilities.includes(c)),
+      removed = before.capabilities.filter(c => !after.capabilities.includes(c));
+    await audit(
+      db,
+      req.user,
+      'role.update',
+      'role',
+      after.id,
+      `Updated role ${after.name}${added.length ? ` · granted ${added.join(', ')}` : ''}${removed.length ? ` · removed ${removed.join(', ')}` : ''}`,
+      changes(before, after, ['name', 'description']),
+    );
+    res.json(after);
+  });
+  app.delete('/api/admin/roles/:id', admin, async (req, res) => {
+    const role = await removeRole(db, req.params.id);
+    await audit(
+      db,
+      req.user,
+      role.builtin ? 'role.reset' : 'role.delete',
+      'role',
+      role.id,
+      role.builtin ? `Reset role ${role.name} to its defaults` : `Deleted role ${role.name}`,
+    );
+    res.json({ok: true});
+  });
   app.put('/api/admin/workspace', admin, async (req, res) => {
     const name = clean(req.body.name, 80),
       welcome = clean(req.body.welcome, 200);
