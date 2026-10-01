@@ -20,7 +20,7 @@ A working first version of an FMX-inspired facilities-management application, bu
 - Requester, technician, manager and administrator permissions enforced by the API
 - Persistent server-side sessions; CSRF-protected writes
 - PostgreSQL deployment and SQLite local development
-- Responsive UI with all fonts bundled locally
+- Work Ticket Pad interface: numbered WO tickets, stamped states and ruled ledgers, with a phone dock and stacked registers; Archivo bundled locally
 - Admin settings for workspace name, welcome message, icon and provisioned-only sign-in
 - People management, manual and automatic groups, expiring provisioning tokens
 - REST provisioning and a SCIM endpoint for Syntra user lifecycle and group memberships

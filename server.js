@@ -8,7 +8,7 @@ import {dateInTimezone} from './dates.js';
 import {moduleSettings, notify, preferences, visibleNotifications, setupSettings} from './requests.js';
 import {setupReleases, installedVersion} from './releases.js';
 import {setupAdministration, workspaceSettings} from './administration.js';
-import {setupOrders, orderSummary} from './orders.js';
+import {setupOrders, orderSummary, assignTicketNumber} from './orders.js';
 import {setupRecords} from './records.js';
 import {setupSpaces} from './reservations.js';
 import {setupAttachments} from './attachments.js';
@@ -207,6 +207,7 @@ export async function generateMaintenance(db, actor = systemActor) {
     );
     if (inserted.length) {
       count++;
+      await assignTicketNumber(db, id);
       await audit(
         db,
         actor,
@@ -271,7 +272,7 @@ async function seed(db) {
     [4, 'Repair leaking circulation pump', 'b3', 'a2', 'High', 'On hold', 2],
     [5, 'Adjust conference room door closer', 'b2', null, 'Low', 'Open', 5],
     [6, 'Replace HVAC return filters', 'b1', 'a1', 'Normal', 'Completed', -2],
-  ])
+  ]) {
     await db.query(
       'INSERT INTO work_orders(id,title,description,building_id,asset_id,priority,status,assignee_id,requester_id,due_date,created_at,completed_at) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)',
       [
@@ -289,6 +290,8 @@ async function seed(db) {
         status === 'Completed' ? now : null,
       ],
     );
+    await assignTicketNumber(db, `demo-${i}`);
+  }
   await db.query(
     'INSERT INTO maintenance(id,title,building_id,asset_id,interval_days,next_due,created_by,created_at) VALUES($1,$2,$3,$4,$5,$6,$7,$8)',
     ['pm1', 'Monthly HVAC inspection', 'b1', 'a1', 30, day(3), 'demo-admin', now],

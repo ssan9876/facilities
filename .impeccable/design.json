@@ -1,793 +1,548 @@
 {
   "schemaVersion": 2,
-  "generatedAt": "2026-10-01T02:30:58.434Z",
+  "generatedAt": "2026-10-01T05:26:58.709Z",
   "title": "Design System: Facilities",
   "extensions": {
     "colorMeta": {
-      "green": {
-        "role": "primary",
-        "displayName": "Green",
+      "desk": {
+        "role": "neutral",
+        "displayName": "Cool Desk",
+        "canonical": "#e7e9ec",
+        "oklch": "oklch(93.3% 0.005 258.3)",
         "tonalRamp": [
-          "oklch(15% 0.0693 164.32)",
-          "oklch(26% 0.0693 164.32)",
-          "oklch(38% 0.0693 164.32)",
-          "oklch(49% 0.0693 164.32)",
-          "oklch(61% 0.0693 164.32)",
-          "oklch(72% 0.0693 164.32)",
-          "oklch(84% 0.0693 164.32)",
-          "oklch(95% 0.0693 164.32)"
+          "#0a0b0d",
+          "#232426",
+          "#3e4042",
+          "#5c5e60",
+          "#7e8083",
+          "#a3a5a7",
+          "#c9cbcd",
+          "#edeff2"
         ]
       },
-      "green-hover": {
-        "role": "primary",
-        "displayName": "Green Hover",
+      "rail": {
+        "role": "neutral",
+        "displayName": "Rail Grey",
+        "canonical": "#dcdfe4",
+        "oklch": "oklch(90.3% 0.008 260.7)",
         "tonalRamp": [
-          "oklch(15% 0.0521 165.40)",
-          "oklch(26% 0.0521 165.40)",
-          "oklch(38% 0.0521 165.40)",
-          "oklch(49% 0.0521 165.40)",
-          "oklch(61% 0.0521 165.40)",
-          "oklch(72% 0.0521 165.40)",
-          "oklch(84% 0.0521 165.40)",
-          "oklch(95% 0.0521 165.40)"
+          "#090b0e",
+          "#222428",
+          "#3d4044",
+          "#5b5e62",
+          "#7e8085",
+          "#a2a5a9",
+          "#c8cbd0",
+          "#eceff4"
+        ]
+      },
+      "paper": {
+        "role": "neutral",
+        "displayName": "Bond White",
+        "canonical": "#ffffff",
+        "oklch": "oklch(100.0% 0.000 89.9)",
+        "tonalRamp": [
+          "#0b0b0b",
+          "#242424",
+          "#404040",
+          "#5d5d5d",
+          "#808080",
+          "#a4a4a4",
+          "#cacaca",
+          "#eeeeee"
         ]
       },
       "ink": {
         "role": "neutral",
         "displayName": "Ink",
+        "canonical": "#1c1f24",
+        "oklch": "oklch(23.8% 0.011 260.7)",
         "tonalRamp": [
-          "oklch(15% 0.0291 174.42)",
-          "oklch(26% 0.0291 174.42)",
-          "oklch(38% 0.0291 174.42)",
-          "oklch(49% 0.0291 174.42)",
-          "oklch(61% 0.0291 174.42)",
-          "oklch(72% 0.0291 174.42)",
-          "oklch(84% 0.0291 174.42)",
-          "oklch(95% 0.0291 174.42)"
+          "#090b10",
+          "#212429",
+          "#3d4045",
+          "#5a5e64",
+          "#7d8087",
+          "#a1a5ab",
+          "#c7cbd2",
+          "#eaeff6"
         ]
       },
-      "muted": {
+      "ink-2": {
         "role": "neutral",
-        "displayName": "Muted",
+        "displayName": "Ink 2",
+        "canonical": "#444a54",
+        "oklch": "oklch(40.7% 0.019 260.7)",
         "tonalRamp": [
-          "oklch(15% 0.0286 167.37)",
-          "oklch(26% 0.0286 167.37)",
-          "oklch(38% 0.0286 167.37)",
-          "oklch(49% 0.0286 167.37)",
-          "oklch(61% 0.0286 167.37)",
-          "oklch(72% 0.0286 167.37)",
-          "oklch(84% 0.0286 167.37)",
-          "oklch(95% 0.0286 167.37)"
+          "#070b13",
+          "#1f242d",
+          "#3a404a",
+          "#585e68",
+          "#7a818c",
+          "#9ea5b1",
+          "#c4cbd7",
+          "#e7effb"
         ]
       },
-      "workspace": {
+      "ink-3": {
         "role": "neutral",
-        "displayName": "Workspace",
+        "displayName": "Ink 3",
+        "canonical": "#5a606b",
+        "oklch": "oklch(48.8% 0.019 262.7)",
         "tonalRamp": [
-          "oklch(15% 0.0034 145.55)",
-          "oklch(26% 0.0034 145.55)",
-          "oklch(38% 0.0034 145.55)",
-          "oklch(49% 0.0034 145.55)",
-          "oklch(61% 0.0034 145.55)",
-          "oklch(72% 0.0034 145.55)",
-          "oklch(84% 0.0034 145.55)",
-          "oklch(95% 0.0034 145.55)"
+          "#070b13",
+          "#1f242e",
+          "#3a404a",
+          "#585e69",
+          "#7a808c",
+          "#9ea5b1",
+          "#c4cbd7",
+          "#e8effc"
         ]
       },
-      "paper": {
+      "rule": {
         "role": "neutral",
-        "displayName": "Paper",
+        "displayName": "Rule",
+        "canonical": "#c3c8cf",
+        "oklch": "oklch(83.1% 0.011 256.7)",
         "tonalRamp": [
-          "oklch(15% 0.0000 89.88)",
-          "oklch(26% 0.0000 89.88)",
-          "oklch(38% 0.0000 89.88)",
-          "oklch(49% 0.0000 89.88)",
-          "oklch(61% 0.0000 89.88)",
-          "oklch(72% 0.0000 89.88)",
-          "oklch(84% 0.0000 89.88)",
-          "oklch(95% 0.0000 89.88)"
+          "#080b10",
+          "#21242a",
+          "#3c4046",
+          "#5a5e64",
+          "#7c8187",
+          "#a0a5ac",
+          "#c6cbd2",
+          "#eaeff6"
         ]
       },
-      "sidebar": {
+      "rule-strong": {
         "role": "neutral",
-        "displayName": "Sidebar",
+        "displayName": "Strong Rule",
+        "canonical": "#8b929c",
+        "oklch": "oklch(65.7% 0.017 257.2)",
         "tonalRamp": [
-          "oklch(15% 0.0078 139.44)",
-          "oklch(26% 0.0078 139.44)",
-          "oklch(38% 0.0078 139.44)",
-          "oklch(49% 0.0078 139.44)",
-          "oklch(61% 0.0078 139.44)",
-          "oklch(72% 0.0078 139.44)",
-          "oklch(84% 0.0078 139.44)",
-          "oklch(95% 0.0078 139.44)"
+          "#070b12",
+          "#1f242c",
+          "#3a4049",
+          "#585e67",
+          "#7a818b",
+          "#9ea5af",
+          "#c4cbd6",
+          "#e7effa"
         ]
       },
-      "line": {
+      "row": {
         "role": "neutral",
-        "displayName": "Line",
+        "displayName": "Row Rule",
+        "canonical": "#e3e6ea",
+        "oklch": "oklch(92.4% 0.006 255.5)",
         "tonalRamp": [
-          "oklch(15% 0.0134 152.59)",
-          "oklch(26% 0.0134 152.59)",
-          "oklch(38% 0.0134 152.59)",
-          "oklch(49% 0.0134 152.59)",
-          "oklch(61% 0.0134 152.59)",
-          "oklch(72% 0.0134 152.59)",
-          "oklch(84% 0.0134 152.59)",
-          "oklch(95% 0.0134 152.59)"
+          "#090b0e",
+          "#222427",
+          "#3e4043",
+          "#5b5e61",
+          "#7e8084",
+          "#a2a5a9",
+          "#c8cbcf",
+          "#eceff3"
         ]
       },
-      "row-line": {
-        "role": "neutral",
-        "displayName": "Row Line",
+      "carbon": {
+        "role": "primary",
+        "displayName": "Carbon Blue",
+        "canonical": "#2f3a8f",
+        "oklch": "oklch(39.2% 0.140 272.6)",
         "tonalRamp": [
-          "oklch(15% 0.0079 139.44)",
-          "oklch(26% 0.0079 139.44)",
-          "oklch(38% 0.0079 139.44)",
-          "oklch(49% 0.0079 139.44)",
-          "oklch(61% 0.0079 139.44)",
-          "oklch(72% 0.0079 139.44)",
-          "oklch(84% 0.0079 139.44)",
-          "oklch(95% 0.0079 139.44)"
+          "#090044",
+          "#141166",
+          "#2a3388",
+          "#4554ab",
+          "#6578d3",
+          "#879dfc",
+          "#acc4ff",
+          "#e7eeff"
         ]
       },
-      "nav-active": {
-        "role": "neutral",
-        "displayName": "Nav Active",
+      "carbon-deep": {
+        "role": "primary",
+        "displayName": "Deep Carbon",
+        "canonical": "#222b72",
+        "oklch": "oklch(32.9% 0.122 272.3)",
         "tonalRamp": [
-          "oklch(15% 0.0233 143.36)",
-          "oklch(26% 0.0233 143.36)",
-          "oklch(38% 0.0233 143.36)",
-          "oklch(49% 0.0233 143.36)",
-          "oklch(61% 0.0233 143.36)",
-          "oklch(72% 0.0233 143.36)",
-          "oklch(84% 0.0233 143.36)",
-          "oklch(95% 0.0233 143.36)"
+          "#06003d",
+          "#14175d",
+          "#2b377f",
+          "#4756a1",
+          "#687ac9",
+          "#8b9ff1",
+          "#afc5ff",
+          "#e7eeff"
         ]
       },
-      "nav-active-ink": {
-        "role": "neutral",
-        "displayName": "Nav Active Ink",
+      "carbon-wash": {
+        "role": "primary",
+        "displayName": "Carbon Wash",
+        "canonical": "#eceefa",
+        "oklch": "oklch(95.1% 0.016 278.5)",
         "tonalRamp": [
-          "oklch(15% 0.0603 158.10)",
-          "oklch(26% 0.0603 158.10)",
-          "oklch(38% 0.0603 158.10)",
-          "oklch(49% 0.0603 158.10)",
-          "oklch(61% 0.0603 158.10)",
-          "oklch(72% 0.0603 158.10)",
-          "oklch(84% 0.0603 158.10)",
-          "oklch(95% 0.0603 158.10)"
+          "#0a0a12",
+          "#22232c",
+          "#3e3f48",
+          "#5b5d67",
+          "#7e7f8a",
+          "#a2a4af",
+          "#c8cad5",
+          "#eceefa"
         ]
       },
-      "neutral-status": {
-        "role": "neutral",
-        "displayName": "Neutral Status",
-        "tonalRamp": [
-          "oklch(15% 0.0058 153.77)",
-          "oklch(26% 0.0058 153.77)",
-          "oklch(38% 0.0058 153.77)",
-          "oklch(49% 0.0058 153.77)",
-          "oklch(61% 0.0058 153.77)",
-          "oklch(72% 0.0058 153.77)",
-          "oklch(84% 0.0058 153.77)",
-          "oklch(95% 0.0058 153.77)"
-        ]
-      },
-      "neutral-status-ink": {
-        "role": "neutral",
-        "displayName": "Neutral Status Ink",
-        "tonalRamp": [
-          "oklch(15% 0.0271 160.89)",
-          "oklch(26% 0.0271 160.89)",
-          "oklch(38% 0.0271 160.89)",
-          "oklch(49% 0.0271 160.89)",
-          "oklch(61% 0.0271 160.89)",
-          "oklch(72% 0.0271 160.89)",
-          "oklch(84% 0.0271 160.89)",
-          "oklch(95% 0.0271 160.89)"
-        ]
-      },
-      "progress": {
+      "stamp": {
         "role": "secondary",
-        "displayName": "Progress",
+        "displayName": "Vermilion Stamp Ink",
+        "canonical": "#c4301d",
+        "oklch": "oklch(54.0% 0.187 30.9)",
         "tonalRamp": [
-          "oklch(15% 0.0131 251.56)",
-          "oklch(26% 0.0131 251.56)",
-          "oklch(38% 0.0131 251.56)",
-          "oklch(49% 0.0131 251.56)",
-          "oklch(61% 0.0131 251.56)",
-          "oklch(72% 0.0131 251.56)",
-          "oklch(84% 0.0131 251.56)",
-          "oklch(95% 0.0131 251.56)"
+          "#3c0000",
+          "#620000",
+          "#880000",
+          "#af1400",
+          "#d94631",
+          "#ff6e57",
+          "#ff957c",
+          "#ffe8e2"
         ]
       },
-      "progress-ink": {
+      "stamp-wash": {
         "role": "secondary",
-        "displayName": "Progress Ink",
+        "displayName": "Stamp Wash",
+        "canonical": "#fcebe7",
+        "oklch": "oklch(95.2% 0.019 33.4)",
         "tonalRamp": [
-          "oklch(15% 0.0791 250.42)",
-          "oklch(26% 0.0791 250.42)",
-          "oklch(38% 0.0791 250.42)",
-          "oklch(49% 0.0791 250.42)",
-          "oklch(61% 0.0791 250.42)",
-          "oklch(72% 0.0791 250.42)",
-          "oklch(84% 0.0791 250.42)",
-          "oklch(95% 0.0791 250.42)"
+          "#120806",
+          "#2d211e",
+          "#493c39",
+          "#685a57",
+          "#8b7c79",
+          "#b0a19d",
+          "#d7c6c2",
+          "#fbeae6"
         ]
       },
-      "completed": {
-        "role": "secondary",
-        "displayName": "Completed",
+      "canary": {
+        "role": "tertiary",
+        "displayName": "Canary Copy",
+        "canonical": "#f3e27c",
+        "oklch": "oklch(90.6% 0.125 100.0)",
         "tonalRamp": [
-          "oklch(15% 0.0220 145.40)",
-          "oklch(26% 0.0220 145.40)",
-          "oklch(38% 0.0220 145.40)",
-          "oklch(49% 0.0220 145.40)",
-          "oklch(61% 0.0220 145.40)",
-          "oklch(72% 0.0220 145.40)",
-          "oklch(84% 0.0220 145.40)",
-          "oklch(95% 0.0220 145.40)"
+          "#180600",
+          "#332100",
+          "#503f00",
+          "#6f5d00",
+          "#928101",
+          "#b7a63d",
+          "#ddcc66",
+          "#f3efd9"
         ]
       },
-      "completed-ink": {
-        "role": "secondary",
-        "displayName": "Completed Ink",
+      "pink": {
+        "role": "tertiary",
+        "displayName": "Pink Copy",
+        "canonical": "#f4bccb",
+        "oklch": "oklch(85.0% 0.067 0.9)",
         "tonalRamp": [
-          "oklch(15% 0.0909 152.12)",
-          "oklch(26% 0.0909 152.12)",
-          "oklch(38% 0.0909 152.12)",
-          "oklch(49% 0.0909 152.12)",
-          "oklch(61% 0.0909 152.12)",
-          "oklch(72% 0.0909 152.12)",
-          "oklch(84% 0.0909 152.12)",
-          "oklch(95% 0.0909 152.12)"
+          "#1f000a",
+          "#3d1422",
+          "#5c303e",
+          "#7d4d5b",
+          "#a26f7e",
+          "#c993a2",
+          "#f1b9c8",
+          "#ffe7ed"
         ]
       },
       "hold": {
-        "role": "secondary",
-        "displayName": "Hold",
+        "role": "tertiary",
+        "displayName": "Ochre Hold",
+        "canonical": "#865d00",
+        "oklch": "oklch(50.9% 0.106 78.7)",
         "tonalRamp": [
-          "oklch(15% 0.0299 92.32)",
-          "oklch(26% 0.0299 92.32)",
-          "oklch(38% 0.0299 92.32)",
-          "oklch(49% 0.0299 92.32)",
-          "oklch(61% 0.0299 92.32)",
-          "oklch(72% 0.0299 92.32)",
-          "oklch(84% 0.0299 92.32)",
-          "oklch(95% 0.0299 92.32)"
+          "#200000",
+          "#3e1900",
+          "#5d3600",
+          "#7d5500",
+          "#a2782b",
+          "#c89c53",
+          "#f0c278",
+          "#faedd9"
         ]
       },
-      "hold-ink": {
-        "role": "secondary",
-        "displayName": "Hold Ink",
+      "done": {
+        "role": "tertiary",
+        "displayName": "Ledger Green",
+        "canonical": "#1d6a44",
+        "oklch": "oklch(46.8% 0.097 157.3)",
         "tonalRamp": [
-          "oklch(15% 0.0826 76.27)",
-          "oklch(26% 0.0826 76.27)",
-          "oklch(38% 0.0826 76.27)",
-          "oklch(49% 0.0826 76.27)",
-          "oklch(61% 0.0826 76.27)",
-          "oklch(72% 0.0826 76.27)",
-          "oklch(84% 0.0826 76.27)",
-          "oklch(95% 0.0826 76.27)"
-        ]
-      },
-      "urgent": {
-        "role": "secondary",
-        "displayName": "Urgent",
-        "tonalRamp": [
-          "oklch(15% 0.0199 45.26)",
-          "oklch(26% 0.0199 45.26)",
-          "oklch(38% 0.0199 45.26)",
-          "oklch(49% 0.0199 45.26)",
-          "oklch(61% 0.0199 45.26)",
-          "oklch(72% 0.0199 45.26)",
-          "oklch(84% 0.0199 45.26)",
-          "oklch(95% 0.0199 45.26)"
-        ]
-      },
-      "urgent-ink": {
-        "role": "secondary",
-        "displayName": "Urgent Ink",
-        "tonalRamp": [
-          "oklch(15% 0.1386 34.28)",
-          "oklch(26% 0.1386 34.28)",
-          "oklch(38% 0.1386 34.28)",
-          "oklch(49% 0.1386 34.28)",
-          "oklch(61% 0.1386 34.28)",
-          "oklch(72% 0.1386 34.28)",
-          "oklch(84% 0.1386 34.28)",
-          "oklch(95% 0.1386 34.28)"
-        ]
-      },
-      "high": {
-        "role": "secondary",
-        "displayName": "High",
-        "tonalRamp": [
-          "oklch(15% 0.0256 84.59)",
-          "oklch(26% 0.0256 84.59)",
-          "oklch(38% 0.0256 84.59)",
-          "oklch(49% 0.0256 84.59)",
-          "oklch(61% 0.0256 84.59)",
-          "oklch(72% 0.0256 84.59)",
-          "oklch(84% 0.0256 84.59)",
-          "oklch(95% 0.0256 84.59)"
-        ]
-      },
-      "high-ink": {
-        "role": "secondary",
-        "displayName": "High Ink",
-        "tonalRamp": [
-          "oklch(15% 0.1008 66.29)",
-          "oklch(26% 0.1008 66.29)",
-          "oklch(38% 0.1008 66.29)",
-          "oklch(49% 0.1008 66.29)",
-          "oklch(61% 0.1008 66.29)",
-          "oklch(72% 0.1008 66.29)",
-          "oklch(84% 0.1008 66.29)",
-          "oklch(95% 0.1008 66.29)"
-        ]
-      },
-      "overdue": {
-        "role": "secondary",
-        "displayName": "Overdue",
-        "tonalRamp": [
-          "oklch(15% 0.1297 35.99)",
-          "oklch(26% 0.1297 35.99)",
-          "oklch(38% 0.1297 35.99)",
-          "oklch(49% 0.1297 35.99)",
-          "oklch(61% 0.1297 35.99)",
-          "oklch(72% 0.1297 35.99)",
-          "oklch(84% 0.1297 35.99)",
-          "oklch(95% 0.1297 35.99)"
-        ]
-      },
-      "accent": {
-        "role": "neutral",
-        "displayName": "Accent",
-        "tonalRamp": [
-          "oklch(15% 0.0160 148.40)",
-          "oklch(26% 0.0160 148.40)",
-          "oklch(38% 0.0160 148.40)",
-          "oklch(49% 0.0160 148.40)",
-          "oklch(61% 0.0160 148.40)",
-          "oklch(72% 0.0160 148.40)",
-          "oklch(84% 0.0160 148.40)",
-          "oklch(95% 0.0160 148.40)"
-        ]
-      },
-      "supporting-ink": {
-        "role": "neutral",
-        "displayName": "Supporting Ink",
-        "tonalRamp": [
-          "oklch(15% 0.0294 153.93)",
-          "oklch(26% 0.0294 153.93)",
-          "oklch(38% 0.0294 153.93)",
-          "oklch(49% 0.0294 153.93)",
-          "oklch(61% 0.0294 153.93)",
-          "oklch(72% 0.0294 153.93)",
-          "oklch(84% 0.0294 153.93)",
-          "oklch(95% 0.0294 153.93)"
-        ]
-      },
-      "switch-off": {
-        "role": "neutral",
-        "displayName": "Switch Off",
-        "tonalRamp": [
-          "oklch(15% 0.0247 157.38)",
-          "oklch(26% 0.0247 157.38)",
-          "oklch(38% 0.0247 157.38)",
-          "oklch(49% 0.0247 157.38)",
-          "oklch(61% 0.0247 157.38)",
-          "oklch(72% 0.0247 157.38)",
-          "oklch(84% 0.0247 157.38)",
-          "oklch(95% 0.0247 157.38)"
-        ]
-      },
-      "type-icon": {
-        "role": "neutral",
-        "displayName": "Type Icon",
-        "tonalRamp": [
-          "oklch(15% 0.0163 133.82)",
-          "oklch(26% 0.0163 133.82)",
-          "oklch(38% 0.0163 133.82)",
-          "oklch(49% 0.0163 133.82)",
-          "oklch(61% 0.0163 133.82)",
-          "oklch(72% 0.0163 133.82)",
-          "oklch(84% 0.0163 133.82)",
-          "oklch(95% 0.0163 133.82)"
-        ]
-      },
-      "type-hover": {
-        "role": "neutral",
-        "displayName": "Type Hover",
-        "tonalRamp": [
-          "oklch(15% 0.0123 137.78)",
-          "oklch(26% 0.0123 137.78)",
-          "oklch(38% 0.0123 137.78)",
-          "oklch(49% 0.0123 137.78)",
-          "oklch(61% 0.0123 137.78)",
-          "oklch(72% 0.0123 137.78)",
-          "oklch(84% 0.0123 137.78)",
-          "oklch(95% 0.0123 137.78)"
-        ]
-      },
-      "unread": {
-        "role": "neutral",
-        "displayName": "Unread",
-        "tonalRamp": [
-          "oklch(15% 0.0130 130.78)",
-          "oklch(26% 0.0130 130.78)",
-          "oklch(38% 0.0130 130.78)",
-          "oklch(49% 0.0130 130.78)",
-          "oklch(61% 0.0130 130.78)",
-          "oklch(72% 0.0130 130.78)",
-          "oklch(84% 0.0130 130.78)",
-          "oklch(95% 0.0130 130.78)"
-        ]
-      },
-      "inbox-icon": {
-        "role": "neutral",
-        "displayName": "Inbox Icon",
-        "tonalRamp": [
-          "oklch(15% 0.0176 131.88)",
-          "oklch(26% 0.0176 131.88)",
-          "oklch(38% 0.0176 131.88)",
-          "oklch(49% 0.0176 131.88)",
-          "oklch(61% 0.0176 131.88)",
-          "oklch(72% 0.0176 131.88)",
-          "oklch(84% 0.0176 131.88)",
-          "oklch(95% 0.0176 131.88)"
-        ]
-      },
-      "inbox-title": {
-        "role": "neutral",
-        "displayName": "Inbox Title",
-        "tonalRamp": [
-          "oklch(15% 0.0574 160.15)",
-          "oklch(26% 0.0574 160.15)",
-          "oklch(38% 0.0574 160.15)",
-          "oklch(49% 0.0574 160.15)",
-          "oklch(61% 0.0574 160.15)",
-          "oklch(72% 0.0574 160.15)",
-          "oklch(84% 0.0574 160.15)",
-          "oklch(95% 0.0574 160.15)"
-        ]
-      },
-      "empty-icon": {
-        "role": "neutral",
-        "displayName": "Empty Icon",
-        "tonalRamp": [
-          "oklch(15% 0.0180 134.92)",
-          "oklch(26% 0.0180 134.92)",
-          "oklch(38% 0.0180 134.92)",
-          "oklch(49% 0.0180 134.92)",
-          "oklch(61% 0.0180 134.92)",
-          "oklch(72% 0.0180 134.92)",
-          "oklch(84% 0.0180 134.92)",
-          "oklch(95% 0.0180 134.92)"
-        ]
-      },
-      "admin-check": {
-        "role": "primary",
-        "displayName": "Admin Check",
-        "tonalRamp": [
-          "oklch(15% 0.0885 159.43)",
-          "oklch(26% 0.0885 159.43)",
-          "oklch(38% 0.0885 159.43)",
-          "oklch(49% 0.0885 159.43)",
-          "oklch(61% 0.0885 159.43)",
-          "oklch(72% 0.0885 159.43)",
-          "oklch(84% 0.0885 159.43)",
-          "oklch(95% 0.0885 159.43)"
-        ]
-      },
-      "admin-divider": {
-        "role": "neutral",
-        "displayName": "Admin Divider",
-        "tonalRamp": [
-          "oklch(15% 0.0103 145.49)",
-          "oklch(26% 0.0103 145.49)",
-          "oklch(38% 0.0103 145.49)",
-          "oklch(49% 0.0103 145.49)",
-          "oklch(61% 0.0103 145.49)",
-          "oklch(72% 0.0103 145.49)",
-          "oklch(84% 0.0103 145.49)",
-          "oklch(95% 0.0103 145.49)"
-        ]
-      },
-      "admin-muted": {
-        "role": "neutral",
-        "displayName": "Admin Muted",
-        "tonalRamp": [
-          "oklch(15% 0.0252 162.24)",
-          "oklch(26% 0.0252 162.24)",
-          "oklch(38% 0.0252 162.24)",
-          "oklch(49% 0.0252 162.24)",
-          "oklch(61% 0.0252 162.24)",
-          "oklch(72% 0.0252 162.24)",
-          "oklch(84% 0.0252 162.24)",
-          "oklch(95% 0.0252 162.24)"
-        ]
-      },
-      "command-surface": {
-        "role": "neutral",
-        "displayName": "Command Surface",
-        "tonalRamp": [
-          "oklch(15% 0.0041 157.18)",
-          "oklch(26% 0.0041 157.18)",
-          "oklch(38% 0.0041 157.18)",
-          "oklch(49% 0.0041 157.18)",
-          "oklch(61% 0.0041 157.18)",
-          "oklch(72% 0.0041 157.18)",
-          "oklch(84% 0.0041 157.18)",
-          "oklch(95% 0.0041 157.18)"
+          "#001500",
+          "#00300f",
+          "#004e2a",
+          "#226e47",
+          "#499269",
+          "#6eb78d",
+          "#94deb2",
+          "#dff5e7"
         ]
       }
     },
     "typographyMeta": {
+      "display": {
+        "displayName": "Display",
+        "purpose": "Page titles (TODAY) and the login ticket title; condensed uppercase, 30px on phones."
+      },
+      "numeral": {
+        "displayName": "Numeral",
+        "purpose": "Tally line and report metrics in carbon; 26px on phones; 20px in register figures."
+      },
+      "ticket-number": {
+        "displayName": "Ticket number",
+        "purpose": "WO numbers in carbon; 17px in the ledger, 22px in the sheet head."
+      },
       "headline": {
-        "displayName": "Page heading",
-        "purpose": "Page title; mobile role applies at 760px."
+        "displayName": "Headline",
+        "purpose": "Ticket sheet title; section heads at 18px."
       },
       "title": {
-        "displayName": "Section heading",
-        "purpose": "Register and section titles."
+        "displayName": "Title",
+        "purpose": "Ledger request titles and register row names."
       },
       "body": {
         "displayName": "Body",
-        "purpose": "General explanatory copy."
+        "purpose": "Paragraphs at 100% width, max 68ch; 13px in ledger cells, 12px metadata."
       },
       "label": {
-        "displayName": "Field label",
-        "purpose": "Explicit form labels."
+        "displayName": "Label stock",
+        "purpose": "Nav tab dividers, table headers, register titles, filter tabs, field labels (10.5px), lifecycle labels."
       },
-      "metric": {
-        "displayName": "Operational count",
-        "purpose": "Summary totals with tabular numerals."
+      "stamp": {
+        "displayName": "Stamp",
+        "purpose": "Status and priority stamps; lifecycle stamp at 15px / 850 / 0.08em."
       },
-      "supporting": {
-        "displayName": "Supporting descriptions",
-        "purpose": "13px settings descriptions and inbox messages; line height varies by context."
-      },
-      "control": {
-        "displayName": "Supporting controls",
-        "purpose": "13px desktop navigation and settings tabs; compact desktop uses12px, mobile Menu uses12px and disclosed destinations use13px."
-      },
-      "settings-title": {
-        "displayName": "Settings sheet title",
-        "purpose": "17px settings and empty-state headings."
-      },
-      "metadata": {
-        "displayName": "Request metadata",
-        "purpose": "12px secondary request lines, type labels, and register footer."
-      },
-      "headline-mobile": {
-        "displayName": "Mobile page heading",
-        "purpose": "24px page headings with1.3 line height at760px and below."
-      },
-      "metric-mobile": {
-        "displayName": "Mobile operational count",
-        "purpose": "24px counts in compact two-column metrics; supporting copy is hidden."
-      },
-      "admin-label": {
-        "displayName": "Administration field label",
-        "purpose": "14px semibold labels; inline checkbox labels use regular weight."
-      },
-      "technical": {
-        "displayName": "Technical block",
-        "purpose": "13px native preformatted text for commands, connection URLs, and one-time token display."
+      "button": {
+        "displayName": "Button",
+        "purpose": "Primary and secondary button labels at 88% width."
       }
     },
     "shadows": [
       {
-        "name": "dialog",
-        "value": "0 18px 70px #102b302e",
-        "purpose": "Native modal above work sheets."
+        "name": "sheet",
+        "value": "-18px 0 60px rgb(20 24 32 / 0.2), -2px 0 6px rgb(20 24 32 / 0.08)",
+        "purpose": "Right-hand ticket sheet over a rgb(28 31 36 / 0.38) backdrop."
+      },
+      {
+        "name": "lifted-ticket",
+        "value": "0 24px 60px -24px rgb(20 24 32 / 0.35)",
+        "purpose": "Blank login ticket."
       },
       {
         "name": "toast",
-        "value": "0 5px 22px #12291526",
-        "purpose": "Transient confirmation above the workspace."
-      },
-      {
-        "name": "mobile-navigation",
-        "value": "0 12px 30px #163e3024",
-        "purpose": "Disclosed mobile destination panel above the workspace."
+        "value": "0 10px 30px -8px rgb(20 24 32 / 0.45)",
+        "purpose": "Ink toast, bottom centre."
       }
     ],
     "motion": [
       {
-        "name": "button-background",
-        "value": "background .16s",
-        "purpose": "Button feedback; disabled by reduced-motion preference."
+        "name": "ease-out-paper",
+        "value": "cubic-bezier(0.16, 1, 0.3, 1)",
+        "purpose": "Sheet entry, stamp landing, row expansion, toggle thumb, phone rail."
       },
       {
-        "name": "dialog-arrival",
-        "value": "editor-arrive .2s cubic-bezier(.16,1,.3,1)",
-        "purpose": "Native modal settles from translateY(5px), opacity .9 and a softer shadow. Disabled by reduced-motion preference."
+        "name": "ease-in-file",
+        "value": "cubic-bezier(0.7, 0, 0.84, 0)",
+        "purpose": "Sheet filing away after a stamp."
       },
       {
-        "name": "switch-background",
-        "value": "background .16s",
-        "purpose": "Checked track feedback; disabled by reduced-motion preference."
+        "name": "sheet-in",
+        "value": "0.24s: translateX(28px), opacity 0.6 -> none",
+        "purpose": "Ticket sheet slides in from the right."
       },
       {
-        "name": "switch-thumb",
-        "value": "transform .16s",
-        "purpose": "Thumb translates18px on checking; disabled by reduced-motion preference."
+        "name": "stamp-land",
+        "value": "0.3s: translateY(-14px) scale(1.7) rotate(-14deg) blur(2px) -> rotate(-5deg)",
+        "purpose": "Lifecycle stamp lands on the strip."
+      },
+      {
+        "name": "sheet-file",
+        "value": "0.24s: -> translate(48px, 18px) rotate(1.5deg), opacity 0",
+        "purpose": "Sheet files away after the stamp lands."
+      },
+      {
+        "name": "row-expand",
+        "value": "0.22s grid-template-rows 0fr -> 1fr; siblings recede to 0.55-0.6 opacity",
+        "purpose": "Focused ledger row opens in place (desktop only)."
+      },
+      {
+        "name": "state",
+        "value": "0.12s-0.14s ease-out",
+        "purpose": "Hover backgrounds, borders and stamp-button tilt."
+      },
+      {
+        "name": "reduced-motion",
+        "value": "@media (prefers-reduced-motion: reduce) { transition: none; animation: none }",
+        "purpose": "Disables all motion, including stamp landing and sheet filing."
       }
     ],
     "breakpoints": [
       {
-        "name": "compact-desktop",
-        "value": "1100px"
+        "name": "medium",
+        "value": "1180px"
       },
       {
-        "name": "mobile",
+        "name": "phone",
         "value": "760px"
-      },
-      {
-        "name": "admin-compact",
-        "value": "700px"
       }
     ]
   },
   "components": [
     {
-      "name": "Primary action",
+      "name": "Primary Button",
       "kind": "button",
       "refersTo": "button-primary",
-      "description": "Create and save actions.",
-      "html": "<button class=\"ds-primary\">New request</button>",
-      "css": ".ds-primary{font-family:Manrope,Segoe UI,sans-serif;font-size:14px;background:var(--green,#245b45);color:white;border:0;padding:11px 18px;border-radius:7px;font-weight:700;display:inline-flex;align-items:center;gap:8px;cursor:pointer;transition:background .16s}.ds-primary:hover{background:#173e2f}.ds-primary:focus-visible{outline:2px solid #277653;outline-offset:4px;}.ds-primary:disabled{opacity:.5;cursor:wait}@media(prefers-reduced-motion:reduce){.ds-primary{transition:none}}"
+      "description": "Carbon-filled primary action, such as New request.",
+      "html": "<button class=\"ds-btn-primary\"><svg width=\"16\" height=\"16\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\"><path d=\"M12 5v14M5 12h14\"/></svg>New request</button>",
+      "css": ".ds-btn-primary{display:inline-flex;align-items:center;gap:8px;background:#2f3a8f;color:#fff;border:1px solid #2f3a8f;padding:10px 16px;border-radius:3px;font-family:Archivo,'Segoe UI',system-ui,sans-serif;font-size:14px;font-weight:650;font-stretch:88%;cursor:pointer;transition:background .14s ease-out}.ds-btn-primary:hover{background:#222b72}.ds-btn-primary:focus-visible{outline:2px solid #2f3a8f;outline-offset:3px}"
     },
     {
-      "name": "Secondary action",
+      "name": "Secondary and Danger Buttons",
       "kind": "button",
       "refersTo": "button-secondary",
-      "description": "Cancel and supporting actions.",
-      "html": "<button class=\"ds-secondary\">Cancel</button>",
-      "css": ".ds-secondary{font-family:Manrope,Segoe UI,sans-serif;font-size:14px;background:white;border:1px solid #bdcdc1;border-radius:6px;padding:9px 13px;color:#29483a;cursor:pointer;transition:background .16s}.ds-secondary:hover{background:#edf3ee}.ds-secondary:focus-visible{outline:2px solid #277653;outline-offset:4px;}@media(prefers-reduced-motion:reduce){.ds-secondary{transition:none}}"
+      "description": "Paper button for secondary actions; the danger variant prints in stamp ink and arms to a vermilion fill.",
+      "html": "<button class=\"ds-btn-secondary\">Edit details</button> <button class=\"ds-btn-secondary ds-danger\">Delete request</button>",
+      "css": ".ds-btn-secondary{display:inline-flex;align-items:center;gap:7px;background:#fff;border:1px solid #8b929c;border-radius:3px;padding:8px 12px;color:#1c1f24;font-family:Archivo,'Segoe UI',system-ui,sans-serif;font-size:14px;font-weight:600;font-stretch:88%;cursor:pointer;transition:background .14s ease-out,border-color .14s ease-out}.ds-btn-secondary:hover{background:#eceefa;border-color:#1c1f24}.ds-btn-secondary:focus-visible{outline:2px solid #2f3a8f;outline-offset:3px}.ds-btn-secondary.ds-danger{color:#c4301d;border-color:color-mix(in srgb,#c4301d 55%,white)}.ds-btn-secondary.ds-danger:hover{background:#fcebe7;border-color:#c4301d}.ds-btn-secondary.ds-danger:active{background:#c4301d;border-color:#c4301d;color:#fff}"
     },
     {
-      "name": "Text field",
-      "kind": "input",
-      "refersTo": "field",
-      "description": "Explicit label above a text input.",
-      "html": "<label class=\"ds-field\">Building name<input placeholder=\"Building name\"></label>",
-      "css": ".ds-field{font-family:Manrope,Segoe UI,sans-serif;display:flex;flex-direction:column;gap:7px;font-size:12px;font-weight:650;color:#20352f}.ds-field input{font-family:Manrope,Segoe UI,sans-serif;font-size:14px;border:1px solid #bfcec3;border-radius:5px;padding:10px;background:white;color:#273e31;font-weight:400;caret-color:var(--green,#245b45)}.ds-field input:focus-visible{outline:2px solid #277653;outline-offset:4px;}"
+      "name": "Stamp Buttons",
+      "kind": "button",
+      "refersTo": "stamp-button",
+      "description": "Lifecycle moves. The next stage is filled carbon, and every stamp button is carbon.",
+      "html": "<div class=\"ds-stamp-bar\"><button class=\"ds-stamp-btn ds-next\">Stamp in progress</button><button class=\"ds-stamp-btn\">Stamp on hold</button><button class=\"ds-stamp-btn\">Stamp completed</button></div>",
+      "css": ".ds-stamp-bar{display:flex;flex-wrap:wrap;gap:10px}.ds-stamp-btn{font-family:Archivo,'Segoe UI',system-ui,sans-serif;font-size:13px;font-weight:800;font-stretch:74%;text-transform:uppercase;letter-spacing:.07em;padding:8px 12px 7px;background:#fff;border:2px solid currentColor;border-radius:3px;color:#2f3a8f;cursor:pointer;transition:transform .12s ease-out,background .12s ease-out}.ds-stamp-btn:hover{background:#eceefa;transform:rotate(-2deg)}.ds-stamp-btn:active{transform:rotate(-4deg) scale(.97)}.ds-stamp-btn:focus-visible{outline:2px solid #2f3a8f;outline-offset:3px}.ds-stamp-btn.ds-next{background:#2f3a8f;border-color:#2f3a8f;color:#fff}.ds-stamp-btn.ds-next:hover{background:#222b72}"
     },
     {
-      "name": "Active navigation",
-      "kind": "nav",
-      "refersTo": "navigation-active",
-      "description": "Current workspace destination.",
-      "html": "<nav aria-label=\"Example navigation\"><button class=\"ds-nav\" aria-current=\"page\">Overview</button></nav>",
-      "css": ".ds-nav{font-family:Manrope,Segoe UI,sans-serif;font-size:13px;border:0;text-align:left;display:flex;gap:12px;align-items:center;background:#dce9db;padding:11px 12px;color:#214a34;border-radius:6px;font-weight:600;cursor:pointer;transition:background .16s}.ds-nav:hover{background:#e4ede3}.ds-nav:focus-visible{outline:2px solid #277653;outline-offset:4px;}@media(prefers-reduced-motion:reduce){.ds-nav{transition:none}}"
-    },
-    {
-      "name": "Status marker",
+      "name": "Status Stamps",
       "kind": "chip",
-      "refersTo": "tag-default",
-      "description": "Written work state with a matching dot; intentionally enlarged from the original10px implementation.",
-      "html": "<span class=\"ds-tag\"><span class=\"ds-dot\"></span>Open</span>",
-      "css": ".ds-tag{font-family:Manrope,Segoe UI,sans-serif;display:inline-flex;align-items:center;gap:6px;padding:4px 8px;border-radius:4px;font-size:11px;font-weight:650;background:#edf1ee;color:#516359}.ds-dot{width:6px;height:6px;border-radius:50%;background:currentColor}"
+      "refersTo": "status-stamp",
+      "description": "Outlined condensed-caps state words. Urgent is the only filled stamp; dashed means awaiting and struck means archived.",
+      "html": "<div class=\"ds-stamps\"><span class=\"ds-tag\">Open</span><span class=\"ds-tag ds-progress\">In progress</span><span class=\"ds-tag ds-hold\">On hold</span><span class=\"ds-tag ds-done\">Completed</span><span class=\"ds-tag ds-urgent\">Urgent</span><span class=\"ds-tag ds-high\">High</span><span class=\"ds-tag ds-hold ds-await\">Awaiting approval</span><span class=\"ds-tag ds-archived\">Archived</span><span class=\"ds-overdue\">Overdue</span></div>",
+      "css": ".ds-stamps{display:flex;flex-wrap:wrap;gap:8px;align-items:center;FF}.ds-tag{display:inline-flex;align-items:center;font-size:11px;font-weight:800;font-stretch:74%;text-transform:uppercase;letter-spacing:.07em;line-height:1;padding:4px 6px 3px;border:1.5px solid currentColor;border-radius:2px;color:#1c1f24;white-space:nowrap}.ds-progress{color:#2f3a8f}.ds-hold{color:#865d00}.ds-done{color:#1d6a44}.ds-urgent{background:#c4301d;border-color:#c4301d;color:#fff}.ds-high{color:#c4301d}.ds-await{border-style:dashed}.ds-archived{color:#5a606b;border-color:#8b929c;text-decoration:line-through;text-decoration-thickness:1.5px}.ds-overdue{font-size:10.5px;font-weight:800;font-stretch:74%;text-transform:uppercase;letter-spacing:.08em;color:#c4301d;border:1.5px solid #c4301d;padding:1px 5px 0;border-radius:2px;transform:rotate(-2deg)}"
     },
     {
-      "name": "Record panel",
+      "name": "Lifecycle Strip",
+      "kind": "custom",
+      "description": "A four-stage ruled strip. Past cells are struck on the desk ground; the current cell carries the rotated stamp.",
+      "html": "<ol class=\"ds-lc\"><li class=\"ds-past\"><span class=\"ds-lc-label\">Open</span></li><li><span class=\"ds-lc-label ds-cur\">In progress</span><span class=\"ds-lc-stamp\">In progress</span></li><li><span class=\"ds-lc-label\">On hold</span></li><li><span class=\"ds-lc-label\">Completed</span></li></ol>",
+      "css": ".ds-lc{list-style:none;margin:0;padding:0;display:grid;grid-template-columns:repeat(4,1fr);border:1px solid #1c1f24;border-radius:2px;font-family:Archivo,'Segoe UI',system-ui,sans-serif;max-width:640px}.ds-lc li{position:relative;min-height:58px;padding:8px 10px;border-right:1px solid #c3c8cf}.ds-lc li:last-child{border-right:0}.ds-lc-label{font-size:11px;font-weight:700;font-stretch:74%;text-transform:uppercase;letter-spacing:.06em;color:#5a606b}.ds-lc-label.ds-cur{color:#1c1f24}.ds-past{background:#e7e9ec}.ds-past .ds-lc-label{color:#444a54;text-decoration:line-through;text-decoration-color:#8b929c}.ds-lc-stamp{position:absolute;right:10px;bottom:8px;font-size:15px;font-weight:850;font-stretch:74%;text-transform:uppercase;letter-spacing:.08em;padding:3px 8px 2px;border:2px solid currentColor;border-radius:3px;transform:rotate(-5deg);color:#2f3a8f;background:rgba(255,255,255,.8);white-space:nowrap}"
+    },
+    {
+      "name": "Ruled Field Grid",
+      "kind": "input",
+      "refersTo": "field-cell",
+      "description": "Fields share single hairlines: the frame rules right and bottom, and each cell rules left and top. Focus gives a carbon wash and an inset underline.",
+      "html": "<div class=\"ds-grid\"><label class=\"ds-field\">Building<input value=\"North Campus\"></label><label class=\"ds-field\">Assigned to<input value=\"Alex Morgan\"></label><label class=\"ds-field ds-full\">Description of work<input placeholder=\"What needs doing?\"></label></div>",
+      "css": ".ds-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));border-right:1px solid #8b929c;border-bottom:1px solid #8b929c;max-width:560px;FF}.ds-field{display:flex;flex-direction:column;gap:3px;font-size:10.5px;font-weight:700;font-stretch:74%;text-transform:uppercase;letter-spacing:.06em;color:#5a606b;border-left:1px solid #8b929c;border-top:1px solid #8b929c;padding:8px 10px 6px;background:#fff;transition:background .12s ease-out}.ds-field:focus-within{background:#eceefa;color:#1c1f24;box-shadow:inset 0 -2px 0 #2f3a8f}.ds-full{grid-column:1/-1}.ds-field input{border:0;background:transparent;padding:3px 0 4px;font:inherit;font-size:14px;font-weight:450;font-stretch:100%;text-transform:none;letter-spacing:0;color:#1c1f24;outline:none;caret-color:#2f3a8f}"
+    },
+    {
+      "name": "Ledger Register",
       "kind": "card",
-      "refersTo": "panel",
-      "description": "Flat bordered sheet for recurring maintenance records.",
-      "html": "<section class=\"ds-panel\"><h2>Upcoming maintenance</h2><div class=\"ds-row\"><strong>Monthly HVAC inspection</strong><small>North Campus</small></div></section>",
-      "css": ".ds-panel{font-family:Manrope,Segoe UI,sans-serif;background:white;border:1px solid var(--line,#dce5de);border-radius:8px;overflow:hidden;color:#20352f}.ds-panel h2{padding:21px 22px;font-size:15px;letter-spacing:-.02em;margin:0;font-weight:700}.ds-row{padding:17px 22px;border-top:1px solid #edf1ec}.ds-row strong{font-size:12px;display:block}.ds-row small{color:var(--muted,#5b7067);font-size:11px;display:block;margin-top:5px}"
+      "refersTo": "register-panel",
+      "description": "A paper register capped by a 2px ink rule, with an ink-filled selected filter tab and carbon WO numbers. Siblings recede on hover.",
+      "html": "<div class=\"ds-ledger\"><div class=\"ds-tabs\"><button class=\"ds-sel\">Active</button><button>Open</button><button>Overdue</button></div><table><thead><tr><th>No.</th><th>Request</th><th>Status</th></tr></thead><tbody><tr><td class=\"ds-no\">WO-0001</td><td>Air conditioning not cooling</td><td><span class=\"ds-t\">Open</span></td></tr><tr><td class=\"ds-no\">WO-0002</td><td>Replace lobby ceiling lights</td><td><span class=\"ds-t ds-c\">In progress</span></td></tr></tbody></table></div>",
+      "css": ".ds-ledger{background:#fff;border:1px solid #c3c8cf;border-top:2px solid #1c1f24;border-radius:0 0 3px 3px;font-family:Archivo,'Segoe UI',system-ui,sans-serif;font-variant-numeric:tabular-nums;max-width:600px}.ds-tabs{display:flex;gap:2px;padding:10px 14px;border-bottom:1px solid #c3c8cf}.ds-tabs button{border:1px solid transparent;background:transparent;color:#444a54;padding:6px 10px 5px;border-radius:3px;font:inherit;font-size:12px;font-weight:700;font-stretch:74%;text-transform:uppercase;letter-spacing:.06em;cursor:pointer}.ds-tabs button:hover{background:#e7e9ec;color:#1c1f24}.ds-tabs button:focus-visible{outline:2px solid #2f3a8f;outline-offset:3px}.ds-tabs .ds-sel,.ds-tabs .ds-sel:hover{background:#1c1f24;border-color:#1c1f24;color:#fff}.ds-ledger table{border-collapse:collapse;width:100%;text-align:left}.ds-ledger th{font-size:11px;font-weight:750;font-stretch:74%;text-transform:uppercase;letter-spacing:.06em;color:#5a606b;padding:10px 14px 8px;border-bottom:1px solid #1c1f24}.ds-ledger td{padding:12px 14px;border-top:1px solid #e3e6ea;font-size:13px;color:#1c1f24}.ds-ledger tbody tr{cursor:pointer;transition:background .12s ease-out,opacity .18s ease-out}.ds-ledger tbody tr:hover{background:#eceefa}.ds-ledger tbody:hover tr:not(:hover){opacity:.6}.ds-no{font-size:17px;font-weight:750;font-stretch:74%;color:#2f3a8f;letter-spacing:.02em}.ds-t{font-size:11px;font-weight:800;font-stretch:74%;text-transform:uppercase;letter-spacing:.07em;padding:4px 6px 3px;border:1.5px solid currentColor;border-radius:2px}.ds-c{color:#2f3a8f}"
     },
     {
-      "name": "Search field",
-      "kind": "input",
-      "description": "Search focus surrounds the entire field.",
-      "html": "<label class=\"ds-search\"><input type=\"search\" aria-label=\"Search requests\" placeholder=\"Search requests\"></label>",
-      "css": ".ds-search{display:flex;align-items:center;gap:8px;border:1px solid var(--line,#dce5de);padding:7px 10px;border-radius:5px}.ds-search input{font-family:Manrope,Segoe UI,sans-serif;border:0;width:180px;outline:none;background:transparent;font-size:12px;color:#20352f}.ds-search:focus-within{outline:2px solid #277653;outline-offset:3px}"
+      "name": "Tally Line",
+      "kind": "custom",
+      "description": "One ruled count line of condensed labels and carbon numerals. Overdue prints in stamp ink.",
+      "html": "<div class=\"ds-tally\"><span class=\"ds-cell\"><span class=\"ds-lab\">Active</span><strong>5</strong></span><span class=\"ds-cell ds-alert\"><span class=\"ds-lab\">Overdue</span><strong>1</strong></span><span class=\"ds-cell\"><span class=\"ds-lab\">In progress</span><strong>1</strong></span></div>",
+      "css": ".ds-tally{display:flex;border-top:2px solid #1c1f24;border-bottom:1px solid #1c1f24;font-family:Archivo,'Segoe UI',system-ui,sans-serif;font-variant-numeric:tabular-nums}.ds-cell{display:inline-flex;align-items:baseline;gap:10px;border-right:1px solid #c3c8cf;padding:10px 22px 9px 0;margin-right:22px}.ds-cell:last-child{border-right:0}.ds-lab{font-size:12px;font-weight:700;font-stretch:74%;text-transform:uppercase;letter-spacing:.06em;color:#444a54}.ds-cell strong{font-size:32px;line-height:1;font-weight:800;font-stretch:74%;color:#2f3a8f}.ds-alert strong{color:#c4301d}"
     },
     {
-      "name": "Settings switch",
-      "kind": "input",
-      "refersTo": "switch-on",
-      "description": "Labeled organization or personal preference. Saving uses the primary action.",
-      "html": "<label class=\"ds-setting\"><span><strong>Maintenance requests</strong><small>Repairs, upkeep, and facilities support.</small></span><span class=\"ds-toggle\"><input type=\"checkbox\" role=\"switch\" aria-label=\"Maintenance requests\" checked><span class=\"ds-track\" aria-hidden=\"true\"></span></span></label>",
-      "css": ".ds-setting{font-family:Manrope,Segoe UI,sans-serif;display:flex;align-items:center;justify-content:space-between;gap:24px;padding:25px 28px;border-bottom:1px solid var(--line,#dce5de);cursor:pointer;color:#20352f}.ds-setting strong{font-size:14px;display:block;margin-bottom:6px}.ds-setting small{font-size:13px;display:block;color:var(--muted,#5b7067);line-height:1.6}.ds-setting:hover{background:#fafcf9}.ds-toggle{width:44px;height:26px;position:relative;flex-shrink:0;display:inline-block}.ds-toggle input{position:absolute;inset:0;width:44px;height:26px;opacity:0;z-index:1;margin:0;cursor:pointer}.ds-track{display:block;height:26px;border-radius:15px;background:#9aaba0;transition:background .16s}.ds-track:after{content:\"\";position:absolute;width:20px;height:20px;background:white;border-radius:50%;top:3px;left:3px;transition:transform .16s}.ds-toggle input:checked+.ds-track{background:var(--green,#245b45)}.ds-toggle input:checked+.ds-track:after{transform:translateX(18px)}.ds-toggle input:focus-visible+.ds-track{outline:2px solid #277653;outline-offset:4px;}@media(max-width:760px){.ds-setting{padding:22px 20px}}@media(prefers-reduced-motion:reduce){.ds-track,.ds-track:after{transition:none}}"
-    },
-    {
-      "name": "Settings tabs",
+      "name": "Tab Divider Navigation",
       "kind": "nav",
-      "refersTo": "settings-tab",
-      "description": "Wrapping destinations shared by settings and notification preferences; all labels remain visible.",
-      "html": "<div class=\"ds-settings-tabs\"><button>Request types</button><button>Notifications</button><button class=\"ds-selected\">Identity</button><button>People</button><button>Groups</button><button>Provisioning</button><button>Workspace</button><button>Updates</button></div>",
-      "css": ".ds-settings-tabs{font-family:Manrope,Segoe UI,sans-serif;display:flex;gap:25px;border-bottom:1px solid var(--line,#dce5de);margin:0 0 26px;flex-wrap:wrap;overflow:visible}.ds-settings-tabs button{font-family:Manrope,Segoe UI,sans-serif;white-space:nowrap;border:0;border-bottom:2px solid transparent;background:transparent;padding:0 0 13px;color:var(--muted,#5b7067);font-size:13px;font-weight:600;flex-shrink:0;cursor:pointer}.ds-settings-tabs button.ds-selected{border-bottom-color:var(--green,#245b45);color:var(--green,#245b45)}.ds-settings-tabs button:focus-visible{outline:2px solid #277653;outline-offset:4px;}@media(max-width:760px){.ds-settings-tabs{gap:21px}}@media(max-width:700px){.ds-settings-tabs{gap:4px 12px}.ds-settings-tabs button{padding:10px 0}}"
+      "description": "A rail of paper tab dividers, one per group. The active row takes the desk ground and a carbon icon.",
+      "html": "<nav class=\"ds-rail\"><span class=\"ds-tab\">Requests</span><button class=\"ds-on\"><svg width=\"17\" height=\"17\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.6\"><path d=\"M3 11l9-7 9 7v9H3z\"/></svg><span>Overview</span></button><button><svg width=\"17\" height=\"17\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.6\"><rect x=\"5\" y=\"3\" width=\"14\" height=\"18\" rx=\"1\"/><path d=\"M9 8h6M9 12h6\"/></svg><span>All requests</span><b>5</b></button><span class=\"ds-tab\">Places</span><button><svg width=\"17\" height=\"17\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.6\"><path d=\"M4 21V5h10v16M14 9h6v12M7 9h4M7 13h4\"/></svg><span>Buildings</span></button></nav>",
+      "css": ".ds-rail{display:grid;width:252px;background:#dcdfe4;padding:4px 0 16px 14px;FF}.ds-tab{justify-self:start;font-size:11px;font-weight:750;font-stretch:74%;text-transform:uppercase;letter-spacing:.06em;color:#444a54;padding:4px 12px 3px 10px;margin:12px 0 2px 6px;background:#fff;border:1px solid #c3c8cf;border-bottom:0;border-radius:5px 9px 0 0}.ds-rail button{display:flex;align-items:center;gap:11px;border:0;border-top:1px solid rgba(195,200,207,.6);background:transparent;color:#444a54;text-align:left;padding:9px 14px 9px 12px;font:inherit;font-size:14px;font-weight:560;border-radius:3px 0 0 3px;cursor:pointer;transition:background .12s ease-out,color .12s ease-out}.ds-rail button svg{color:#5a606b}.ds-rail button:hover{background:rgba(255,255,255,.55);color:#1c1f24}.ds-rail button:focus-visible{outline:2px solid #2f3a8f;outline-offset:3px}.ds-rail .ds-on{background:#e7e9ec;color:#1c1f24;font-weight:700}.ds-rail .ds-on svg{color:#2f3a8f}.ds-rail b{margin-left:auto;font-stretch:74%;font-weight:750;font-size:13px;color:#2f3a8f}"
     },
     {
-      "name": "Request-type summary",
-      "kind": "custom",
-      "refersTo": "type-summary",
-      "description": "Enabled request type in a horizontal divided strip, including compact mobile columns.",
-      "html": "<button class=\"ds-type\"><span class=\"ds-type-symbol\"><svg class=\"ds-icon\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.6\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><path d=\"M9 5H5v16h14V5h-4 M9 3h6v4H9z M8 12h8 M8 16h5\"/></svg></span><span class=\"ds-type-copy\"><strong>Maintenance</strong><small>5 active<span class=\"ds-summary-detail\"> requests</span></small></span><svg class=\"ds-icon\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.6\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><path d=\"M5 12h14 M14 7l5 5-5 5\"/></svg></button>",
-      "css": ".ds-type{font-family:Manrope,Segoe UI,sans-serif;display:flex;align-items:center;gap:13px;border:0;border-right:1px solid var(--line,#dce5de);padding:18px 21px;background:transparent;text-align:left;color:var(--green,#245b45);width:100%;cursor:pointer;transition:background .16s}.ds-type:hover{background:#f0f6ee}.ds-type:focus-visible{outline:2px solid #277653;outline-offset:4px;}.ds-type-copy{flex:1}.ds-type strong{display:block;font-size:13px}.ds-type small{display:block;color:var(--muted,#5b7067);font-size:12px;margin-top:4px}.ds-type-symbol{background:#edf4e9;padding:9px;border-radius:6px;display:flex}.ds-icon{width:19px;height:19px;flex-shrink:0}@media(max-width:760px){.ds-type{flex:1;min-width:0;border-bottom:0;border-right:1px solid var(--line,#dce5de);padding:12px 8px;gap:0;display:block}.ds-type-symbol,.ds-type>.ds-icon,.ds-summary-detail{display:none}.ds-type strong{font-size:12px}.ds-type small{font-size:11px;margin-top:3px}}@media(prefers-reduced-motion:reduce){.ds-type{transition:none}}"
-    },
-    {
-      "name": "Inbox record",
-      "kind": "custom",
-      "refersTo": "inbox-unread",
-      "description": "Unread notification uses a pale row wash; read records return to normal paper.",
-      "html": "<div class=\"ds-inbox ds-unread\"><span class=\"ds-inbox-icon\"><svg class=\"ds-icon\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.6\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><path d=\"M9 5H5v16h14V5h-4 M9 3h6v4H9z M8 12h8 M8 16h5\"/></svg></span><div><button class=\"ds-inbox-title\">Request assigned</button><p>A maintenance request needs your attention.</p><small>Maintenance · Today</small></div></div>",
-      "css": ".ds-inbox{font-family:Manrope,Segoe UI,sans-serif;display:flex;align-items:flex-start;gap:16px;padding:22px 25px;border-top:1px solid var(--line,#dce5de);background:white}.ds-inbox.ds-unread{background:#f3f8ef}.ds-inbox>div{flex:1;min-width:0}.ds-inbox-icon{display:flex;padding:9px;background:#e9f0e4;border-radius:6px;color:var(--green,#245b45)}.ds-icon{width:19px;height:19px;flex-shrink:0}.ds-inbox-title{font-family:Manrope,Segoe UI,sans-serif;border:0;background:transparent;text-align:left;padding:0;color:#244c38;font-size:14px;font-weight:700;line-height:1.5;overflow-wrap:anywhere;cursor:pointer}.ds-inbox-title:hover{text-decoration:underline;text-underline-offset:3px}.ds-inbox-title:focus-visible{outline:2px solid #277653;outline-offset:4px;}.ds-inbox p{font-size:13px;margin:6px 0;color:var(--muted,#5b7067);line-height:1.65}.ds-inbox small{color:var(--muted,#5b7067);font-size:12px}@media(max-width:760px){.ds-inbox{padding:20px 16px;gap:11px}.ds-inbox-icon{padding:7px}}"
-    },
-    {
-      "name": "Mobile navigation disclosure",
-      "kind": "nav",
-      "refersTo": "mobile-menu",
-      "description": "Expanded-state preview of the shipped Menu control and full destinations. Application code synchronizes aria-expanded, closes on Escape, and restores Menu focus.",
-      "html": "<div class=\"ds-mobile-shell\"><button class=\"ds-menu\" aria-controls=\"ds-workspace-nav\" aria-expanded=\"true\"><svg class=\"ds-icon\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.6\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><path d=\"M4 6h16 M4 12h16 M4 18h16\"/></svg>Menu</button><nav id=\"ds-workspace-nav\" class=\"ds-menu-panel\" aria-label=\"Main navigation\"><button class=\"ds-selected\" aria-current=\"page\"><svg class=\"ds-icon\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.6\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><path d=\"M3 10 12 3l9 7v10H3z M9 20v-7h6v7\"/></svg>Overview</button><button><svg class=\"ds-icon\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.6\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><path d=\"M9 5H5v16h14V5h-4 M9 3h6v4H9z M8 12h8 M8 16h5\"/></svg>All requests</button><button><svg class=\"ds-icon\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.6\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><path d=\"M9 5H5v16h14V5h-4 M9 3h6v4H9z M8 12h8 M8 16h5\"/></svg>Maintenance requests<span class=\"ds-count\">5</span></button><button><svg class=\"ds-icon\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.6\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><path d=\"M4 5h16v16H4z M8 3v4 M16 3v4 M4 11h16 M8 15h3\"/></svg>Schedule requests</button><button><svg class=\"ds-icon\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.6\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><path d=\"M3 4h18v13H3z M8 21h8 M12 17v4\"/></svg>Technology requests</button><button><svg class=\"ds-icon\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.6\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><path d=\"M4 5h16v16H4z M8 3v4 M16 3v4 M4 11h16 M8 15h3\"/></svg>Preventive maintenance</button><button><svg class=\"ds-icon\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.6\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><path d=\"M4 4h16v16H4z M4 10h16 M10 10v10\"/></svg>Assets</button><button><svg class=\"ds-icon\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.6\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><path d=\"M4 21V3h12v18 M16 9h4v12 M8 7h4 M8 11h4 M8 15h4 M2 21h20\"/></svg>Buildings</button><button><svg class=\"ds-icon\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.6\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><path d=\"M5 17h14l-2-3V9a5 5 0 0 0-10 0v5z M10 21h4\"/></svg>Notifications</button><button><svg class=\"ds-icon\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.6\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><path d=\"M4 7h16 M4 17h16 M8 4v6 M16 14v6\"/></svg>Settings</button></nav></div>",
-      "css": ".ds-mobile-shell{font-family:Manrope,Segoe UI,sans-serif;position:relative;min-height:590px;padding:15px 16px;background:#f0f4ef}.ds-menu{font-family:Manrope,Segoe UI,sans-serif;display:flex;align-items:center;gap:7px;position:absolute;right:16px;top:17px;border:1px solid #bdcdc1;border-radius:6px;background:white;color:var(--green,#245b45);font-size:12px;padding:7px 10px;cursor:pointer}.ds-icon{width:19px;height:19px}.ds-menu-panel{display:grid;position:absolute;top:66px;left:12px;right:12px;max-height:calc(100dvh - 90px);overflow-y:auto;z-index:20;background:#f0f4ef;padding:10px;border:1px solid #bdcdc1;border-radius:8px;box-shadow:0 12px 30px #163e3024;gap:3px}.ds-menu-panel button{font-family:Manrope,Segoe UI,sans-serif;width:100%;font-size:13px;white-space:normal;padding:12px;border:0;text-align:left;display:flex;gap:12px;align-items:center;background:transparent;color:#53655b;border-radius:6px;font-weight:600;cursor:pointer;transition:background .16s}.ds-menu-panel button:hover{background:#e4ede3}.ds-menu-panel button.ds-selected{background:#dce9db;color:#214a34}.ds-count{margin-left:auto;background:white;padding:1px 7px;border-radius:4px;font-size:11px}.ds-menu:focus-visible,.ds-menu-panel button:focus-visible{outline:2px solid #277653;outline-offset:4px;}@media(prefers-reduced-motion:reduce){.ds-menu-panel button{transition:none}}"
-    },
-    {
-      "name": "Administration fields",
-      "kind": "input",
-      "refersTo": "admin-field",
-      "description": "Identity, ordinary-user, group, and connection settings share the single-column labeled field and native checkbox pattern.",
-      "html": "<div class=\"ds-admin-form\"><label>Workspace name<input value=\"Facilities\"></label><label>Workspace icon<select><option>Building</option><option>Maintenance</option><option>Technology</option><option>Calendar</option></select></label><label class=\"ds-admin-check\"><input type=\"checkbox\" checked>Add newly provisioned users automatically</label><p class=\"ds-form-error\" role=\"alert\"></p><button class=\"ds-admin-primary\" type=\"button\">Save changes</button></div>",
-      "css": ".ds-admin-form{font-family:Manrope,Segoe UI,sans-serif;display:grid;gap:16px;padding:24px;max-width:720px;color:#20352f}.ds-admin-form label:not(.ds-admin-check){display:grid;gap:7px;font-weight:600;font-size:14px}.ds-admin-form input:not([type=checkbox]),.ds-admin-form select{width:100%;padding:11px;border:1px solid var(--line,#d8dfda);border-radius:6px;background:white;color:inherit;font:inherit}.ds-admin-check{display:flex;align-items:center;gap:10px;font-weight:400;font-size:14px}.ds-admin-check input{accent-color:#246a49;width:18px;height:18px}.ds-admin-form input:focus-visible,.ds-admin-form select:focus-visible{outline:2px solid #277653;outline-offset:4px;}.ds-admin-form>.ds-form-error:empty{display:none}.ds-admin-primary{font-family:Manrope,Segoe UI,sans-serif;background:var(--green,#245b45);color:white;border:0;padding:11px 18px;border-radius:7px;font-weight:700;font-size:14px;display:inline-flex;align-items:center;gap:8px;cursor:pointer;justify-self:start;transition:background .16s}.ds-admin-primary:hover{background:#173e2f}.ds-admin-primary:focus-visible{outline:2px solid #277653;outline-offset:4px}@media(max-width:700px){.ds-admin-primary{justify-self:stretch}}@media(prefers-reduced-motion:reduce){.ds-admin-primary{transition:none}}"
-    },
-    {
-      "name": "Group membership fieldset",
-      "kind": "custom",
-      "description": "Manual membership checkboxes display immediate-saving behavior in the legend, with provider-synchronization guidance.",
-      "html": "<div class=\"ds-admin-group\"><fieldset><legend>Members · Changes save immediately</legend><label class=\"ds-member\"><input type=\"checkbox\" checked>Member name</label><small>Removing a member clears current assignments. A later provider sync may add them again.</small></fieldset></div>",
-      "css": ".ds-admin-group{font-family:Manrope,Segoe UI,sans-serif;border-top:1px solid #dfe5df;color:#20352f;font-size:14px}.ds-admin-group fieldset{margin:0 24px 24px;padding:16px;border:1px solid #dfe5df;display:grid;gap:12px}.ds-admin-group small{color:#52635a}.ds-member{display:flex;align-items:center;gap:10px;font-weight:400}.ds-member input{accent-color:#246a49;width:18px;height:18px}.ds-member input:focus-visible{outline:2px solid #277653;outline-offset:4px;}"
-    },
-    {
-      "name": "One-time technical value",
-      "kind": "custom",
-      "refersTo": "technical-block",
-      "description": "Synthetic placeholder shows the shipped one-time token notice. Commands and connection URLs reuse the same wrapping technical block.",
-      "html": "<div class=\"ds-secret-notice\"><strong>Copy this token now. It is shown once.</strong><pre class=\"ds-technical\">[one-time token value]</pre><button class=\"ds-quiet\">I saved the token</button></div>",
-      "css": ".ds-secret-notice{font-family:Manrope,Segoe UI,sans-serif;padding:26px 28px;border-bottom:1px solid var(--line,#dce5de);margin-bottom:24px;background:#fff7df;border:1px solid #e7d8a4;border-radius:6px;color:#6e5b2d;font-size:12px}.ds-technical{white-space:pre-wrap;overflow-wrap:anywhere;background:var(--surface,#f3f6f4);padding:16px;font-size:13px;line-height:1.6;max-width:100%}.ds-quiet{font-family:Manrope,Segoe UI,sans-serif;border:0;color:var(--green,#245b45);background:transparent;font-size:12px;font-weight:700;cursor:pointer}.ds-quiet:focus-visible{outline:2px solid #277653;outline-offset:4px;}@media(max-width:760px){.ds-secret-notice{padding:22px 20px}}"
+      "name": "Notice",
+      "kind": "card",
+      "refersTo": "notice",
+      "description": "A paper notice with a dashed rule, never a tinted banner.",
+      "html": "<div class=\"ds-notice\">Demo workspace — these records are illustrative.</div>",
+      "css": ".ds-notice{padding:10px 14px;background:#fff;border:1px dashed #8b929c;border-radius:3px;color:#444a54;font-family:Archivo,'Segoe UI',system-ui,sans-serif;font-size:13px;line-height:1.5}"
     }
   ],
   "narrative": {
-    "northStar": "Civic operations records",
-    "overview": "A quiet green navigation rail frames white work sheets and aligned registers. The implemented interface favors readable records, modest corners, clear field labels, and restrained actions. This descriptive name comes from the direction contract; no approved image composition exists.\n\nThe locally bundled Manrope family connects page headings, table records, forms, and navigation. A single organization shares one visual workspace; different buildings and equipment use the same record language.\n\nAdministrators can edit the workspace name and welcome message and select one of the existing SVG icons. These identity choices personalize copy and the sign-in/navigation mark while preserving the green register system.",
+    "northStar": "The Work Ticket Pad",
+    "overview": "Every request is a numbered work ticket torn from one shared pad. The workspace is that pad, its rubber stamps and the office ledger. White bond ticket stock lies on a cool grey desk. Black ruled hairlines form every field. Carbon-blue numerals carry ticket numbers and counts, and vermilion stamp ink marks what is urgent or late. States are rubber stamps with words, outlined, never tinted pills. Navigation is a column of paper tab dividers along the left edge of the pad.\n\nThe density is office-ledger dense. The Today view is one ruled tally line of carbon numerals, a ledger of open tickets by due date with WO numbers large at the left, and ruled side registers. A ticket opens as a right-hand sheet (full screen on phones) with a four-stage lifecycle strip, stamp-forward buttons and a ruled field grid. Its head is tinted canary or pink when the viewer holds the assignee or office copy. Phones get a dock and turn every register into stacked, labelled ruled rows.\n\nThe system refuses the generic SaaS card dashboard with pastel status pills. Depth comes from rules and paper, not floating cards.",
     "keyCharacteristics": [
-      "Green navigation and actions against pale green neutral surfaces.",
-      "Dense aligned registers with explicit text status markers.",
-      "Flat sheets, subtle borders, and soft corners.",
-      "Visible mobile Menu disclosure and scrollable tables."
+      "Archivo variable, used at two widths: condensed caps (74%) for label stock, stamps and numerals, and normal width for reading text.",
+      "Tabular numerals everywhere; carbon blue is the numeral and action ink.",
+      "Ruled grids whose cells share single hairlines; a 2px ink rule caps every register.",
+      "Rubber-stamp states: outlined condensed caps with the state word always present.",
+      "Flat paper on a grey desk; shadows only on things lifted off the pad."
     ],
     "rules": [
       {
-        "name": "The State Has Words Rule",
-        "body": "Color accompanies a written status or priority; the dot never replaces the label.",
+        "name": "The Carbon Numeral Rule",
+        "body": "Numbers that identify or count (WO numbers, tallies, metrics, register figures, nav counts) are condensed carbon. Carbon is also the only action colour; no second accent exists.",
         "section": "colors"
       },
       {
-        "name": "The Register Numerals Rule",
-        "body": "Keep dates and counts aligned with tabular numerals in tables and metrics.",
+        "name": "The Stamp Ink Rule",
+        "body": "Vermilion means urgent, late, destructive or needs-attention. It is never decoration, never a heading colour and never a background larger than a stamp or badge.",
+        "section": "colors"
+      },
+      {
+        "name": "The Carbon Copy Rule",
+        "body": "Canary and pink exist only as copies of the ticket: the copy glyph and the sheet-head tint. They are never fills, highlights or status colours.",
+        "section": "colors"
+      },
+      {
+        "name": "The Words-On-Stamps Rule",
+        "body": "Green and ochre appear only inside stamps that also print the state word (Completed, On hold, Approved, Awaiting approval). Colour never carries state alone.",
+        "section": "colors"
+      },
+      {
+        "name": "The Label Stock Rule",
+        "body": "Condensed uppercase is reserved for printed form furniture: labels, tabs, headers, stamps and numerals. Anything a person types or reads as prose returns to 100% width, sentence case and zero tracking, including inputs inside condensed field cells.",
         "section": "typography"
       },
       {
-        "name": "The Sheets Stay Flat Rule",
-        "body": "Persistent metrics, panels, and tables use a border; overlay shadows stay with dialogs, disclosed mobile navigation, and toast feedback.",
+        "name": "The Closed Frame Rule",
+        "body": "A ruled grid draws its frame on the right and bottom, and every cell draws its own left and top. Lines never double, and any cell count closes cleanly.",
+        "section": "layout"
+      },
+      {
+        "name": "The Flat Pad Rule",
+        "body": "Nothing resting on the desk casts a shadow. If it is not sliding over the pad, use a rule instead.",
         "section": "elevation"
       }
     ],
     "dos": [
-      "Do pair status color with a written label.",
-      "Do preserve aligned rows and tabular dates and counts.",
-      "Do use flat white sheets for persistent records.",
-      "Do retain horizontal table scrolling on mobile.",
-      "Do use the shipped Manrope family and inline SVG icons."
+      "**Do** set every ticket number and count in condensed carbon with tabular figures.",
+      "**Do** print the state word inside every status stamp; outline by default, fill only Urgent.",
+      "**Do** build fields, ticket cells and strips as ruled grids under the Closed Frame Rule.",
+      "**Do** cap each register with a 2px ink top rule on paper against the desk.",
+      "**Do** use dashed rules for awaiting and provisional, and strike-through for archived or filed.",
+      "**Do** reserve canary and pink for the copy glyph and the sheet-head tint.",
+      "**Do** honour reduced motion: every transition and animation, including the stamp landing and sheet filing, is disabled."
     ],
     "donts": [
-      "Don't communicate urgency or completion through color alone.",
-      "Don't apply overlay shadows to every register panel.",
-      "Don't promote the build's very small supporting text into a general type scale."
+      "**Don't** build card dashboards or tinted pastel status pills; this pad refuses them.",
+      "**Don't** use vermilion for anything that is not urgent, late, destructive or an unread count.",
+      "**Don't** use green or ochre outside state stamps, or let colour carry a state without its word.",
+      "**Don't** fill stamp buttons in any colour other than carbon.",
+      "**Don't** add shadows to registers, panels or rows; only the sheet, login ticket and toast are lifted.",
+      "**Don't** set typed values or prose in condensed caps."
     ]
   }
 }

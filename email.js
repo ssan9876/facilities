@@ -51,13 +51,14 @@ export async function enqueueEmail(db, {userId = null, to, subject, body, delayM
 // Called by notify() for each in-app notification recipient.
 export async function queueNotificationEmail(db, user, order, message) {
   if (!configured) return;
-  const title =
-    order.title || (await db.query('SELECT title FROM work_orders WHERE id=$1', [order.id]))[0]?.title || 'Request';
+  const row = (await db.query('SELECT title,number FROM work_orders WHERE id=$1', [order.id]))[0];
+  const title = order.title || row?.title || 'Request';
+  const ticket = row?.number ? `WO-${String(row.number).padStart(4, '0')} ` : '';
   await enqueueEmail(db, {
     userId: user.id,
     to: user.email,
-    subject: `${title} · ${message}`,
-    body: `${message}\n\nRequest: ${title}\nOpen it in {{ORG}}: {{APP_URL}}/#order=${encodeURIComponent(order.id)}\n\nYou can change which updates you receive by email under Notifications → Preferences.`,
+    subject: `${ticket}${title} · ${message}`,
+    body: `${message}\n\nRequest: ${ticket}${title}\nOpen it in {{ORG}}: {{APP_URL}}/#order=${encodeURIComponent(order.id)}\n\nYou can change which updates you receive by email under Notifications → Preferences.`,
   });
 }
 
