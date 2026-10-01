@@ -184,7 +184,7 @@ Verify restoration in a separate deployment before relying on backups. Store enc
 
 ## GitHub releases and updates
 
-Public repository: https://github.com/ssan9876/go-fmx-clone. CI runs SQLite and PostgreSQL API tests, browser checks, and a Docker build on main and pull requests. Pushing a `vMAJOR.MINOR.PATCH` tag matching `package.json` runs the same checks and publishes `facilities.tar.gz` and `SHA256SUMS` as a GitHub release. Release downloads contain source; the installation builds its own Docker image. No GitHub token is needed to download public releases.
+Public repository: https://github.com/ssan9876/facilities. CI runs SQLite and PostgreSQL API tests, browser checks, and a Docker build on main and pull requests. Pushing a `vMAJOR.MINOR.PATCH` tag matching `package.json` runs the same checks and publishes `facilities.tar.gz` and `SHA256SUMS` as a GitHub release. Release downloads contain source; the installation builds its own Docker image. No GitHub token is needed to download public releases.
 
 Administrators use **Settings → Updates → Check for updates** for stable-release status and release notes, and **Install** to update the server from the browser. The button needs the host update agent, installed once on the server:
 
