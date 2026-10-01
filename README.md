@@ -96,7 +96,7 @@ Verify restoration in a separate deployment before relying on backups. Store enc
 
 ## GitHub releases and updates
 
-Public repository: https://github.com/ssan9876/go-fmx-clone. CI runs API tests, browser checks, and a Docker build on main and pull requests. Pushing a `vMAJOR.MINOR.PATCH` tag matching `package.json` runs the same checks and publishes `facilities.tar.gz` and `SHA256SUMS` as a GitHub release. Release downloads contain source; the installation builds its own Docker image. No GitHub token is needed to download public releases.
+Public repository: https://github.com/ssan9876/go-fmx-clone. CI runs SQLite and PostgreSQL API tests, browser checks, and a Docker build on main and pull requests. Pushing a `vMAJOR.MINOR.PATCH` tag matching `package.json` runs the same checks and publishes `facilities.tar.gz` and `SHA256SUMS` as a GitHub release. Release downloads contain source; the installation builds its own Docker image. No GitHub token is needed to download public releases.
 
 Administrators use **Settings → Updates → Check for updates** for stable-release status and release notes. Applying updates requires server access:
 
@@ -119,4 +119,4 @@ The current Syntra provider advertises standard profile/email claims but does no
 
 ## Verification status
 
-Nine automated tests cover persistence, legacy migration, organization dates, role mapping, production guards, core flows, CSRF, request-type visibility and enforcement, admin-only settings, personal notification preferences/delivery and maintenance idempotency. Browser checks pass for creating/completing/commenting on requests, schedule times, module switches, notification preferences, navigation, and mobile overflow. Docker Compose configuration validates; the local Docker daemon was unavailable, so PostgreSQL/container execution remains unverified. A real identity-provider sign-in must be validated with your provider. The application does not yet provide production observability, IdP backchannel logout, or automated migration tooling.
+Ten automated tests cover persistence, legacy migration, organization dates, role mapping, production guards, core flows, CSRF, request-type visibility and enforcement, admin-only settings, personal notification preferences/delivery and maintenance idempotency. Browser checks pass for creating/completing/commenting on requests, schedule times, module switches, notification preferences, navigation, and mobile overflow. GitHub CI passes against PostgreSQL 17 and SQLite, browser checks, and a Docker image build. A Linux container deployment and release upgrade were verified on Proxmox. Live Syntra discovery, client registration, PKCE authorization and the login-page redirect were verified; completing the credentialed sign-in still requires a user login. The application does not yet provide production observability, IdP backchannel logout, or automated migration tooling.
