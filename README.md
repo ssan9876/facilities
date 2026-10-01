@@ -17,6 +17,11 @@ A working first version of an FMX-inspired facilities-management application, bu
 - Persistent server-side sessions; CSRF-protected writes
 - PostgreSQL deployment and SQLite local development
 - Responsive UI with all fonts bundled locally
+- Admin settings for workspace name, welcome message, icon and provisioned-only sign-in
+- People management, manual and automatic groups, expiring provisioning tokens
+- REST provisioning and a SCIM endpoint for Syntra user lifecycle and group memberships
+
+See [provisioning setup](deployment/PROVISIONING.md) for endpoints and the required immutable SSO identity mapping.
 
 This is an initial application, not full FMX feature parity. Attachments, inventory, facility reservations, email notifications, editing/deleting buildings and assets, reporting exports and an audit history are not implemented yet.
 

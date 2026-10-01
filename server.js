@@ -7,6 +7,7 @@ import {setupAuth} from './auth.js';
 import {dateInTimezone} from './dates.js';
 import {moduleSettings,requireModule,notify,preferences,visibleNotifications,setupSettings} from './requests.js';
 import {setupReleases,installedVersion} from './releases.js';
+import {setupAdministration} from './administration.js';
 
 const statuses = ['Open', 'In progress', 'On hold', 'Completed'];
 const priorities = ['Low', 'Normal', 'High', 'Urgent'];
@@ -36,12 +37,13 @@ export async function createApp(env=process.env, dbOverride) {
   app.disable('x-powered-by');
   if (env.NODE_ENV==='production') app.set('trust proxy',1);
   app.use(helmet({contentSecurityPolicy:{directives:{'script-src':["'self'"], 'style-src':["'self'"], 'font-src':["'self'"], 'img-src':["'self'","data:"]}}}));
-  app.use(express.json({limit:'64kb'}));
+  app.use(express.json({limit:'64kb',type:['application/json','application/scim+json']}));
   app.get('/health', async (req,res) => {await q('SELECT 1');res.json({ok:true,version:installedVersion});});
   app.use(['/api','/auth'],(req,res,next)=>{res.set('Cache-Control','no-store');next();});
   await setupAuth(app,db,env);
   setupSettings(app,db);
   setupReleases(app,env);
+  setupAdministration(app,db,env);
   const checkLocation = async (building,asset) => {
     if (!(await q('SELECT id FROM buildings WHERE id=$1',[building])).length) throw error('Choose an existing building.');
     if (asset && !(await q('SELECT id FROM assets WHERE id=$1 AND building_id=$2',[asset,building])).length) throw error('The asset must belong to the selected building.');
@@ -58,7 +60,7 @@ export async function createApp(env=process.env, dbOverride) {
       q('SELECT * FROM buildings ORDER BY name'),q('SELECT * FROM assets ORDER BY name'),
       q(`SELECT w.*, b.name AS building, a.name AS asset, u.name AS assignee, r.name AS requester FROM work_orders w JOIN buildings b ON b.id=w.building_id LEFT JOIN assets a ON a.id=w.asset_id LEFT JOIN users u ON u.id=w.assignee_id JOIN users r ON r.id=w.requester_id ${restricted?'WHERE w.requester_id=$1':''} ORDER BY w.created_at DESC`,restricted?[req.user.id]:[]),
       restricted ? [] : q('SELECT m.*,b.name AS building,a.name AS asset FROM maintenance m JOIN buildings b ON b.id=m.building_id LEFT JOIN assets a ON a.id=m.asset_id ORDER BY m.next_due'),
-      restricted ? [] : q('SELECT id,name,role FROM users ORDER BY name'),
+      restricted ? [] : q('SELECT id,name,role FROM users WHERE active=1 ORDER BY name'),
     ]);
     const modules=await moduleSettings(db);
     const counts=req.user.role==='admin'?await q('SELECT request_type,COUNT(*) AS count FROM work_orders GROUP BY request_type'):[];
@@ -99,7 +101,7 @@ export async function createApp(env=process.env, dbOverride) {
     if ('assignee_id' in req.body) {
       if (!canManage(req.user)) throw error('A manager must assign work orders.',403);
       assignee=req.body.assignee_id||null;
-      if (assignee && !(await q("SELECT id FROM users WHERE id=$1 AND role IN ('admin','manager','technician')",[assignee])).length) throw error('Choose a technician or manager.');
+      if (assignee && !(await q("SELECT id FROM users WHERE id=$1 AND active=1 AND role IN ('admin','manager','technician')",[assignee])).length) throw error('Choose an enabled technician or manager.');
     }
     await q('UPDATE work_orders SET status=$1, assignee_id=$2, completed_at=$3 WHERE id=$4',[status,assignee,status==='Completed'?(row.completed_at||new Date().toISOString()):null,row.id]);
     if (assignee!==row.assignee_id&&assignee) await notify(db,row,'assigned',[assignee],req.user.id,`${req.user.name} assigned this request to you.`);

@@ -2,6 +2,7 @@ import session from 'express-session';
 import * as oidc from 'openid-client';
 import {randomUUID, randomBytes} from 'node:crypto';
 import {defaultTimezone} from './dates.js';
+import {setupProvisioning,workspaceSettings} from './administration.js';
 
 export function roleForClaims(claims, env = process.env) {
   const groups = Array.isArray(claims.groups) ? claims.groups.filter(x => typeof x === 'string') : typeof claims.groups==='string' ? [claims.groups] : [];
@@ -29,6 +30,7 @@ export async function setupAuth(app, db, env) {
     if(req.get('host')?.toLowerCase()!==appUrl.host.toLowerCase()) return res.redirect(308,appUrl.origin+req.originalUrl);
     next();
   });
+  setupProvisioning(app,db,env);
   class Store extends session.Store {
     get(id, cb) { db.query('SELECT body FROM sessions WHERE id=$1 AND expires_at>$2', [id, new Date().toISOString()]).then(rows => cb(null, rows[0] ? JSON.parse(rows[0].body) : null)).catch(cb); }
     set(id, value, cb) { db.query('INSERT INTO sessions(id,body,expires_at) VALUES($1,$2,$3) ON CONFLICT(id) DO UPDATE SET body=$2, expires_at=$3', [id, JSON.stringify(value), new Date(Date.now()+8*3600000).toISOString()]).then(() => cb?.()).catch(cb); }
@@ -68,19 +70,22 @@ export async function setupAuth(app, db, env) {
     const role = roleForClaims(claims,env);
     const subject = `${claims.iss}|${claims.sub}`;
     let user = (await db.query('SELECT * FROM users WHERE subject=$1', [subject]))[0];
+    if(user&&!user.active)throw Object.assign(new Error('Your FMX account is disabled. Contact your administrator.'),{status:403});
+    if(!user&&(await workspaceSettings(db)).provisioned_only&&claims.sub!==env.OIDC_ADMIN_SUBJECT)throw Object.assign(new Error('Your FMX account must be provisioned before you can sign in.'),{status:403});
     if (!user) {
       user={id:randomUUID()};
       await db.query('INSERT INTO users(id,subject,name,email,role) VALUES($1,$2,$3,$4,$5)', [user.id,subject,claims.name || claims.preferred_username || 'Team member',claims.email || '',role]);
-    } else await db.query('UPDATE users SET name=$1,email=$2,role=$3 WHERE id=$4', [claims.name || 'Team member',claims.email || '',role,user.id]);
+    } else if(!user.managed)await db.query('UPDATE users SET name=$1,email=$2,role=$3 WHERE id=$4', [claims.name || 'Team member',claims.email || '',role,user.id]);
     await regenerate(req); req.session.userId=user.id; await save(req); res.redirect('/');
   });
   app.use(async (req,res,next) => {
-    if (req.session.userId) req.user=(await db.query('SELECT id,name,email,role FROM users WHERE id=$1', [req.session.userId]))[0];
+    if (req.session.userId) req.user=(await db.query('SELECT id,name,email,role FROM users WHERE id=$1 AND active=1', [req.session.userId]))[0];
     next();
   });
-  app.get('/api/me', (req,res) => {
+  app.get('/api/me', async (req,res) => {
     req.session.csrf ||= randomBytes(24).toString('hex');
-    res.json({user:req.user || null, csrf:req.session.csrf, organization:env.ORG_NAME || 'My Organization', timezone, mode});
+    const branding=await workspaceSettings(db);
+    res.json({user:req.user || null, csrf:req.session.csrf, organization:branding.name||env.ORG_NAME || 'My Organization', branding, timezone, mode});
   });
   app.use('/api', (req,res,next) => {
     if (!req.user) return res.status(401).json({error:'Sign in to continue.'});

@@ -89,3 +89,7 @@ td{padding:16px;font-size:12px}th{padding:13px 16px;font-size:11px}
 }
 /* Release commands must remain readable on narrow settings screens. */
 .update-command{white-space:pre-wrap;overflow-wrap:anywhere;background:var(--surface,#f3f6f4);padding:16px;font-size:13px;line-height:1.6;max-width:100%}
+
+.admin-form{display:grid;gap:16px;padding:24px;max-width:720px}.admin-form label:not(.admin-check){display:grid;gap:7px;font-weight:600}.admin-form input:not([type=checkbox]),.admin-form select{width:100%;padding:11px;border:1px solid var(--line,#d8dfda);border-radius:6px;background:white;color:inherit;font:inherit}.admin-check{display:flex;align-items:center;gap:10px;font-weight:400}.admin-check input{accent-color:#246a49;width:18px;height:18px}.admin-user,.admin-group{border-top:1px solid #dfe5df}.admin-group fieldset{margin:0 24px 24px;padding:16px;border:1px solid #dfe5df;display:grid;gap:12px}.admin-user small,.admin-group small{color:#52635a}.settings-tabs{overflow-x:auto}.settings-tabs button{white-space:nowrap}.update-command{overflow-wrap:anywhere;white-space:pre-wrap}
+
+.admin-form>.sheet-heading{padding:0}.admin-form>.primary{justify-self:start}.admin-form>.form-error:empty{display:none}.brand,.org{overflow-wrap:anywhere;min-width:0}.settings-tabs{flex-wrap:wrap;overflow:visible}.settings-tabs button{flex-shrink:0}@media(max-width:700px){.settings-tabs{gap:4px 12px}.settings-tabs button{padding:10px 0}.admin-form>.primary{justify-self:stretch}}

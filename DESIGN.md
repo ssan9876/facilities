@@ -35,6 +35,10 @@ colors:
   inbox-icon: "#e9f0e4"
   inbox-title: "#244c38"
   empty-icon: "#e9f1e5"
+  admin-check: "#246a49"
+  admin-divider: "#dfe5df"
+  admin-muted: "#52635a"
+  command-surface: "#f3f6f4"
 typography:
   headline:
     fontFamily: "Manrope, Segoe UI, sans-serif"
@@ -90,6 +94,13 @@ typography:
     fontSize: "24px"
     fontWeight: 650
     letterSpacing: "-.02em"
+  admin-label:
+    fontFamily: "Manrope, Segoe UI, sans-serif"
+    fontSize: "14px"
+    fontWeight: 600
+  technical:
+    fontSize: "13px"
+    lineHeight: 1.6
 rounded:
   tag: "4px"
   field: "5px"
@@ -167,6 +178,17 @@ components:
   type-summary-mobile:
     textColor: "{colors.green}"
     padding: "12px 8px"
+  admin-field:
+    backgroundColor: "{colors.paper}"
+    rounded: "{rounded.navigation}"
+    padding: "11px"
+    width: "100%"
+  admin-checkbox:
+    size: "18px"
+  technical-block:
+    backgroundColor: "{colors.command-surface}"
+    typography: "{typography.technical}"
+    padding: "16px"
 ---
 
 # Design System: Facilities
@@ -178,6 +200,8 @@ components:
 A quiet green navigation rail frames white work sheets and aligned registers. The implemented interface favors readable records, modest corners, clear field labels, and restrained actions. This descriptive name comes from the direction contract; no approved image composition exists.
 
 The locally bundled Manrope family connects page headings, table records, forms, and navigation. A single organization shares one visual workspace; different buildings and equipment use the same record language.
+
+Administrators can edit the workspace name and welcome message and select one of the existing SVG icons. These identity choices personalize copy and the sign-in/navigation mark while preserving the green register system.
 
 **Key Characteristics:**
 - Green navigation and actions against pale green neutral surfaces.
@@ -209,6 +233,9 @@ The palette is green-led, with muted neutral surfaces and semantic color confine
 - **Control and inbox washes** (`accent`, `type-icon`, `type-hover`, `unread`, `inbox-icon`, `empty-icon`): notification hover, type icons and hover, unread rows, inbox icons, and empty-state icon surroundings respectively.
 - **Supporting ink** (`supporting-ink`) and **Inbox title ink** (`inbox-title`): request metadata and actionable notification titles.
 - **Switch off** (`switch-off`): unchecked settings switches; checked switches use operations green.
+- **Administration green** (`admin-check`): checked native administration checkboxes; this existing green variant does not introduce a separate administration palette.
+- **Administration divider and metadata** (`admin-divider`, `admin-muted`): repeated person/group boundaries, membership fieldsets, and supporting account/group text.
+- **Technical surface** (`command-surface`): fallback wash used by preformatted update commands and provisioning connection details when no `--surface` override exists.
 
 **The State Has Words Rule.** Color accompanies a written status or priority; the dot never replaces the label.
 
@@ -226,6 +253,8 @@ The palette is green-led, with muted neutral surfaces and semantic color confine
 - **Control:** navigation and settings tabs (13px, 600); compact desktop navigation uses 12px. Expanded mobile destinations use 13px; the Menu control uses 12px.
 - **Settings title:** sheet and empty-state headings (17px, 700); inbox section headings use 16px.
 - **Metadata:** request secondary lines (12px, line height 1.5), with 12px table footers and request-type labels.
+- **Administration label:** 14px semibold field labels; inline checkbox labels use regular weight (400).
+- **Technical:** 13px preformatted command/connection text with line height 1.6. The browser's native preformatted font is retained rather than adding another bundled family.
 
 **The Register Numerals Rule.** Keep dates and counts aligned with tabular numerals in tables and metrics.
 
@@ -240,6 +269,8 @@ At widths up to 1100px, the sidebar becomes 210px, content uses 28px 24px paddin
 Tables retain their columns and scroll horizontally rather than squeezing records into unreadable widths. The request extension sets table cell padding to 16px and heading padding to 13px 16px at all widths, overriding the earlier desktop and mobile cell padding. Request titles and secondary lines wrap within 360px; mobile titles retain a 230px minimum width. Form grids use an 18px gap.
 
 Request-type summaries share one divided strip that remains horizontal on mobile, using equal compact columns with 12px 8px padding and an 18px bottom margin. Mobile summaries hide decorative icons, arrows, and the extra word after active counts. Settings sheets have a 920px maximum width; settings rows use 25px 28px padding and a 24px gap. At the mobile breakpoint, sheet headings and settings rows use 22px 20px padding, the footer stacks, and its save action aligns left. Settings tabs and mobile request filters scroll horizontally without wrapping. Inbox rows use 22px 25px padding and a 16px gap, reducing to 20px 16px padding and an 11px gap on mobile.
+
+Administration forms use a single-column grid with a 16px gap, 24px padding, and a 720px maximum width, including within the wider settings sheet. Group membership fieldsets have 16px padding, a 12px row gap, and 24px side and bottom margins. These forms retain their padding on mobile; identity sheet headings inherit the existing 22px 20px mobile heading padding inside the form. The expanded settings destinations use the existing scrolling tab bar rather than a second navigation pattern.
 
 ## Elevation & Depth
 
@@ -304,6 +335,18 @@ Switches use a real checkbox with switch semantics, a 44px by 26px track, and a 
 
 The top-bar bell is a bordered compact action with a labeled unread count and an accent hover wash. Inbox records use pale icon squares, 14px bold actionable titles, 13px message copy, and 12px metadata. Unread rows add the `unread` wash and a labeled mark-as-read action; read rows retain the normal paper surface. Empty inboxes use a circular icon wash, a 17px heading, and 13px copy. Notification preferences reuse the settings sheet and switches without creating a separate visual language.
 
+### Administration forms
+
+Identity, People, Groups, and Provisioning extend the existing settings sheet. Administration inputs and selects use white paper, the shared line border, 11px padding, and a 6px radius. Labels sit 7px above fields. Native checkboxes are 18px squares with a green checked accent and 10px spacing to regular-weight text; they reuse the standard focus-visible outline. Forms retain the existing green primary save action and textual error feedback.
+
+Identity edits the workspace name, welcome message, and a selected Building, Maintenance, Technology, or Calendar SVG icon. People cards separate account identity from editable non-administrator roles and account-enabled state. Protected administrator entries explicitly say "Administrator · Protected" and omit editing controls. Group sections combine labeled fields, automatic assignment checkboxes, and a bordered Members fieldset. Manual membership uses checkbox state; explanatory copy names automatic provisioning and later provider synchronization rather than inventing source-colored membership badges. Membership changes save immediately, while group details use the primary save action.
+
+### Technical blocks and provisioning states
+
+Preformatted technical blocks are now reused for update commands, SCIM/REST connection URLs, and newly created provisioning tokens. They use the technical typography role, 16px padding, the technical wash, `white-space: pre-wrap`, and `overflow-wrap: anywhere` so long values wrap within narrow sheets.
+
+Provisioning token rows state an expiry date or "Revoked" in words; active rows expose a quiet Revoke action. Newly created token values appear in a notice-colored sheet section with the explicit instruction "Copy this token now. It is shown once." and an "I saved the token" dismissal action. No persistent secret value or token-specific status color is established by this system. The token form uses the same administration fields for connection name and expiry days.
+
 ## Do's and Don'ts
 
 ### Do:
@@ -318,4 +361,4 @@ The top-bar bell is a bordered compact action with a labeled unread count and an
 - **Don't** apply overlay shadows to every register panel.
 - **Don't** promote the build's very small supporting text into a general type scale.
 
-Not canonized: inherited 10px comment timestamps and 11px metric/organization metadata remain pending legibility review. New 13px descriptions/controls, 17px settings headings, 12px request metadata, switch states, and inbox washes are intentional shipped extensions, not defects to legitimize. The previously unused accent now serves notification hover and is recorded. Other isolated legacy shades/sizes remain advisory pre-existing drift; this documentation pass does not repair UI. Screenshots show different record counts after browser checks; fixture contents are not visual rules. Roll quality boards were unavailable and no image comp was approved, so this records code and rendered evidence without claiming comp parity.
+Not canonized: inherited 10px comment timestamps and 11px metric/organization metadata remain pending legibility review. Administration's repeated checkbox/divider treatments and technical blocks are intentional shipped extensions; fixture workspace names, record counts, endpoint hosts, and token values are not design tokens. Blank error areas and nested heading padding visible in administration forms describe current markup rather than a new spacing doctrine. Other isolated legacy shades/sizes remain advisory pre-existing drift; this documentation pass does not repair UI. Roll quality boards were unavailable and no image comp was approved, so this records code and rendered evidence without claiming comp parity.

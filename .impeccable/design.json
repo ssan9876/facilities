@@ -1,6 +1,6 @@
 {
   "schemaVersion": 2,
-  "generatedAt": "2026-10-01T00:49:33.792Z",
+  "generatedAt": "2026-10-01T02:28:23.731Z",
   "title": "Design System: Facilities",
   "extensions": {
     "colorMeta": {
@@ -465,6 +465,62 @@
           "oklch(84% 0.0180 134.92)",
           "oklch(95% 0.0180 134.92)"
         ]
+      },
+      "admin-check": {
+        "role": "primary",
+        "displayName": "Admin Check",
+        "tonalRamp": [
+          "oklch(15% 0.0885 159.43)",
+          "oklch(26% 0.0885 159.43)",
+          "oklch(38% 0.0885 159.43)",
+          "oklch(49% 0.0885 159.43)",
+          "oklch(61% 0.0885 159.43)",
+          "oklch(72% 0.0885 159.43)",
+          "oklch(84% 0.0885 159.43)",
+          "oklch(95% 0.0885 159.43)"
+        ]
+      },
+      "admin-divider": {
+        "role": "neutral",
+        "displayName": "Admin Divider",
+        "tonalRamp": [
+          "oklch(15% 0.0103 145.49)",
+          "oklch(26% 0.0103 145.49)",
+          "oklch(38% 0.0103 145.49)",
+          "oklch(49% 0.0103 145.49)",
+          "oklch(61% 0.0103 145.49)",
+          "oklch(72% 0.0103 145.49)",
+          "oklch(84% 0.0103 145.49)",
+          "oklch(95% 0.0103 145.49)"
+        ]
+      },
+      "admin-muted": {
+        "role": "neutral",
+        "displayName": "Admin Muted",
+        "tonalRamp": [
+          "oklch(15% 0.0252 162.24)",
+          "oklch(26% 0.0252 162.24)",
+          "oklch(38% 0.0252 162.24)",
+          "oklch(49% 0.0252 162.24)",
+          "oklch(61% 0.0252 162.24)",
+          "oklch(72% 0.0252 162.24)",
+          "oklch(84% 0.0252 162.24)",
+          "oklch(95% 0.0252 162.24)"
+        ]
+      },
+      "command-surface": {
+        "role": "neutral",
+        "displayName": "Command Surface",
+        "tonalRamp": [
+          "oklch(15% 0.0041 157.18)",
+          "oklch(26% 0.0041 157.18)",
+          "oklch(38% 0.0041 157.18)",
+          "oklch(49% 0.0041 157.18)",
+          "oklch(61% 0.0041 157.18)",
+          "oklch(72% 0.0041 157.18)",
+          "oklch(84% 0.0041 157.18)",
+          "oklch(95% 0.0041 157.18)"
+        ]
       }
     },
     "typographyMeta": {
@@ -511,6 +567,14 @@
       "metric-mobile": {
         "displayName": "Mobile operational count",
         "purpose": "24px counts in compact two-column metrics; supporting copy is hidden."
+      },
+      "admin-label": {
+        "displayName": "Administration field label",
+        "purpose": "14px semibold labels; inline checkbox labels use regular weight."
+      },
+      "technical": {
+        "displayName": "Technical block",
+        "purpose": "13px native preformatted text for commands, connection URLs, and one-time token display."
       }
     },
     "shadows": [
@@ -632,7 +696,7 @@
       "kind": "nav",
       "refersTo": "settings-tab",
       "description": "Section choices shared by settings and notification preferences.",
-      "html": "<div class=\"ds-settings-tabs\"><button class=\"ds-selected\">Request types</button><button>Notifications</button><button>Workspace</button></div>",
+      "html": "<div class=\"ds-settings-tabs\"><button>Request types</button><button>Notifications</button><button class=\"ds-selected\">Identity</button><button>People</button><button>Groups</button><button>Provisioning</button><button>Workspace</button><button>Updates</button></div>",
       "css": ".ds-settings-tabs{font-family:Manrope,Segoe UI,sans-serif;display:flex;gap:25px;border-bottom:1px solid var(--line,#dce5de);margin:0 0 26px;overflow:auto}.ds-settings-tabs button{font-family:Manrope,Segoe UI,sans-serif;white-space:nowrap;border:0;border-bottom:2px solid transparent;background:transparent;padding:0 0 13px;color:var(--muted,#5b7067);font-size:13px;font-weight:600;cursor:pointer}.ds-settings-tabs button.ds-selected{border-bottom-color:var(--green,#245b45);color:var(--green,#245b45)}.ds-settings-tabs button:focus-visible{outline:2px solid #277653;outline-offset:4px;}@media(max-width:760px){.ds-settings-tabs{gap:21px}}"
     },
     {
@@ -658,11 +722,34 @@
       "description": "Expanded-state preview of the shipped Menu control and full destinations. Application code synchronizes aria-expanded, closes on Escape, and restores Menu focus.",
       "html": "<div class=\"ds-mobile-shell\"><button class=\"ds-menu\" aria-controls=\"ds-workspace-nav\" aria-expanded=\"true\"><svg class=\"ds-icon\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.6\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><path d=\"M4 6h16 M4 12h16 M4 18h16\"/></svg>Menu</button><nav id=\"ds-workspace-nav\" class=\"ds-menu-panel\" aria-label=\"Main navigation\"><button class=\"ds-selected\" aria-current=\"page\"><svg class=\"ds-icon\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.6\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><path d=\"M3 10 12 3l9 7v10H3z M9 20v-7h6v7\"/></svg>Overview</button><button><svg class=\"ds-icon\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.6\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><path d=\"M9 5H5v16h14V5h-4 M9 3h6v4H9z M8 12h8 M8 16h5\"/></svg>All requests</button><button><svg class=\"ds-icon\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.6\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><path d=\"M9 5H5v16h14V5h-4 M9 3h6v4H9z M8 12h8 M8 16h5\"/></svg>Maintenance requests<span class=\"ds-count\">5</span></button><button><svg class=\"ds-icon\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.6\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><path d=\"M4 5h16v16H4z M8 3v4 M16 3v4 M4 11h16 M8 15h3\"/></svg>Schedule requests</button><button><svg class=\"ds-icon\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.6\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><path d=\"M3 4h18v13H3z M8 21h8 M12 17v4\"/></svg>Technology requests</button><button><svg class=\"ds-icon\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.6\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><path d=\"M4 5h16v16H4z M8 3v4 M16 3v4 M4 11h16 M8 15h3\"/></svg>Preventive maintenance</button><button><svg class=\"ds-icon\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.6\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><path d=\"M4 4h16v16H4z M4 10h16 M10 10v10\"/></svg>Assets</button><button><svg class=\"ds-icon\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.6\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><path d=\"M4 21V3h12v18 M16 9h4v12 M8 7h4 M8 11h4 M8 15h4 M2 21h20\"/></svg>Buildings</button><button><svg class=\"ds-icon\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.6\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><path d=\"M5 17h14l-2-3V9a5 5 0 0 0-10 0v5z M10 21h4\"/></svg>Notifications</button><button><svg class=\"ds-icon\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.6\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><path d=\"M4 7h16 M4 17h16 M8 4v6 M16 14v6\"/></svg>Settings</button></nav></div>",
       "css": ".ds-mobile-shell{font-family:Manrope,Segoe UI,sans-serif;position:relative;min-height:590px;padding:15px 16px;background:#f0f4ef}.ds-menu{font-family:Manrope,Segoe UI,sans-serif;display:flex;align-items:center;gap:7px;position:absolute;right:16px;top:17px;border:1px solid #bdcdc1;border-radius:6px;background:white;color:var(--green,#245b45);font-size:12px;padding:7px 10px;cursor:pointer}.ds-icon{width:19px;height:19px}.ds-menu-panel{display:grid;position:absolute;top:66px;left:12px;right:12px;max-height:calc(100dvh - 90px);overflow-y:auto;z-index:20;background:#f0f4ef;padding:10px;border:1px solid #bdcdc1;border-radius:8px;box-shadow:0 12px 30px #163e3024;gap:3px}.ds-menu-panel button{font-family:Manrope,Segoe UI,sans-serif;width:100%;font-size:13px;white-space:normal;padding:12px;border:0;text-align:left;display:flex;gap:12px;align-items:center;background:transparent;color:#53655b;border-radius:6px;font-weight:600;cursor:pointer;transition:background .16s}.ds-menu-panel button:hover{background:#e4ede3}.ds-menu-panel button.ds-selected{background:#dce9db;color:#214a34}.ds-count{margin-left:auto;background:white;padding:1px 7px;border-radius:4px;font-size:11px}.ds-menu:focus-visible,.ds-menu-panel button:focus-visible{outline:2px solid #277653;outline-offset:4px;}@media(prefers-reduced-motion:reduce){.ds-menu-panel button{transition:none}}"
+    },
+    {
+      "name": "Administration fields",
+      "kind": "input",
+      "refersTo": "admin-field",
+      "description": "Identity, ordinary-user, group, and connection settings share the single-column labeled field and native checkbox pattern.",
+      "html": "<div class=\"ds-admin-form\"><label>Workspace name<input value=\"Facilities\"></label><label>Workspace icon<select><option>Building</option><option>Maintenance</option><option>Technology</option><option>Calendar</option></select></label><label class=\"ds-admin-check\"><input type=\"checkbox\" checked>Add newly provisioned users automatically</label></div>",
+      "css": ".ds-admin-form{font-family:Manrope,Segoe UI,sans-serif;display:grid;gap:16px;padding:24px;max-width:720px;color:#20352f}.ds-admin-form label:not(.ds-admin-check){display:grid;gap:7px;font-weight:600;font-size:14px}.ds-admin-form input:not([type=checkbox]),.ds-admin-form select{width:100%;padding:11px;border:1px solid var(--line,#d8dfda);border-radius:6px;background:white;color:inherit;font:inherit}.ds-admin-check{display:flex;align-items:center;gap:10px;font-weight:400;font-size:14px}.ds-admin-check input{accent-color:#246a49;width:18px;height:18px}.ds-admin-form input:focus-visible,.ds-admin-form select:focus-visible{outline:2px solid #277653;outline-offset:4px;}"
+    },
+    {
+      "name": "Group membership fieldset",
+      "kind": "custom",
+      "description": "Manual membership checkboxes are grouped under a Members legend with provider-synchronization guidance.",
+      "html": "<div class=\"ds-admin-group\"><fieldset><legend>Members</legend><label class=\"ds-member\"><input type=\"checkbox\" checked>Member name</label><small>Removing a member clears current assignments. A later provider sync may add them again.</small></fieldset></div>",
+      "css": ".ds-admin-group{font-family:Manrope,Segoe UI,sans-serif;border-top:1px solid #dfe5df;color:#20352f;font-size:14px}.ds-admin-group fieldset{margin:0 24px 24px;padding:16px;border:1px solid #dfe5df;display:grid;gap:12px}.ds-admin-group small{color:#52635a}.ds-member{display:flex;align-items:center;gap:10px;font-weight:400}.ds-member input{accent-color:#246a49;width:18px;height:18px}.ds-member input:focus-visible{outline:2px solid #277653;outline-offset:4px;}"
+    },
+    {
+      "name": "One-time technical value",
+      "kind": "custom",
+      "refersTo": "technical-block",
+      "description": "Synthetic placeholder shows the shipped one-time token notice. Commands and connection URLs reuse the same wrapping technical block.",
+      "html": "<div class=\"ds-secret-notice\"><strong>Copy this token now. It is shown once.</strong><pre class=\"ds-technical\">[one-time token value]</pre><button class=\"ds-quiet\">I saved the token</button></div>",
+      "css": ".ds-secret-notice{font-family:Manrope,Segoe UI,sans-serif;padding:26px 28px;border-bottom:1px solid var(--line,#dce5de);margin-bottom:24px;background:#fff7df;border:1px solid #e7d8a4;border-radius:6px;color:#6e5b2d;font-size:12px}.ds-technical{white-space:pre-wrap;overflow-wrap:anywhere;background:var(--surface,#f3f6f4);padding:16px;font-size:13px;line-height:1.6;max-width:100%}.ds-quiet{font-family:Manrope,Segoe UI,sans-serif;border:0;color:var(--green,#245b45);background:transparent;font-size:12px;font-weight:700;cursor:pointer}.ds-quiet:focus-visible{outline:2px solid #277653;outline-offset:4px;}@media(max-width:760px){.ds-secret-notice{padding:22px 20px}}"
     }
   ],
   "narrative": {
     "northStar": "Civic operations records",
-    "overview": "A quiet green navigation rail frames white work sheets and aligned registers. The implemented interface favors readable records, modest corners, clear field labels, and restrained actions. This descriptive name comes from the direction contract; no approved image composition exists.\n\nThe locally bundled Manrope family connects page headings, table records, forms, and navigation. A single organization shares one visual workspace; different buildings and equipment use the same record language.",
+    "overview": "A quiet green navigation rail frames white work sheets and aligned registers. The implemented interface favors readable records, modest corners, clear field labels, and restrained actions. This descriptive name comes from the direction contract; no approved image composition exists.\n\nThe locally bundled Manrope family connects page headings, table records, forms, and navigation. A single organization shares one visual workspace; different buildings and equipment use the same record language.\n\nAdministrators can edit the workspace name and welcome message and select one of the existing SVG icons. These identity choices personalize copy and the sign-in/navigation mark while preserving the green register system.",
     "keyCharacteristics": [
       "Green navigation and actions against pale green neutral surfaces.",
       "Dense aligned registers with explicit text status markers.",

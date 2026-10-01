@@ -35,8 +35,8 @@ test('request types, admin settings, hidden records and personal notifications',
   const request=(type,extra={})=>call('/api/orders','POST',{title:type+' test',building_id:'b1',due_date:'2026-10-02',request_type:type,...extra});
   try {
     await call('/auth/login');csrf=(await call('/api/me')).body.csrf;
-    await db.query('INSERT INTO users VALUES($1,$2,$3,$4,$5)',['tech','tech','Taylor Tech','','technician']);
-    await db.query('INSERT INTO users VALUES($1,$2,$3,$4,$5)',['manager','manager','Team Manager','','manager']);
+    await db.query('INSERT INTO users(id,subject,name,email,role) VALUES($1,$2,$3,$4,$5)',['tech','tech','Taylor Tech','','technician']);
+    await db.query('INSERT INTO users(id,subject,name,email,role) VALUES($1,$2,$3,$4,$5)',['manager','manager','Team Manager','','manager']);
     const tech=(await request('technology')).body.id;
     assert.ok(tech);
     assert.equal((await request('invalid')).status,400);

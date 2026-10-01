@@ -82,7 +82,7 @@ test('persistent workflows, CSRF, role boundaries and recurring maintenance',asy
     await db.query("UPDATE users SET role=$1 WHERE id=$2",['requester','demo-admin']);
     assert.equal((await call('/api/buildings','POST',{name:'Forbidden'})).status,403);
     assert.equal((await call(`/api/orders/${id}`,'PATCH',{status:'Open'})).status,403);
-    await db.query('INSERT INTO users VALUES($1,$2,$3,$4,$5)',['other','other','Other user','','requester']);
+    await db.query('INSERT INTO users(id,subject,name,email,role) VALUES($1,$2,$3,$4,$5)',['other','other','Other user','','requester']);
     await db.query('UPDATE work_orders SET requester_id=$1 WHERE id=$2',['other',id]);
     assert.ok(!(await call('/api/data')).json.orders.some(x=>x.id===id));
     assert.equal((await call(`/api/orders/${id}/comments`)).status,404);

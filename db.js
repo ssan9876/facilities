@@ -34,6 +34,10 @@ export async function openDatabase(url = process.env.DATABASE_URL, file = proces
     'CREATE TABLE IF NOT EXISTS notification_preferences (user_id TEXT PRIMARY KEY REFERENCES users(id), body TEXT NOT NULL)',
     'CREATE TABLE IF NOT EXISTS notifications (id TEXT PRIMARY KEY, user_id TEXT NOT NULL REFERENCES users(id), order_id TEXT NOT NULL REFERENCES work_orders(id), event TEXT NOT NULL, message TEXT NOT NULL, created_at TEXT NOT NULL, read_at TEXT)',
     'CREATE INDEX IF NOT EXISTS notifications_user ON notifications(user_id, created_at)',
+    'CREATE TABLE IF NOT EXISTS admin_settings (id TEXT PRIMARY KEY, body TEXT NOT NULL)',
+    'CREATE TABLE IF NOT EXISTS user_groups (id TEXT PRIMARY KEY, name TEXT UNIQUE NOT NULL, description TEXT NOT NULL, auto_assign INTEGER NOT NULL DEFAULT 0)',
+    'CREATE TABLE IF NOT EXISTS group_members (group_id TEXT NOT NULL REFERENCES user_groups(id), user_id TEXT NOT NULL REFERENCES users(id), source TEXT NOT NULL, PRIMARY KEY(group_id,user_id,source))',
+    'CREATE TABLE IF NOT EXISTS provisioning_keys (id TEXT PRIMARY KEY, name TEXT NOT NULL, digest TEXT NOT NULL, expires_at TEXT NOT NULL, revoked INTEGER NOT NULL DEFAULT 0)',
   ]) await query(sql);
   // Additive migration: preserve existing requests and classify them as maintenance.
   const columns = url ? (await query("SELECT column_name AS name FROM information_schema.columns WHERE table_schema='public' AND table_name='work_orders'")) : await query('PRAGMA table_info(work_orders)');
@@ -41,5 +45,8 @@ export async function openDatabase(url = process.env.DATABASE_URL, file = proces
     if (!columns.some(c=>c.name===name)) await query(`ALTER TABLE work_orders ADD COLUMN ${name} ${definition}`);
   }
   for (const key of ['maintenance','schedule','technology','notifications']) await query('INSERT INTO modules(id,enabled) VALUES($1,1) ON CONFLICT(id) DO NOTHING',[key]);
+  const userColumns=url ? await query("SELECT column_name AS name FROM information_schema.columns WHERE table_schema='public' AND table_name='users'") : await query('PRAGMA table_info(users)');
+  for(const [name,definition] of [['active','INTEGER NOT NULL DEFAULT 1'],['managed','INTEGER NOT NULL DEFAULT 0'],['user_name','TEXT'],['external_id','TEXT']]) if(!userColumns.some(c=>c.name===name)) await query(`ALTER TABLE users ADD COLUMN ${name} ${definition}`);
+  await query('CREATE UNIQUE INDEX IF NOT EXISTS users_user_name ON users(user_name)');
   return {query, close};
 }
