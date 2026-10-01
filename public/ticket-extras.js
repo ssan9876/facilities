@@ -332,3 +332,83 @@ export function bindTimerBadge() {
 setInterval(() => {
   for (const el of document.querySelectorAll('[data-running-since]')) el.textContent = since(el.dataset.runningSince);
 }, 1000);
+
+// ---- Rate the fix (requester) and reopen with a reason ----
+const stars = n => '★'.repeat(n) + '☆'.repeat(5 - n);
+export function ratingCard(o) {
+  const mine = o.requester_id === state.me.user.id;
+  if (o.status !== 'Completed' || !mine) return '';
+  const r = o.rating;
+  return `<section class="tp-card rating-card"><h2>${r ? 'Your rating' : 'How did we do?'}</h2><div class="stars" role="group" aria-label="Rate the fix">${[
+    1, 2, 3, 4, 5,
+  ]
+    .map(
+      n =>
+        `<button type="button" data-rate="${n}" class="${r && r.score >= n ? 'on' : ''}" aria-pressed="${r?.score === n}" aria-label="${n} star${n === 1 ? '' : 's'}">${r && r.score >= n ? '★' : '☆'}</button>`,
+    )
+    .join(
+      '',
+    )}</div>${r?.comment ? `<p class="muted-line">“${escape(r.comment)}”</p>` : ''}<p class="muted-line">Not fixed after all? <button type="button" class="quiet-button" data-reopen>Reopen it</button></p></section>`;
+}
+export const ratingFact = o =>
+  o.rating && o.requester_id !== state.me.user.id
+    ? `<div><dt>Requester rating</dt><dd><span class="stars-read" aria-label="${o.rating.score} of 5">${stars(o.rating.score)}</span>${o.rating.comment ? ` “${escape(o.rating.comment)}”` : ''}</dd></div>`
+    : '';
+export function bindRating(o) {
+  const id = encodeURIComponent(o.id);
+  $$('[data-rate]').forEach(
+    b =>
+      (b.onclick = () => {
+        const score = Number(b.dataset.rate);
+        dialog(
+          `${stars(score)} · Rate the fix`,
+          `<form id="rate-form"><div class="form-grid">${field(score <= 2 ? 'What went wrong? (optional)' : 'Anything to add? (optional)', 'comment', 'textarea', o.rating?.comment || '', true)}</div>${formActions('Send rating')}</form>`,
+        );
+        bindCancel();
+        bindForm($('#rate-form'), async data => {
+          await api(`/orders/${id}/rating`, {method: 'POST', body: JSON.stringify({score, comment: data.comment})});
+          closeDialog();
+          await hooks.refresh();
+          toast('Thanks for rating the fix.');
+        });
+      }),
+  );
+  const reopen = $('[data-reopen]');
+  if (reopen)
+    reopen.onclick = () => {
+      dialog(
+        'Reopen this request',
+        `<form id="reopen-form"><p class="form-context">Tell the team what is still wrong. They are notified and the request goes back to Open.</p><div class="form-grid">${field('What is still wrong?', 'reason', 'textarea')}</div>${formActions('Reopen request')}</form>`,
+      );
+      bindCancel();
+      bindForm($('#reopen-form'), async data => {
+        await api(`/orders/${id}/reopen`, {method: 'POST', body: JSON.stringify({reason: data.reason})});
+        closeDialog();
+        await hooks.refresh();
+        toast('Request reopened. The team has been told.');
+      });
+    };
+  const print = $('[data-print]');
+  if (print) print.onclick = () => printDialog([o.number]);
+}
+// Printable work orders: choose which copies, then open the print page.
+export function printDialog(numbers) {
+  const all = [
+    ['requester', 'Requester copy (white)'],
+    ['technician', 'Technician copy (canary)'],
+    ['office', 'Office copy (pink)'],
+  ];
+  dialog(
+    numbers.length === 1 ? 'Print work order' : `Print ${numbers.length} work orders`,
+    `<form id="print-form"><p class="form-context">Each copy prints on its own page with a QR code back to the ticket.</p><div class="form-grid"><fieldset class="field full check-group"><legend>Copies</legend>${all.map(([k, l]) => `<label class="field-check inline"><input type="checkbox" name="copy" value="${k}" ${k === 'technician' ? 'checked' : ''}>${l}</label>`).join('')}</fieldset></div>${formActions('Open print view')}</form>`,
+  );
+  bindCancel();
+  $('#print-form').onsubmit = e => {
+    e.preventDefault();
+    const copies = $$('#print-form [name=copy]:checked').map(i => i.value);
+    if (!copies.length) return toast('Choose at least one copy.');
+    const tickets = numbers.map(n => `WO-${String(n).padStart(4, '0')}`).join(',');
+    window.open(`/print?tickets=${encodeURIComponent(tickets)}&copies=${copies.join(',')}`, '_blank', 'noopener');
+    closeDialog();
+  };
+}

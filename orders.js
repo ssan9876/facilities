@@ -9,9 +9,9 @@ import {audit, auditQuery, changes} from './audit.js';
 import {reserveSpace} from './reservations.js';
 import {checkSubmission, saveAnswers, answersFor} from './requestforms.js';
 
-const orderColumns =
+export const orderColumns =
   'w.*, b.name AS building, a.name AS asset, u.name AS assignee, r.name AS requester, s.name AS space, c.name AS category';
-const orderJoins =
+export const orderJoins =
   'FROM work_orders w JOIN buildings b ON b.id=w.building_id LEFT JOIN assets a ON a.id=w.asset_id LEFT JOIN users u ON u.id=w.assignee_id JOIN users r ON r.id=w.requester_id LEFT JOIN spaces s ON s.id=w.space_id LEFT JOIN categories c ON c.id=w.category_id';
 const detailFields = [
   'title',
@@ -290,6 +290,7 @@ export function setupOrders(app, db, env) {
         request_type: o.request_type,
         due_date: o.due_date,
         starts_at: o.starts_at,
+        ends_at: o.ends_at,
         building: o.building,
         assignee: o.assignee,
         reservation_status: o.reservation_status,
@@ -347,6 +348,7 @@ export function setupOrders(app, db, env) {
       permissions,
       assignable,
       ...(await orderExtras(db, order, req.user)),
+      rating: (await q('SELECT score,comment,created_at FROM order_ratings WHERE order_id=$1', [order.id]))[0] || null,
     });
   });
 

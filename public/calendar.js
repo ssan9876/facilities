@@ -1,6 +1,6 @@
 // Calendar: every ticket on the day it is due (schedule requests on their start day), with
 // projected preventive maintenance. Month grid on wide screens, an agenda list on phones.
-import {state, $, $$, escape, icon, can, today, addDays, api, heading, ticketNo} from './ui.js';
+import {state, $, $$, escape, icon, can, today, addDays, api, heading, ticketNo, toast} from './ui.js';
 import {requestTypes} from './request-settings.js';
 import {hooks} from './hooks.js';
 
@@ -54,7 +54,8 @@ export function calendarPage() {
 function chip(o) {
   const late = o.status !== 'Completed' && o.due_date < today();
   const when = o.request_type === 'schedule' && o.starts_at ? o.starts_at.slice(11) + ' ' : '';
-  return `<li><button type="button" class="cal-chip ${o.status.toLowerCase().replaceAll(' ', '-')} ${late ? 'late' : ''} ${o.priority === 'Urgent' ? 'urgent' : ''}" data-cal-open="${escape(o.id)}" title="${escape(`${ticketNo(o.number)} ${o.title} · ${o.status} · ${o.building}${o.assignee ? ' · ' + o.assignee : ''}`)}"><span class="cal-no">${escape(ticketNo(o.number))}</span> ${escape(when)}${escape(o.title)}</button></li>`;
+  const movable = can('requests.edit_any') && o.status !== 'Completed';
+  return `<li><button type="button" class="cal-chip ${o.status.toLowerCase().replaceAll(' ', '-')} ${late ? 'late' : ''} ${o.priority === 'Urgent' ? 'urgent' : ''}" data-cal-open="${escape(o.id)}" ${movable ? `draggable="true" data-cal-drag="${escape(o.id)}"` : ''} title="${escape(`${ticketNo(o.number)} ${o.title} · ${o.status} · ${o.building}${o.assignee ? ' · ' + o.assignee : ''}`)}"><span class="cal-no">${escape(ticketNo(o.number))}</span> ${escape(when)}${escape(o.title)}</button></li>`;
 }
 const planChip = p =>
   `<li><button type="button" class="cal-chip planned" data-cal-plans-page title="${escape(`Planned maintenance: ${p.title} · ${p.building}`)}"><span class="cal-no">PM</span> ${escape(p.title)}</button></li>`;
@@ -89,7 +90,7 @@ function render(data) {
       const items = byDay[d] || {orders: [], plans: []};
       const all = [...items.orders.map(chip), ...items.plans.map(planChip)];
       const shown = c.expanded === d ? all : all.slice(0, 4);
-      return `<div class="cal-day ${monthOf(d) === c.month ? '' : 'outside'} ${d === now ? 'today' : ''}" role="gridcell" aria-label="${escape(new Date(d + 'T12:00:00').toLocaleDateString(undefined, {weekday: 'long', month: 'long', day: 'numeric'}))}, ${all.length} item${all.length === 1 ? '' : 's'}"><span class="cal-date">${Number(d.slice(8))}</span><ul class="cal-items">${shown.join('')}</ul>${all.length > shown.length ? `<button type="button" class="quiet-button cal-more" data-cal-expand="${d}">+${all.length - shown.length} more</button>` : ''}</div>`;
+      return `<div class="cal-day ${monthOf(d) === c.month ? '' : 'outside'} ${d === now ? 'today' : ''}" data-cal-day="${d}" role="gridcell" aria-label="${escape(new Date(d + 'T12:00:00').toLocaleDateString(undefined, {weekday: 'long', month: 'long', day: 'numeric'}))}, ${all.length} item${all.length === 1 ? '' : 's'}"><span class="cal-date">${Number(d.slice(8))}</span><ul class="cal-items">${shown.join('')}</ul>${all.length > shown.length ? `<button type="button" class="quiet-button cal-more" data-cal-expand="${d}">+${all.length - shown.length} more</button>` : ''}</div>`;
     }).join('');
     root.innerHTML = `<div class="cal-grid" role="grid" aria-label="${escape(monthLabel(c.month))}"><div class="cal-week cal-head" role="row">${names.map(n => `<span role="columnheader">${escape(n)}</span>`).join('')}</div><div class="cal-days">${cells}</div></div>`;
   }
@@ -99,6 +100,7 @@ function render(data) {
       `<p class="muted-line">Showing the first ${data.orders.length} of ${data.total} tickets in this range.</p>`,
     );
   $$('[data-cal-open]').forEach(b => (b.onclick = () => hooks.openTicket(b.dataset.calOpen)));
+  bindDrag(data);
   $$('[data-cal-plans-page]').forEach(
     b =>
       (b.onclick = () => {
@@ -113,6 +115,57 @@ function render(data) {
         render(data);
       }),
   );
+}
+
+// Drag a ticket to another day to move its due date (schedule requests keep their times). Undo moves it back.
+function bindDrag(data) {
+  $$('[data-cal-drag]').forEach(
+    b =>
+      (b.ondragstart = e => {
+        e.dataTransfer.setData('text/plain', b.dataset.calDrag);
+        e.dataTransfer.effectAllowed = 'move';
+        b.classList.add('dragging');
+      }),
+  );
+  $$('[data-cal-drag]').forEach(b => (b.ondragend = () => b.classList.remove('dragging')));
+  $$('[data-cal-day]').forEach(cell => {
+    cell.ondragover = e => {
+      if (!e.dataTransfer.types.includes('text/plain')) return;
+      e.preventDefault();
+      cell.classList.add('drop-target');
+    };
+    cell.ondragleave = () => cell.classList.remove('drop-target');
+    cell.ondrop = async e => {
+      e.preventDefault();
+      cell.classList.remove('drop-target');
+      const o = data.orders.find(x => x.id === e.dataTransfer.getData('text/plain'));
+      const day = cell.dataset.calDay;
+      if (!o || o.due_date === day) return;
+      const move = target => {
+        if (o.request_type !== 'schedule') return {due_date: target};
+        const shift = v => (v ? target + v.slice(10) : v);
+        return {starts_at: shift(o.starts_at), ends_at: shift(o.ends_at)};
+      };
+      try {
+        await api(`/orders/${encodeURIComponent(o.id)}`, {method: 'PATCH', body: JSON.stringify(move(day))});
+        hooks.render();
+        toast(
+          `${ticketNo(o.number)} moved to ${new Date(day + 'T12:00:00').toLocaleDateString(undefined, {month: 'short', day: 'numeric'})}.`,
+          {
+            undo: async () => {
+              await api(`/orders/${encodeURIComponent(o.id)}`, {
+                method: 'PATCH',
+                body: JSON.stringify(move(o.due_date)),
+              });
+              hooks.render();
+            },
+          },
+        );
+      } catch (err) {
+        toast(err.message);
+      }
+    };
+  });
 }
 
 export async function bindCalendar() {

@@ -38,6 +38,10 @@ services:
       RATE_LIMIT_WRITES: ${RATE_LIMIT_WRITES:-300}
       RATE_LIMIT_UPLOADS: ${RATE_LIMIT_UPLOADS:-30}
       RATE_LIMIT_PROVISIONING: ${RATE_LIMIT_PROVISIONING:-600}
+      # Reply by email (see README): the reply address and the key your mail provider posts with.
+      INBOUND_EMAIL_ADDRESS: ${INBOUND_EMAIL_ADDRESS:-}
+      INBOUND_EMAIL_KEY: ${INBOUND_EMAIL_KEY:-}
+      DIGEST_HOUR: ${DIGEST_HOUR:-7}
     depends_on:
       db:
         condition: service_healthy

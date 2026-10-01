@@ -63,9 +63,10 @@ export function setupField(app, db, env) {
       : [[], []];
     const plans =
       modules.maintenance && can(req.user, 'maintenance.view')
-        ? await db.query('SELECT id,title,interval_days,next_due,active FROM maintenance WHERE asset_id=$1 ORDER BY next_due', [
-            asset.id,
-          ])
+        ? await db.query(
+            'SELECT id,title,interval_days,next_due,active FROM maintenance WHERE asset_id=$1 ORDER BY next_due',
+            [asset.id],
+          )
         : [];
     const runs = plans.length
       ? await db.query(

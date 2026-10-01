@@ -42,7 +42,7 @@ import {reportsPage, bindReports} from './reports.js';
 import {connectLive} from './live.js';
 import {readUrl, syncUrl, viewsNav, viewTools, bindViews, openView} from './views.js';
 import {bindShortcuts} from './keys.js';
-import {timerBadge, bindTimerBadge} from './ticket-extras.js';
+import {timerBadge, bindTimerBadge, printDialog} from './ticket-extras.js';
 import {assetPage, openScanner} from './field.js';
 
 // Theme and contrast are per device; apply them before the first render.
@@ -618,7 +618,7 @@ const selection = () => (state.selected ||= new Set());
 function bulkBar() {
   const n = selection().size;
   const people = state.data.users.filter(u => u.assignable);
-  return `<div class="bulk-bar" id="bulk-bar" role="region" aria-label="Selected requests" ${n ? '' : 'hidden'}><strong id="bulk-count">${n} selected</strong>${can('requests.update_any') ? `<label class="ticket-control">Set status<select id="bulk-status"><option value="">Keep status</option>${['Open', 'In progress', 'On hold'].map(x => `<option>${x}</option>`).join('')}</select></label>` : ''}${can('requests.assign') ? `<label class="ticket-control">Assign to<select id="bulk-assign"><option value="">Keep assignee</option><option value="none">Unassigned</option>${people.map(u => `<option value="${escape(u.id)}">${escape(u.name)}</option>`).join('')}</select></label>` : ''}<button type="button" class="primary" id="bulk-apply">Apply to selected</button><button type="button" class="quiet-button" id="bulk-clear">Clear selection</button></div>`;
+  return `<div class="bulk-bar" id="bulk-bar" role="region" aria-label="Selected requests" ${n ? '' : 'hidden'}><strong id="bulk-count">${n} selected</strong>${can('requests.update_any') ? `<label class="ticket-control">Set status<select id="bulk-status"><option value="">Keep status</option>${['Open', 'In progress', 'On hold'].map(x => `<option>${x}</option>`).join('')}</select></label>` : ''}${can('requests.assign') ? `<label class="ticket-control">Assign to<select id="bulk-assign"><option value="">Keep assignee</option><option value="none">Unassigned</option>${people.map(u => `<option value="${escape(u.id)}">${escape(u.name)}</option>`).join('')}</select></label>` : ''}<button type="button" class="primary" id="bulk-apply">Apply to selected</button><button type="button" class="secondary" id="bulk-print">${icon('download')}Print</button><button type="button" class="quiet-button" id="bulk-clear">Clear selection</button></div>`;
 }
 function ordersTable(compact) {
   const {rows = [], total = 0, error} = state.list || {};
@@ -691,6 +691,7 @@ function bindBulk() {
     });
     sync();
   };
+  $('#bulk-print').onclick = () => printDialog(state.list.rows.filter(o => sel.has(o.id)).map(o => o.number));
   $('#bulk-clear').onclick = () => {
     sel.clear();
     $$('[data-pick]').forEach(b => (b.checked = false));

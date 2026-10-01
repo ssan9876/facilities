@@ -38,6 +38,9 @@ import {
   bindExtras,
   loadTicketLookups,
   mentionsIn,
+  ratingCard,
+  ratingFact,
+  bindRating,
 } from './ticket-extras.js';
 import {locationFields, bindLocation, requestTiming, bindTiming} from './forms.js';
 import {configurableFields, bindConfigurable, withAnswers, ruleFor} from './requestform.js';
@@ -165,6 +168,7 @@ export async function ticketPage(ref) {
     fact('Opened', fmtStamp(o.created_at)),
     o.completed_at ? fact('Completed', fmtStamp(o.completed_at)) : '',
     followersFact(o),
+    ratingFact(o),
   ].join('');
   const answers = o.answers?.length
     ? `<dl class="tp-answers">${o.answers.map(a => fact(escape(a.label), escape(a.value))).join('')}</dl>`
@@ -180,9 +184,9 @@ export async function ticketPage(ref) {
     ...(o.checklist.length ? [escape(checklistProgress(o))] : []),
   ].join('<span class="sep" aria-hidden="true">·</span>');
   $('#ticket-page').innerHTML =
-    `<div class="tp"><header class="tp-head"><button type="button" class="quiet-button tp-back" data-ticket-back>${icon('arrow-left')}Back</button><div class="tp-title"><span class="ticket-no">${escape(number)}</span><h1>${escape(o.title)}</h1></div><p class="tp-summary">${summary}</p><div class="tp-actions">${p.take ? `<button type="button" class="primary" data-take>${icon('check')}Take it</button>` : ''}${actions}${canEditDetails ? `<button class="secondary" id="edit-order">${icon('edit')}${textEdit ? 'Edit text' : 'Edit details'}</button>` : ''}<button class="secondary" id="show-history">${icon('history')}Activity</button>${followButton(o)}</div></header>` +
+    `<div class="tp"><header class="tp-head"><button type="button" class="quiet-button tp-back" data-ticket-back>${icon('arrow-left')}Back</button><div class="tp-title"><span class="ticket-no">${escape(number)}</span><h1>${escape(o.title)}</h1></div><p class="tp-summary">${summary}</p><div class="tp-actions">${p.take ? `<button type="button" class="primary" data-take>${icon('check')}Take it</button>` : ''}${actions}${canEditDetails ? `<button class="secondary" id="edit-order">${icon('edit')}${textEdit ? 'Edit text' : 'Edit details'}</button>` : ''}<button class="secondary" id="show-history">${icon('history')}Activity</button>${followButton(o)}<button type="button" class="secondary" data-print>${icon('download')}Print</button></div></header>` +
     `<div class="tp-grid"><aside class="tp-side">${controls}${timeCard(o, p)}<section class="tp-card"><h2>Details</h2><dl class="tp-facts">${facts}</dl></section>${p.delete ? '<button class="quiet-button danger" id="delete-order">Delete request</button>' : ''}</aside>` +
-    `<div class="tp-main"><section class="tp-card"><h2>Description</h2><p class="detail-description">${escape(o.description) || none('No additional details.')}</p>${answers}</section>${reservation}<div id="history" hidden></div>${checklistCard(o, p)}<section class="tp-card"><h2>Conversation</h2><div id="comments" aria-live="polite">Loading comments…</div><form id="comment-form">${field('Add a comment', 'body', 'textarea')}${commentTools(o)}<div class="form-error" role="alert"></div><div class="editor-actions"><button class="primary" type="submit">Post comment</button></div></form></section>${attachments}${parts}</div></div></div>`;
+    `<div class="tp-main"><section class="tp-card"><h2>Description</h2><p class="detail-description">${escape(o.description) || none('No additional details.')}</p>${answers}</section>${ratingCard(o)}${reservation}<div id="history" hidden></div>${checklistCard(o, p)}<section class="tp-card"><h2>Conversation</h2><div id="comments" aria-live="polite">Loading comments…</div><form id="comment-form">${field('Add a comment', 'body', 'textarea')}${commentTools(o)}<div class="form-error" role="alert"></div><div class="editor-actions"><button class="primary" type="submit">Post comment</button></div></form></section>${attachments}${parts}</div></div></div>`;
   const reopen = async message => {
     await hooks.refresh();
     if (message) toast(message);
@@ -449,6 +453,7 @@ export async function ticketPage(ref) {
     );
   };
   bindExtras(o, {reload: () => hooks.refresh()});
+  bindRating(o);
   const commentDraft = autosave($('#comment-form'), 'comment.' + id);
   $('#comment-form').onsubmit = async e => {
     e.preventDefault();

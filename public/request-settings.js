@@ -5,6 +5,7 @@ import {formsUI, bindForms} from './settings-forms.js';
 import {dataUI, bindData} from './settings-data.js';
 import {accessUI, bindAccess} from './access-settings.js';
 import {toolsUI, bindTools} from './settings-tools.js';
+import {officeUI, bindOffice} from './settings-office.js';
 import {appearance, applyAppearance} from './ui.js';
 function updatesUI(state, escape) {
   const release = state.release,
@@ -46,6 +47,8 @@ const sectionCapability = {
   assignment: 'admin.roles',
   access: 'admin.roles',
   data: 'admin.data',
+  import: 'admin.settings',
+  integrations: 'admin.settings',
   audit: 'admin.audit',
   updates: 'admin.updates',
 };
@@ -78,6 +81,8 @@ const settingsGroups = [
     'System',
     [
       ['data', 'Backups & data'],
+      ['import', 'Import'],
+      ['integrations', 'Integrations'],
       ['audit', 'Audit log'],
       ['updates', 'Updates'],
     ],
@@ -108,6 +113,7 @@ export function settingsUI(state, escape, icon, heading) {
   let body;
   if (['access', 'assignment'].includes(state.settingsTab)) body = accessUI(state);
   else if (['checklists', 'due'].includes(state.settingsTab)) body = toolsUI(state);
+  else if (['import', 'integrations'].includes(state.settingsTab)) body = officeUI(state);
   else if (isAdminTab(state.settingsTab)) body = adminUI(state, escape);
   else if (state.settingsTab === 'updates') body = updatesUI(state, escape);
   else if (state.settingsTab === 'audit') body = auditUI(state, escape);
@@ -197,9 +203,26 @@ export function notificationsUI(state, escape, icon, heading) {
         .filter(([key]) => key !== 'email' || (state.data.modules.email && state.data.emailConfigured))
         .sort(([a], [b]) => (a === 'email') - (b === 'email'))
         .map(([key, [label, description]]) => toggle(escape, key, label, description, state.data.preferences[key]))
-        .join(
-          '',
-        )}<div class="settings-footer"><p>You won’t receive notifications for your own actions.</p><div class="form-error" role="alert"></div><button class="primary" type="submit">Save preferences</button></div></form><section class="settings-sheet appearance-sheet"><div class="sheet-heading"><h2>Appearance on this device</h2><p>Changes apply right away and are remembered in this browser.</p></div><div class="setting-row"><span><strong>Theme</strong><small>Dark is easier at night and in dim mechanical rooms.</small></span><span class="segmented" role="radiogroup" aria-label="Theme">${[
+        .join('')}${
+        state.data.modules.email && state.data.emailConfigured
+          ? toggle(
+              escape,
+              'digest',
+              'Daily digest instead',
+              'One email each morning with your updates, open work and anything due, instead of an email per update.',
+              state.data.preferences.digest,
+            ) +
+            `<div class="setting-row"><span><strong>Quiet hours</strong><small>No email between these times (organization time); it arrives when they end.</small></span><span class="quiet-hours">${[
+              'quiet_start',
+              'quiet_end',
+            ]
+              .map(
+                (name, i) =>
+                  `<label><span class="visually-hidden">${i ? 'Quiet hours end' : 'Quiet hours start'}</span><select name="${name}" aria-label="${i ? 'Quiet hours end' : 'Quiet hours start'}"><option value="">${i ? 'Until' : 'Off'}</option>${Array.from({length: 24}, (_, h) => `<option value="${h}" ${state.data.preferences[name] === h ? 'selected' : ''}>${new Date(2000, 0, 1, h).toLocaleTimeString(undefined, {hour: 'numeric'})}</option>`).join('')}</select></label>`,
+              )
+              .join('<span aria-hidden="true">to</span>')}</span></div>`
+          : ''
+      }<div class="settings-footer"><p>You won’t receive notifications for your own actions.</p><div class="form-error" role="alert"></div><button class="primary" type="submit">Save preferences</button></div></form><section class="settings-sheet appearance-sheet"><div class="sheet-heading"><h2>Appearance on this device</h2><p>Changes apply right away and are remembered in this browser.</p></div><div class="setting-row"><span><strong>Theme</strong><small>Dark is easier at night and in dim mechanical rooms.</small></span><span class="segmented" role="radiogroup" aria-label="Theme">${[
         ['system', 'System'],
         ['light', 'Light'],
         ['dark', 'Dark'],
@@ -227,6 +250,7 @@ export function bindSettings(state, api, refresh, render, toast, openOrder) {
   bindData(state, render);
   bindAccess(state, render);
   bindTools(state, render);
+  bindOffice(state, render);
   document
     .querySelectorAll('.appearance-sheet [name=theme]')
     .forEach(r => (r.onchange = () => applyAppearance({theme: r.value})));
@@ -340,6 +364,8 @@ export function bindSettings(state, api, refresh, render, toast, openOrder) {
       const data = Object.fromEntries(
         [...form.querySelectorAll('input[type=checkbox]')].map(input => [input.name, input.checked]),
       );
+      for (const select of form.querySelectorAll('select[name^=quiet_]'))
+        data[select.name] = select.value === '' ? null : Number(select.value);
       try {
         await api(name === 'module-form' ? '/settings' : '/preferences', {
           method: name === 'module-form' ? 'PATCH' : 'PUT',

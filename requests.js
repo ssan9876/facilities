@@ -1,5 +1,5 @@
 import {randomUUID} from 'node:crypto';
-import {queueNotificationEmail, emailConfigured} from './email.js';
+import {queueNotificationEmail, emailConfigured, quietDelay} from './email.js';
 import {audit, changes} from './audit.js';
 import {can, canOn} from './permissions.js';
 
@@ -13,9 +13,14 @@ export const defaultPreferences = {
   mention: true,
   due: true,
   email: true,
+  // Email as one morning digest instead of one message per update, and hours when no email is sent.
+  digest: false,
+  quiet_start: null,
+  quiet_end: null,
 };
 const eventKeys = ['created', 'assigned', 'status', 'comment'];
-const optionalKeys = ['mention', 'due', 'email'];
+const optionalKeys = ['mention', 'due', 'email', 'digest'];
+const hour = v => v === null || (Number.isInteger(v) && v >= 0 && v <= 23);
 export async function moduleSettings(db) {
   return Object.fromEntries((await db.query('SELECT * FROM modules')).map(row => [row.id, Number(row.enabled) === 1]));
 }
@@ -52,9 +57,10 @@ export async function notify(db, order, event, recipients, actorId, message) {
       message,
       created_at: created,
     });
-    if (modules.email && prefs.email) {
+    // People on the daily digest get no per-update email; quiet hours delay the rest.
+    if (modules.email && prefs.email && !prefs.digest) {
       const user = (await db.query('SELECT id,email FROM users WHERE id=$1 AND active=1', [userId]))[0];
-      if (user?.email) await queueNotificationEmail(db, user, order, message);
+      if (user?.email) await queueNotificationEmail(db, user, order, message, {delayMs: quietDelay(prefs)});
     }
   }
 }
@@ -119,7 +125,8 @@ export function setupSettings(app, db) {
       Array.isArray(body) ||
       eventKeys.some(k => typeof body[k] !== 'boolean') ||
       Object.keys(body).some(k => !(k in defaultPreferences)) ||
-      optionalKeys.some(k => body[k] !== undefined && typeof body[k] !== 'boolean')
+      optionalKeys.some(k => body[k] !== undefined && typeof body[k] !== 'boolean') ||
+      ['quiet_start', 'quiet_end'].some(k => body[k] !== undefined && !hour(body[k]))
     )
       return res.status(400).json({error: 'Provide true or false for all four notification preferences.'});
     const saved = {...(await preferences(db, req.user.id)), ...body};

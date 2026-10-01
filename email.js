@@ -1,5 +1,5 @@
 import nodemailer from 'nodemailer';
-import {randomUUID} from 'node:crypto';
+import {randomUUID, randomBytes} from 'node:crypto';
 import {section, error} from './validation.js';
 import {audit} from './audit.js';
 
@@ -30,11 +30,11 @@ const oneLine = v =>
   String(v)
     .replace(/[\r\n]+/g, ' ')
     .slice(0, 200);
-export async function enqueueEmail(db, {userId = null, to, subject, body, delayMs = 0}) {
+export async function enqueueEmail(db, {userId = null, to, subject, body, delayMs = 0, replyTo = null}) {
   if (!to || !/^[^\s@]+@[^\s@]+$/.test(to)) return false;
   const now = new Date();
   await db.query(
-    'INSERT INTO email_outbox(id,user_id,to_address,subject,body,created_at,send_after) VALUES($1,$2,$3,$4,$5,$6,$7)',
+    'INSERT INTO email_outbox(id,user_id,to_address,subject,body,created_at,send_after,reply_to) VALUES($1,$2,$3,$4,$5,$6,$7,$8)',
     [
       randomUUID(),
       userId,
@@ -43,22 +43,55 @@ export async function enqueueEmail(db, {userId = null, to, subject, body, delayM
       body,
       now.toISOString(),
       new Date(now.getTime() + delayMs).toISOString(),
+      replyTo,
     ],
   );
   kick();
   return true;
 }
+// Quiet hours: how long to hold an email so it arrives when the person's quiet hours end (organization time).
+export function quietDelay(prefs, now = new Date(), timezone = process.env.ORG_TIMEZONE || 'America/Phoenix') {
+  const {quiet_start: start, quiet_end: end} = prefs || {};
+  if (start == null || end == null || start === end) return 0;
+  const parts = Object.fromEntries(
+    new Intl.DateTimeFormat('en-US', {timeZone: timezone, hour: 'numeric', minute: 'numeric', hourCycle: 'h23'})
+      .formatToParts(now)
+      .map(p => [p.type, Number(p.value)]),
+  );
+  const minute = parts.hour * 60 + parts.minute;
+  const inside = start < end ? minute >= start * 60 && minute < end * 60 : minute >= start * 60 || minute < end * 60;
+  if (!inside) return 0;
+  return ((end * 60 - minute + 1440) % 1440 || 1440) * 60000;
+}
+// Reply-by-email: a random token in the reply address names the ticket and the person it was sent to.
+export const inboundAddress = () => process.env.INBOUND_EMAIL_ADDRESS || '';
+export async function replyAddress(db, orderId, userId) {
+  const address = inboundAddress();
+  const at = address.indexOf('@');
+  if (at < 1) return null;
+  const token = randomBytes(16).toString('hex').slice(0, 20);
+  await db.query('INSERT INTO reply_tokens(token,order_id,user_id,created_at) VALUES($1,$2,$3,$4)', [
+    token,
+    orderId,
+    userId,
+    new Date().toISOString(),
+  ]);
+  return `${address.slice(0, at)}+${token}${address.slice(at)}`;
+}
 // Called by notify() for each in-app notification recipient.
-export async function queueNotificationEmail(db, user, order, message) {
+export async function queueNotificationEmail(db, user, order, message, {delayMs = 0} = {}) {
   if (!configured) return;
   const row = (await db.query('SELECT title,number FROM work_orders WHERE id=$1', [order.id]))[0];
   const title = order.title || row?.title || 'Request';
   const ticket = row?.number ? `WO-${String(row.number).padStart(4, '0')} ` : '';
+  const replyTo = await replyAddress(db, order.id, user.id);
   await enqueueEmail(db, {
     userId: user.id,
     to: user.email,
     subject: `${ticket}${title} · ${message}`,
-    body: `${message}\n\nRequest: ${ticket}${title}\nOpen it in {{ORG}}: {{APP_URL}}/tickets/${row?.number ? `WO-${String(row.number).padStart(4, '0')}` : encodeURIComponent(order.id)}\n\nYou can change which updates you receive by email under Notifications → Preferences.`,
+    delayMs,
+    replyTo,
+    body: `${message}\n\nRequest: ${ticket}${title}\nOpen it in {{ORG}}: {{APP_URL}}/tickets/${row?.number ? `WO-${String(row.number).padStart(4, '0')}` : encodeURIComponent(order.id)}\n${replyTo ? '\nReply to this email to add a comment to the request.\n' : ''}\nYou can change which updates you receive by email under Notifications → Preferences.`,
   });
 }
 
@@ -86,6 +119,7 @@ export async function deliverEmails(db, transport, {appUrl, from, organization, 
         to: message.to_address,
         subject: `${organization}: ${message.subject}`,
         text: fill(message.body),
+        ...(message.reply_to ? {replyTo: message.reply_to} : {}),
       });
       await db.query('UPDATE email_outbox SET sent_at=$1,last_error=NULL WHERE id=$2', [
         new Date().toISOString(),
