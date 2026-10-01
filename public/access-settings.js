@@ -1,5 +1,5 @@
-// Settings → Access as code (the access file's status, reload, export and template) and
-// Settings → Auto-assignment (rules that assign new tickets to a group, role or person).
+// Settings → Access as code: edit, upload, check and apply the access document, restore earlier versions,
+// and reload the server file. Settings → Auto-assignment: rules that assign new tickets.
 import {
   $,
   $$,
@@ -22,21 +22,44 @@ import {requestTypes} from './request-settings.js';
 const when = iso => (iso ? new Date(iso).toLocaleString() : '—');
 const codeBadge = '<span class="source-badge">Access file</span>';
 
+const count = (n, word) => `${n} ${word}${n === 1 ? '' : 's'}`;
+const sourceLabel = {editor: 'edited in Settings', upload: 'uploaded', file: 'from the server file'};
+const problemList = problems =>
+  problems?.length ? `<ul class="problem-list">${problems.map(p => `<li>${e(p)}</li>`).join('')}</ul>` : '';
+
 export function accessUI(state) {
   const info = state.accessInfo;
-  if (!info || !state.admin)
+  if (!info || !state.admin || !state.accessDoc)
     return `<section class="settings-sheet" data-access-loading><div class="empty">${state.accessError ? e(state.accessError) : 'Loading access settings…'}</div></section>`;
   if (state.settingsTab === 'assignment') return assignmentUI(state, info);
-  const s = info.status || {};
-  const state_ =
+  const s = info.status || {},
+    doc = state.accessDoc;
+  const draft = state.accessDraft ?? doc.text;
+  const dirty = draft !== doc.text;
+  const active = s.applied_at
+    ? `Active version ${e(sourceLabel[s.source] || 'applied')} by ${e(s.applied_by || 'someone')}, ${e(when(s.applied_at))}: ${count(s.summary.roles, 'role')}, ${count(s.summary.groups, 'group')}, ${count(s.summary.rules, 'assignment rule')}.`
+    : 'Nothing applied yet. Roles, groups and rules are managed in the other Settings tabs.';
+  const fileNote =
     s.present === false
-      ? `<p>No file at <code>${e(info.file)}</code>. Everything is managed here in Settings.</p>`
-      : s.ok === false
-        ? `<p class="form-error">The file was rejected ${e(when(s.failed_at))}. ${e(s.error || '')} The last good configuration is still active.</p>${s.problems?.length ? `<ul class="problem-list">${s.problems.map(p => `<li>${e(p)}</li>`).join('')}</ul>` : ''}`
-        : s.applied_at
-          ? `<p>Applied ${e(when(s.applied_at))}: ${s.summary.roles} roles, ${s.summary.groups} groups, ${s.summary.rules} assignment rules.</p>`
-          : `<p>The file has not been applied yet.</p>`;
-  return `<section class="settings-sheet"><div class="sheet-heading"><h2>Access as code</h2><p>Keep roles, groups, the SSO sign-in role mapping and auto-assignment rules in one YAML file, version it with the rest of your configuration, and apply it here or on restart. Everything the file defines is read-only in Settings; anything it leaves out stays editable.</p></div><div class="setting-row"><span><strong>Access file</strong><small><code>${e(info.file)}</code></small></span>${s.present === false ? tag('on-hold', 'No file yet') : s.ok === false ? tag('urgent', 'Rejected') : s.applied_at ? tag('completed', 'Applied') : ''}</div><div class="sheet-heading access-status">${state_}</div><div class="settings-footer access-actions"><a class="secondary" href="/api/admin/access/template.yaml" download>${icon('download')}Download template</a><a class="secondary" href="/api/admin/access/export.yaml" download>${icon('download')}Export current setup</a><button type="button" class="primary" data-access-reload>Reload from file</button></div></section><section class="settings-sheet"><div class="sheet-heading"><h2>How to use it</h2><ol class="steps"><li>Download the template (every option is explained) or export what you have set up so far.</li><li>Edit it and save it as <code>${e(info.file)}</code> on the server. In the standard install that is <code>/opt/facilities/config/access.yaml</code>.</li><li>Press <strong>Reload from file</strong>. The whole file is checked first; if anything is wrong nothing changes and each problem is listed here.</li></ol></div></section>`;
+      ? `No server file at <code>${e(info.file)}</code>; that's fine, the document here is enough.`
+      : s.ok === false && s.rejected_source === 'file'
+        ? `<span class="form-error">The server file was rejected ${e(when(s.rejected_at))}; the active version stayed in place.</span>${problemList(s.problems)}`
+        : `Server file <code>${e(info.file)}</code> is applied at startup when it changes.`;
+  const check = state.accessCheck;
+  const result = !check
+    ? ''
+    : check.ok
+      ? `<div class="check-result ok" role="status"><strong>Looks good.</strong> Defines ${check.roles.length} role${check.roles.length === 1 ? '' : 's'}${check.roles.length ? ` (${e(check.roles.join(', '))})` : ''}, ${check.groups.length} group${check.groups.length === 1 ? '' : 's'}${check.groups.length ? ` (${e(check.groups.join(', '))})` : ''}, ${check.rules.length} assignment rule${check.rules.length === 1 ? '' : 's'}${check.sso ? ' and the SSO role map' : ''}.${check.applied ? ' Applied.' : ''}</div>`
+      : `<div class="check-result bad" role="alert"><strong>${e(check.error)}</strong>${problemList(check.problems)}</div>`;
+  const history = doc.versions.length
+    ? `<ol class="version-list">${doc.versions
+        .map(
+          (v, i) =>
+            `<li><span><strong>${e(when(v.created_at))}</strong><small>${e(v.actor_name)} · ${e(sourceLabel[v.source] || v.source)} · ${count(v.summary.roles, 'role')}, ${count(v.summary.groups, 'group')}, ${count(v.summary.rules, 'rule')}${i === 0 ? ' · active' : ''}</small></span>${i === 0 ? '' : `<button type="button" class="quiet-button" data-load-version="${e(v.id)}">Load into editor</button>`}</li>`,
+        )
+        .join('')}</ol>`
+    : '<p class="muted-line">No versions yet.</p>';
+  return `<section class="settings-sheet wide-sheet"><div class="sheet-heading"><h2>Access as code</h2><p>Roles, groups, the SSO sign-in role map and auto-assignment rules in one YAML document. Edit it here, upload a file, or start from the template. <strong>Check</strong> validates everything; <strong>Apply</strong> makes it active. Anything it defines becomes read-only in the other tabs; anything it leaves out stays editable there.</p><p class="access-active">${active}</p></div><div class="editor-toolbar" role="toolbar" aria-label="Access document"><label class="secondary upload-button">${icon('upload')}Upload file<input type="file" id="access-upload" accept=".yaml,.yml,text/yaml,text/plain" hidden></label><button type="button" class="secondary" data-access-insert="template">Start from template</button><button type="button" class="secondary" data-access-insert="export">Start from current setup</button><button type="button" class="secondary" data-access-download>${icon('download')}Download</button>${dirty ? '<span class="dirty-note">Unsaved changes</span>' : ''}</div><label class="visually-hidden" for="access-editor">Access document (YAML)</label><textarea id="access-editor" class="code-editor" spellcheck="false" autocapitalize="off" autocomplete="off" wrap="off" placeholder="version: 1&#10;roles:&#10;  …">${e(draft)}</textarea>${result}<div class="settings-footer access-actions"><span class="muted-line">Up to ${Math.round(doc.max / 1000)} KB. Tab indents two spaces.</span>${dirty ? '<button type="button" class="quiet-button" data-access-revert>Discard changes</button>' : ''}<button type="button" class="secondary" data-access-check>Check</button><button type="button" class="primary" data-access-apply>Apply</button></div></section><section class="settings-sheet"><div class="sheet-heading"><h2>History</h2><p>Every applied version is kept (the latest 50). Load one into the editor, check it, then apply it to roll back.</p>${history}</div></section><section class="settings-sheet"><div class="sheet-heading"><h2>Server file</h2><p>${fileNote}</p></div><div class="settings-footer access-actions"><a class="secondary" href="/api/admin/access/template.yaml" download>${icon('download')}Download template</a><button type="button" class="secondary" data-access-reload>Apply the server file now</button></div></section>`;
 }
 
 function describeRule(state, r) {
@@ -70,9 +93,14 @@ function assignmentUI(state, info) {
 
 export function bindAccess(state, render) {
   const load = async () => {
-    const [info, admin] = await Promise.all([api('/admin/access'), state.admin ? state.admin : api('/admin')]);
+    const [info, admin, doc] = await Promise.all([
+      api('/admin/access'),
+      state.admin ? state.admin : api('/admin'),
+      api('/admin/access/document'),
+    ]);
     state.accessInfo = info;
     state.admin = admin;
+    state.accessDoc = doc;
     state.accessError = '';
   };
   if ($('[data-access-loading]') && !state.accessLoading) {
@@ -84,20 +112,147 @@ export function bindAccess(state, render) {
         render();
       });
   }
+  const refreshAll = async () => {
+    [state.accessInfo, state.admin, state.accessDoc] = await Promise.all([
+      api('/admin/access'),
+      api('/admin'),
+      api('/admin/access/document'),
+    ]);
+  };
   const reload = $('[data-access-reload]');
   if (reload)
     reload.onclick = async () => {
       reload.disabled = true;
       try {
-        state.accessInfo = {...state.accessInfo, ...(await api('/admin/access/reload', {method: 'POST'}))};
-        state.admin = await api('/admin');
-        toast('Access file applied.');
+        await api('/admin/access/reload', {method: 'POST'});
+        toast('Server file applied.');
       } catch (err) {
-        state.accessInfo = await api('/admin/access');
         toast(err.message);
       }
+      await refreshAll();
+      state.accessDraft = undefined;
       render();
     };
+  // The editor: keeps its draft across redraws, indents with Tab, and checks or applies the whole document.
+  const editor = $('#access-editor');
+  if (editor) {
+    const send = async (url, method, body) => {
+      const res = await fetch('/api' + url, {
+        method,
+        headers: {'Content-Type': 'application/json', 'x-csrf-token': state.me?.csrf || ''},
+        body: JSON.stringify(body),
+      });
+      const data = await res.json().catch(() => ({error: 'The server did not answer. Try again.'}));
+      return {ok: res.ok, status: res.status, data};
+    };
+    const setDraft = text => {
+      state.accessDraft = text;
+      state.accessCheck = null;
+      render();
+      $('#access-editor')?.focus();
+    };
+    editor.oninput = () => {
+      const was = (state.accessDraft ?? state.accessDoc.text) !== state.accessDoc.text;
+      state.accessDraft = editor.value;
+      if (state.accessCheck) state.accessCheck = null;
+      // Redraw only when the "unsaved changes" state flips, so typing is never interrupted.
+      if (was !== (editor.value !== state.accessDoc.text)) {
+        const at = [editor.selectionStart, editor.selectionEnd];
+        render();
+        const again = $('#access-editor');
+        again.focus();
+        again.setSelectionRange(...at);
+      }
+    };
+    editor.onkeydown = ev => {
+      if (ev.key !== 'Tab' || ev.shiftKey || ev.ctrlKey || ev.altKey || ev.metaKey) return;
+      ev.preventDefault();
+      editor.setRangeText('  ', editor.selectionStart, editor.selectionEnd, 'end');
+      editor.dispatchEvent(new Event('input'));
+    };
+    const fetchText = async url => {
+      const res = await fetch(url);
+      if (!res.ok) throw new Error('Could not load it. Try again.');
+      return res.text();
+    };
+    const replaceDraft = async text => {
+      const current = state.accessDraft ?? state.accessDoc.text;
+      if (current.trim() && current !== state.accessDoc.text && !confirm('Replace your unsaved changes in the editor?'))
+        return;
+      setDraft(text);
+    };
+    $$('[data-access-insert]').forEach(
+      b =>
+        (b.onclick = async () => {
+          try {
+            await replaceDraft(
+              await fetchText(
+                b.dataset.accessInsert === 'template'
+                  ? '/api/admin/access/template.yaml'
+                  : '/api/admin/access/export.yaml',
+              ),
+            );
+          } catch (err) {
+            toast(err.message);
+          }
+        }),
+    );
+    $('#access-upload').onchange = async ev => {
+      const file = ev.target.files[0];
+      if (!file) return;
+      if (file.size > state.accessDoc.max)
+        return toast(`That file is larger than ${Math.round(state.accessDoc.max / 1000)} KB.`);
+      state.accessUpload = true;
+      await replaceDraft(await file.text());
+      toast(`${file.name} loaded. Check it, then apply.`);
+    };
+    $('[data-access-download]').onclick = () => {
+      const link = document.createElement('a');
+      link.href = URL.createObjectURL(new Blob([editor.value], {type: 'application/yaml'}));
+      link.download = 'access.yaml';
+      link.click();
+      setTimeout(() => URL.revokeObjectURL(link.href), 1000);
+    };
+    const revert = $('[data-access-revert]');
+    if (revert) revert.onclick = () => setDraft(state.accessDoc.text);
+    $('[data-access-check]').onclick = async () => {
+      const {data} = await send('/admin/access/check', 'POST', {text: editor.value});
+      state.accessCheck = data.ok ? data : {ok: false, error: data.error, problems: data.problems};
+      render();
+    };
+    $('[data-access-apply]').onclick = async ev => {
+      ev.target.disabled = true;
+      const text = editor.value;
+      const {ok, data} = await send('/admin/access/document', 'PUT', {
+        text,
+        source: state.accessUpload ? 'upload' : 'editor',
+      });
+      if (!ok) {
+        state.accessCheck = {ok: false, error: data.error, problems: data.problems};
+        render();
+        return;
+      }
+      state.accessUpload = false;
+      const summary = await send('/admin/access/check', 'POST', {text});
+      await refreshAll();
+      state.accessDraft = undefined;
+      state.accessCheck = summary.ok ? {...summary.data, applied: true} : null;
+      toast('Access document applied.');
+      render();
+    };
+    $$('[data-load-version]').forEach(
+      b =>
+        (b.onclick = async () => {
+          try {
+            const v = await api('/admin/access/versions/' + b.dataset.loadVersion);
+            await replaceDraft(v.text);
+            toast(`Version from ${when(v.created_at)} loaded. Check it, then apply to restore it.`);
+          } catch (err) {
+            toast(err.message);
+          }
+        }),
+    );
+  }
   const ruleSheet = rule => {
     const a = state.admin;
     const categories = Object.entries(state.data.forms || {}).flatMap(([type, f]) =>

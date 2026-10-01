@@ -217,6 +217,10 @@ export const migrations = [
       await q(
         'CREATE TABLE IF NOT EXISTS assignment_rules (id TEXT PRIMARY KEY, name TEXT NOT NULL, sort INTEGER NOT NULL DEFAULT 0, request_type TEXT, category_id TEXT REFERENCES categories(id), buildings TEXT NOT NULL, target_kind TEXT NOT NULL, target_id TEXT NOT NULL, strategy TEXT NOT NULL, active INTEGER NOT NULL DEFAULT 1, last_user_id TEXT, source TEXT NOT NULL, created_at TEXT NOT NULL)',
       );
+      // Every applied access document (edited or uploaded in Settings, or read from the file), newest last.
+      await q(
+        'CREATE TABLE IF NOT EXISTS access_versions (id TEXT PRIMARY KEY, created_at TEXT NOT NULL, actor_name TEXT NOT NULL, source TEXT NOT NULL, body TEXT NOT NULL, summary TEXT NOT NULL)',
+      );
     },
   },
 ];

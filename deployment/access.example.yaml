@@ -1,9 +1,13 @@
 # Facilities access file (version 1)
 #
-# Declares roles, groups, the SSO sign-in role mapping and ticket assignment rules. Save it as
-# config/access.yaml next to the app (or set ACCESS_FILE), then restart or use Settings → Roles → Reload.
-# The whole file is checked first: if anything is wrong, nothing changes and the problems are listed in
-# Settings → Roles. Everything defined here is read-only in Settings; anything not mentioned stays editable.
+# Declares roles, groups, the SSO sign-in role mapping and ticket assignment rules. Edit and apply it in
+# Settings → Access as code (or upload it there), or save it on the server as config/access.yaml
+# (ACCESS_FILE) where it is applied at startup when it changes. The whole document is checked first: if
+# anything is wrong, nothing changes and every problem is listed. Everything defined here is read-only in
+# the other Settings tabs; anything not mentioned stays editable there.
+#
+# This template applies as-is. Lines starting with "#" are examples that need names from your workspace
+# (buildings, request-form categories, people); uncomment and adjust them.
 #
 # Capabilities (use "requests.*" style wildcards to take a whole group):
 #   Requests
@@ -63,19 +67,19 @@ roles:
       - maintenance.view
       - inventory.view
 
-  # A custom role built from another one.
-  north-plumber:
-    name: North Campus plumber
-    description: Works plumbing tickets in North Campus.
+  # A custom role built from another one, limited to maintenance tickets.
+  plumber:
+    name: Plumber
+    description: Works plumbing tickets.
     extends: technician
     add: [parts.record_any]
     remove: [maintenance.view]
     scope:
       request_types: [maintenance]
-      buildings: [North Campus]
+      # buildings: [North Campus]     # building names from Settings → Buildings
     submit: [maintenance]
 
-  # An IT administrator who only installs updates and reads the audit log.
+  # An IT administrator who only installs updates, runs backups and reads the audit log.
   it-admin:
     name: IT administrator
     capabilities: [admin.updates, admin.data, admin.audit]
@@ -84,10 +88,10 @@ groups:
   plumbers:
     name: Plumbers
     description: Everyone who takes plumbing work.
-    roles: [north-plumber]          # roles this group grants on top of each member's own role
-    sso: [facilities-plumbers]       # members join and leave from this SSO group claim at sign-in
-    # members: [pat@example.org]     # listing members makes the file own the membership
-    # auto_assign: true              # every newly provisioned person joins
+    roles: [plumber]                  # roles this group grants on top of each member's own role
+    sso: [facilities-plumbers]        # members join and leave from this SSO group claim at sign-in
+    # members: [pat@example.org]      # listing members (email or username) makes the file own membership
+    # auto_assign: true               # every newly provisioned person joins
 
 # Which role people sign in with, from their SSO group claims (first match wins). Replaces the
 # OIDC_ADMIN_GROUP / OIDC_MANAGER_GROUP / OIDC_TECHNICIAN_GROUP variables when present.
@@ -101,9 +105,9 @@ sso:
 # New tickets are assigned by the first matching rule to someone in its group or role who can be
 # assigned that ticket. least_busy picks whoever has the fewest open tickets; round_robin takes turns.
 assignment:
-  - name: North Campus plumbing
+  - name: Maintenance to the plumbers
     request_type: maintenance
-    category: Plumbing              # a category of the request type (Settings → Request forms)
-    buildings: [North Campus]
-    assign_to: {group: plumbers}    # or {role: technician} or {user: pat@example.org}
+    # category: Plumbing              # a category of the request type (Settings → Request forms)
+    # buildings: [North Campus]
+    assign_to: {group: plumbers}      # or {role: technician} or {user: pat@example.org}
     strategy: least_busy

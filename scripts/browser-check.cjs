@@ -314,10 +314,37 @@ const assert = require('node:assert/strict');
   await page.locator('#rule-form').getByRole('button', {name: 'Create rule'}).click();
   await page.getByRole('cell', {name: 'Community Center plumbing', exact: true}).waitFor();
   await page.screenshot({path: '.impeccable/review/assignment-desktop.png', fullPage: true});
-  // Access as code: no file in this workspace, so the page explains how to add one.
+  // Access as code: edit the document in Settings, check it, apply it.
   await page.getByRole('button', {name: 'Access as code', exact: true}).click();
-  await page.getByText('No file yet', {exact: true}).waitFor();
+  await page.locator('#access-editor').waitFor();
+  await page.getByRole('button', {name: 'Start from template', exact: true}).click();
+  await page.waitForFunction(() => document.querySelector('#access-editor').value.includes('it-admin'));
+  await page.getByRole('button', {name: 'Check', exact: true}).click();
+  await page.locator('.check-result.ok').waitFor();
+  // A typo is caught before anything changes.
+  await page
+    .locator('#access-editor')
+    .fill('version: 1\nroles:\n  oops:\n    name: Oops\n    capabilities: [requests.fly]\n');
+  await page.getByRole('button', {name: 'Apply', exact: true}).click();
+  await page.locator('.check-result.bad').waitFor();
+  assert.match(await page.locator('.check-result').innerText(), /requests\.fly/);
+  await page.screenshot({path: '.impeccable/review/access-problems-desktop.png', fullPage: true});
+  await page
+    .locator('#access-editor')
+    .fill(
+      'version: 1\nroles:\n  night-crew:\n    name: Night crew\n    extends: technician\n    scope: {buildings: [North Campus]}\n',
+    );
+
+  await page.getByText('Unsaved changes', {exact: true}).waitFor();
+  await page.getByRole('button', {name: 'Check', exact: true}).click();
+  await page.locator('.check-result.ok').waitFor();
+  await page.getByRole('button', {name: 'Apply', exact: true}).click();
+  await page.getByText('Access document applied.', {exact: true}).waitFor();
+  await page.locator('.version-list li').first().waitFor();
+  assert.equal(await page.getByText('Unsaved changes', {exact: true}).count(), 0);
   await page.screenshot({path: '.impeccable/review/access-desktop.png', fullPage: true});
+  await page.getByRole('button', {name: 'Roles', exact: true}).click();
+  await page.locator('.role-col').filter({hasText: 'Night crew'}).getByText('Access file', {exact: true}).waitFor();
   await page.getByRole('button', {name: 'Provisioning', exact: true}).click();
   await page.getByLabel('Connection name').fill('Browser integration');
   await page.getByRole('button', {name: 'Create token', exact: true}).click();

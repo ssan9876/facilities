@@ -1,8 +1,10 @@
-// Access as code: roles, groups, SSO role mapping and ticket assignment rules declared in one YAML file
-// (ACCESS_FILE, default config/access.yaml). The file is validated as a whole and applied at startup and
-// from Settings → Roles → Reload. Anything it defines is marked source='code' and read-only in the UI;
-// roles, groups and rules it does not mention stay editable there. A file that fails validation changes
-// nothing: the last good configuration stays active and the error is shown in Settings.
+// Access as code: roles, groups, SSO role mapping and ticket assignment rules declared in one YAML document.
+// The document is edited or uploaded in Settings → Access as code, or kept on the server as a file
+// (ACCESS_FILE, default config/access.yaml). Whichever changed last is active: the file applies at startup
+// only when its content changed since it was last applied, so edits made in Settings survive restarts.
+// Every document is validated as a whole before anything changes; a rejected one leaves the last good
+// configuration in place. Anything it defines is marked source='code' and read-only elsewhere in Settings;
+// roles, groups and rules it does not mention stay editable there. Applied versions are kept as history.
 import {readFile} from 'node:fs/promises';
 import {createHash, randomUUID} from 'node:crypto';
 import path from 'node:path';
@@ -386,49 +388,79 @@ export async function applyPlan(db, plan, actor) {
   return summary;
 }
 
-// Reads, validates and applies the file. Failures are recorded and leave the last good configuration.
-export async function loadAccessFile(db, env, {actor, logger} = {}) {
-  const file = accessFilePath(env);
+const digest = text => createHash('sha256').update(text).digest('hex').slice(0, 16);
+export const maxDocument = 60000;
+const keepVersions = 50;
+
+// Validates and applies one document, records it as the active version and returns the new status.
+export async function applyDocument(db, text, {actor, source, file} = {}) {
+  if (typeof text !== 'string') throw fail('Send the access document as text.');
+  if (text.length > maxDocument) throw fail(`The access document must be under ${maxDocument / 1000} KB.`, 413);
+  const plan = await planAccess(db, text);
+  const summary = await applyPlan(db, plan, actor);
   const previous = await accessStatus(db);
+  const now = new Date().toISOString();
+  const status = {
+    ...previous,
+    ok: true,
+    hash: digest(text),
+    source,
+    applied_at: now,
+    applied_by: actor?.name || (source === 'file' ? 'Server file' : 'System'),
+    summary,
+    sso: plan.sso,
+    problems: [],
+    error: undefined,
+    ...(source === 'file' ? {file_hash: digest(text), file} : {}),
+  };
+  await db.query(
+    'INSERT INTO access_versions(id,created_at,actor_name,source,body,summary) VALUES($1,$2,$3,$4,$5,$6)',
+    [randomUUID(), now, status.applied_by, source, text, JSON.stringify(summary)],
+  );
+  const old = await db.query('SELECT id FROM access_versions ORDER BY created_at DESC');
+  for (const v of old.slice(keepVersions)) await db.query('DELETE FROM access_versions WHERE id=$1', [v.id]);
+  await saveStatus(db, status);
+  return status;
+}
+const rejected = async (db, err, extra) => {
+  const status = {
+    ...(await accessStatus(db)),
+    ...extra,
+    ok: false,
+    rejected_at: new Date().toISOString(),
+    error: err.message,
+    problems: err.problems || [],
+  };
+  await saveStatus(db, status);
+  return status;
+};
+
+// The server file: applied at startup when it changed since it was last applied, or on demand (force).
+export async function loadAccessFile(db, env, {actor, logger, force = false} = {}) {
+  const file = accessFilePath(env);
   let text;
   try {
     text = await readFile(file, 'utf8');
   } catch (err) {
     if (err.code !== 'ENOENT') throw err;
-    const status = {...previous, file, present: false, checked_at: new Date().toISOString()};
+    const status = {...(await accessStatus(db)), file, present: false};
     await saveStatus(db, status);
     if (actor) throw fail(`No access file at ${file}.`, 404);
     return status;
   }
-  const hash = createHash('sha256').update(text).digest('hex').slice(0, 16);
+  const previous = await accessStatus(db);
+  if (!force && previous.file_hash === digest(text)) {
+    await saveStatus(db, {...previous, file, present: true});
+    return db.access;
+  }
   try {
-    const plan = await planAccess(db, text);
-    const summary = await applyPlan(db, plan, actor);
-    const status = {
-      file,
-      present: true,
-      ok: true,
-      hash,
-      applied_at: new Date().toISOString(),
-      summary,
-      sso: plan.sso,
-      problems: [],
-    };
-    await saveStatus(db, status);
-    logger?.info('access file applied', {file, ...summary});
-    return status;
+    const status = await applyDocument(db, text, {actor, source: 'file', file});
+    await saveStatus(db, {...status, present: true});
+    logger?.info('access file applied', {file, ...status.summary});
+    return db.access;
   } catch (err) {
-    const status = {
-      ...previous,
-      file,
-      present: true,
-      ok: false,
-      failed_hash: hash,
-      failed_at: new Date().toISOString(),
-      error: err.message,
-      problems: err.problems || [],
-    };
-    await saveStatus(db, status);
+    if (err.status && err.status >= 500) throw err;
+    const status = await rejected(db, err, {file, present: true, rejected_source: 'file', rejected_hash: digest(text)});
     logger?.warn('access file rejected', {file, error: err.message, problems: err.problems});
     if (actor) throw Object.assign(fail(err.message, 422), {problems: err.problems || []});
     return status;
@@ -509,8 +541,8 @@ export async function exportAccess(db) {
   };
   return (
     `# Facilities access file, exported ${new Date().toISOString().slice(0, 10)}.\n` +
-    '# Save it as config/access.yaml (ACCESS_FILE) and use Settings → Roles → Reload to apply it.\n' +
-    '# The template (Settings → Roles → Download template) documents every option.\n' +
+    '# Apply it in Settings → Access as code, or save it on the server as config/access.yaml (ACCESS_FILE).\n' +
+    '# The template (Settings → Access as code → Start from template) documents every option.\n' +
     YAML.stringify(body, {lineWidth: 0})
   );
 }
@@ -532,10 +564,14 @@ export function accessTemplate() {
     .join('\n');
   return `# Facilities access file (version 1)
 #
-# Declares roles, groups, the SSO sign-in role mapping and ticket assignment rules. Save it as
-# config/access.yaml next to the app (or set ACCESS_FILE), then restart or use Settings → Roles → Reload.
-# The whole file is checked first: if anything is wrong, nothing changes and the problems are listed in
-# Settings → Roles. Everything defined here is read-only in Settings; anything not mentioned stays editable.
+# Declares roles, groups, the SSO sign-in role mapping and ticket assignment rules. Edit and apply it in
+# Settings → Access as code (or upload it there), or save it on the server as config/access.yaml
+# (ACCESS_FILE) where it is applied at startup when it changes. The whole document is checked first: if
+# anything is wrong, nothing changes and every problem is listed. Everything defined here is read-only in
+# the other Settings tabs; anything not mentioned stays editable there.
+#
+# This template applies as-is. Lines starting with "#" are examples that need names from your workspace
+# (buildings, request-form categories, people); uncomment and adjust them.
 #
 # Capabilities (use "requests.*" style wildcards to take a whole group):
 ${catalog}
@@ -560,19 +596,19 @@ roles:
       - maintenance.view
       - inventory.view
 
-  # A custom role built from another one.
-  north-plumber:
-    name: North Campus plumber
-    description: Works plumbing tickets in North Campus.
+  # A custom role built from another one, limited to maintenance tickets.
+  plumber:
+    name: Plumber
+    description: Works plumbing tickets.
     extends: technician
     add: [parts.record_any]
     remove: [maintenance.view]
     scope:
       request_types: [maintenance]
-      buildings: [North Campus]
+      # buildings: [North Campus]     # building names from Settings → Buildings
     submit: [maintenance]
 
-  # An IT administrator who only installs updates and reads the audit log.
+  # An IT administrator who only installs updates, runs backups and reads the audit log.
   it-admin:
     name: IT administrator
     capabilities: [admin.updates, admin.data, admin.audit]
@@ -581,10 +617,10 @@ groups:
   plumbers:
     name: Plumbers
     description: Everyone who takes plumbing work.
-    roles: [north-plumber]          # roles this group grants on top of each member's own role
-    sso: [facilities-plumbers]       # members join and leave from this SSO group claim at sign-in
-    # members: [pat@example.org]     # listing members makes the file own the membership
-    # auto_assign: true              # every newly provisioned person joins
+    roles: [plumber]                  # roles this group grants on top of each member's own role
+    sso: [facilities-plumbers]        # members join and leave from this SSO group claim at sign-in
+    # members: [pat@example.org]      # listing members (email or username) makes the file own membership
+    # auto_assign: true               # every newly provisioned person joins
 
 # Which role people sign in with, from their SSO group claims (first match wins). Replaces the
 # OIDC_ADMIN_GROUP / OIDC_MANAGER_GROUP / OIDC_TECHNICIAN_GROUP variables when present.
@@ -598,11 +634,11 @@ sso:
 # New tickets are assigned by the first matching rule to someone in its group or role who can be
 # assigned that ticket. least_busy picks whoever has the fewest open tickets; round_robin takes turns.
 assignment:
-  - name: North Campus plumbing
+  - name: Maintenance to the plumbers
     request_type: maintenance
-    category: Plumbing              # a category of the request type (Settings → Request forms)
-    buildings: [North Campus]
-    assign_to: {group: plumbers}    # or {role: technician} or {user: pat@example.org}
+    # category: Plumbing              # a category of the request type (Settings → Request forms)
+    # buildings: [North Campus]
+    assign_to: {group: plumbers}      # or {role: technician} or {user: pat@example.org}
     strategy: least_busy
 `;
 }
@@ -691,8 +727,50 @@ export function setupAccess(app, db, env, {logger} = {}) {
     res.json({status: await accessStatus(db), file: accessFilePath(env), rules: await rulesPayload()}),
   );
   app.post('/api/admin/access/reload', roles, async (req, res) => {
-    const status = await loadAccessFile(db, env, {actor: req.user, logger});
+    const status = await loadAccessFile(db, env, {actor: req.user, logger, force: true});
     res.json({status, rules: await rulesPayload()});
+  });
+  const versions = async () =>
+    (
+      await db.query('SELECT id,created_at,actor_name,source,summary FROM access_versions ORDER BY created_at DESC')
+    ).map(v => ({...v, summary: JSON.parse(v.summary)}));
+  // The active document (latest applied version) and the history, for the editor.
+  app.get('/api/admin/access/document', roles, async (req, res) => {
+    const latest = (await db.query('SELECT body FROM access_versions ORDER BY created_at DESC LIMIT 1'))[0];
+    res.json({text: latest?.body ?? '', versions: await versions(), max: maxDocument});
+  });
+  app.get('/api/admin/access/versions/:id', roles, async (req, res) => {
+    const v = (await db.query('SELECT * FROM access_versions WHERE id=$1', [req.params.id]))[0];
+    if (!v) throw fail('Version not found.', 404);
+    res.json({text: v.body, created_at: v.created_at, actor_name: v.actor_name});
+  });
+  // Check without applying: the summary of what the document defines, or every problem.
+  app.post('/api/admin/access/check', roles, async (req, res) => {
+    const text = req.body?.text;
+    if (typeof text !== 'string') throw fail('Send the access document as text.');
+    try {
+      const plan = await planAccess(db, text);
+      res.json({
+        ok: true,
+        roles: plan.roles.map(r => r.id),
+        groups: plan.groups.map(g => g.key),
+        rules: plan.rules.map(r => r.name),
+        sso: !!plan.sso,
+      });
+    } catch (err) {
+      if (err.status && err.status >= 500) throw err;
+      res.status(422).json({ok: false, error: err.message, problems: err.problems || []});
+    }
+  });
+  app.put('/api/admin/access/document', roles, async (req, res) => {
+    const source = req.body?.source === 'upload' ? 'upload' : 'editor';
+    try {
+      const status = await applyDocument(db, req.body?.text, {actor: req.user, source});
+      res.json({status, rules: await rulesPayload(), versions: await versions()});
+    } catch (err) {
+      if (!err.problems && err.status !== 400) throw err;
+      throw Object.assign(fail(err.message, 422), {problems: err.problems || []});
+    }
   });
   app.get('/api/admin/access/export.yaml', roles, async (req, res) => {
     res

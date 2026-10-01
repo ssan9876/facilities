@@ -249,7 +249,9 @@ test('assignment rules can be managed in Settings and the template documents eve
     assert.equal((await call('/api/admin/assignment-rules/' + rule.body.id, 'DELETE')).status, 200);
     const template = accessTemplate();
     for (const id of capabilityIds) assert.ok(template.includes(id), `template lists ${id}`);
-    assert.ok(YAML.parse(template).roles['north-plumber']);
+    assert.ok(YAML.parse(template).roles.plumber);
+    const applied = await call('/api/admin/access/document', 'PUT', {text: template});
+    assert.equal(applied.status, 200, 'the template applies as-is: ' + JSON.stringify(applied.body.problems));
   } finally {
     await w.close();
   }
@@ -258,4 +260,59 @@ test('assignment rules can be managed in Settings and the template documents eve
 test('the committed template matches the code (npm run access:template)', async () => {
   const {readFileSync} = await import('node:fs');
   assert.equal(readFileSync(new URL('../deployment/access.example.yaml', import.meta.url), 'utf8'), accessTemplate());
+});
+
+test('administrators edit, upload, check and restore the access document in Settings', async () => {
+  const f = tempFile('version: 1\nroles:\n  night-crew:\n    name: Night crew\n    extends: technician\n');
+  const env = {ACCESS_FILE: f.file};
+  const w = await startWorkspace(env);
+  const {call, as, addUser, db} = w;
+  try {
+    const {loadAccessFile} = await import('../access.js');
+    let doc = (await call('/api/admin/access/document')).body;
+    assert.match(doc.text, /night-crew/, 'the file applied at startup is the active document');
+    assert.equal(doc.versions[0].source, 'file');
+    // Checking reports problems without changing anything.
+    const broken = 'version: 1\nroles:\n  bad:\n    name: Bad\n    capabilities: [requests.fly]\n';
+    const check = await call('/api/admin/access/check', 'POST', {text: broken});
+    assert.equal(check.status, 422);
+    assert.ok(check.body.problems.some(p => p.includes('requests.fly')));
+    assert.equal((await call('/api/admin/access/document', 'PUT', {text: broken})).status, 422);
+    assert.equal((await call('/api/admin/access/document')).body.versions.length, 1, 'nothing was applied');
+    const good =
+      'version: 1\nroles:\n  day-crew:\n    name: Day crew\n    extends: technician\n    scope: {buildings: [North Campus]}\n';
+    assert.deepEqual((await call('/api/admin/access/check', 'POST', {text: good})).body.roles, ['day-crew']);
+    // Upload applies it: day crew replaces night crew.
+    const applied = await call('/api/admin/access/document', 'PUT', {text: good, source: 'upload'});
+    assert.equal(applied.status, 200);
+    assert.equal(applied.body.status.source, 'upload');
+    assert.equal(applied.body.status.applied_by, 'Alex Morgan');
+    const roles = (await call('/api/admin/roles')).body;
+    assert.equal(roles.find(r => r.id === 'day-crew').source, 'code');
+    assert.ok(!roles.some(r => r.id === 'night-crew'));
+    // A restart with the same server file keeps the console's version.
+    await loadAccessFile(db, env);
+    assert.equal(db.access.source, 'upload');
+    assert.ok((await call('/api/admin/roles')).body.some(r => r.id === 'day-crew'));
+    // Restoring an earlier version: load it, then apply it again.
+    doc = (await call('/api/admin/access/document')).body;
+    assert.equal(doc.versions.length, 2);
+    const first = (await call('/api/admin/access/versions/' + doc.versions[1].id)).body;
+    assert.match(first.text, /night-crew/);
+    assert.equal((await call('/api/admin/access/document', 'PUT', {text: first.text})).body.status.source, 'editor');
+    // A changed server file wins at the next start.
+    f.write('version: 1\nroles:\n  late-crew:\n    name: Late crew\n    extends: requester\n');
+    await loadAccessFile(db, env);
+    assert.equal(db.access.source, 'file');
+    assert.ok((await call('/api/admin/roles')).body.some(r => r.id === 'late-crew'));
+    assert.equal((await call('/api/admin/access/document', 'PUT', {text: 'x'.repeat(61000)})).status, 413);
+    // Only people who manage roles may see or change it.
+    await addUser('mgr', 'manager');
+    await as('mgr');
+    assert.equal((await call('/api/admin/access/document')).status, 403);
+    assert.equal((await call('/api/admin/access/document', 'PUT', {text: good})).status, 403);
+  } finally {
+    await w.close();
+    rmSync(f.dir, {recursive: true, force: true});
+  }
 });
