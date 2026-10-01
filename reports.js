@@ -114,6 +114,17 @@ export function setupReports(app, db, env) {
   // The order export honours the same filters as the register, so "export what I see" is exact.
   app.get('/api/reports/orders.csv', exportCsv, async (req, res) => {
     const {orders} = await listOrders(db, req.user, req.query, timezone, {limit: 100000, offset: 0});
+    // Custom answers export as one "Question: answer" cell per request.
+    const answers = new Map();
+    for (let i = 0; i < orders.length; i += 500) {
+      const ids = orders.slice(i, i + 500).map(o => o.id);
+      if (!ids.length) continue;
+      const rows = await db.query(
+        `SELECT a.order_id, f.label, a.value FROM order_answers a JOIN form_fields f ON f.id=a.field_id WHERE a.order_id IN (${ids.map((_, n) => '$' + (n + 1)).join(',')}) ORDER BY f.sort, f.created_at`,
+        ids,
+      );
+      for (const r of rows) answers.set(r.order_id, [...(answers.get(r.order_id) || []), `${r.label}: ${r.value}`]);
+    }
     res
       .attachment(`requests-${stamp()}.csv`)
       .type('text/csv')
@@ -123,6 +134,7 @@ export function setupReports(app, db, env) {
             'Ticket',
             'ID',
             'Type',
+            'Category',
             'Title',
             'Status',
             'Priority',
@@ -138,11 +150,13 @@ export function setupReports(app, db, env) {
             'Created',
             'Completed',
             'Description',
+            'Answers',
           ],
           orders.map(o => [
             ticketLabel(o.number),
             o.id,
             o.request_type,
+            o.category,
             o.title,
             o.status,
             o.priority,
@@ -158,6 +172,7 @@ export function setupReports(app, db, env) {
             o.created_at,
             o.completed_at,
             o.description,
+            (answers.get(o.id) || []).join('; '),
           ]),
         ),
       );

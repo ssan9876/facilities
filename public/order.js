@@ -28,6 +28,7 @@ import {
 } from './ui.js';
 import {hooks} from './hooks.js';
 import {locationFields, bindLocation, requestTiming, bindTiming} from './forms.js';
+import {configurableFields, bindConfigurable, withAnswers, ruleFor} from './requestform.js';
 
 const statuses = ['Open', 'In progress', 'On hold', 'Completed'];
 const reducedMotion = () => matchMedia('(prefers-reduced-motion: reduce)').matches;
@@ -129,6 +130,7 @@ export async function ticketPage(ref) {
       `<span class="request-kind">${icon(requestTypes[o.request_type].icon)}${requestTypes[o.request_type].label}</span>`,
     ),
     cell('Priority', tag(o.priority)),
+    cell('Category', o.category ? escape(o.category) : '<span class="unassigned">None</span>'),
     cell('Opened', fmtStamp(o.created_at)),
     cell('Building', escape(o.building)),
     cell('Asset', escape(o.asset) || '<span class="unassigned">None</span>'),
@@ -151,7 +153,11 @@ export async function ticketPage(ref) {
   ].join('');
   $('#ticket-page').innerHTML =
     `<div class="ticket-bar"><button type="button" class="quiet-button" data-ticket-back>${icon('arrow-left')}Back</button><span class="copy-label"><span class="copies" data-copy="${copy}" aria-hidden="true"><i class="c-requester"></i><i class="c-technician"></i><i class="c-office"></i></span>${{requester: 'Requester copy', technician: 'Technician copy', office: 'Office copy'}[copy]}</span></div><article class="ticket-sheet" data-copy="${copy}"><header class="ticket-head"><span class="ticket-no">${escape(number)}</span><h1>${escape(o.title)}</h1></header><div class="ticket-body">` +
-    `<div id="lifecycle-slot">${lifecycle(o.status)}</div>${stampBar}<div class="ticket-fields">${fields}${cell('Description of work', `<span class="detail-description">${escape(o.description) || 'No additional details.'}</span>`, 'wide')}</div><div class="detail-toolbar">${canEditDetails ? `<button class="secondary" id="edit-order">${icon('edit')}${textEdit ? 'Edit text' : 'Edit details'}</button>` : ''}<button class="secondary" id="show-history">${icon('history')}Activity</button>${can('requests.delete') ? '<button class="secondary danger" id="delete-order">Delete request</button>' : ''}</div>${reservation}${canUpdate ? `<section class="detail-section stamp-forward"><div class="section-head compact"><h2>${canAssign ? 'Reassign or correct' : 'Correct the status'}</h2></div>${update}</section>` : `<p class="muted-line">Assigned to ${escape(o.assignee) || 'no one yet'}.</p>`}<div id="history" hidden></div>${attachments}${parts}<section class="detail-section"><div class="section-head compact"><h2>Conversation</h2></div><div id="comments" aria-live="polite">Loading comments…</div><form id="comment-form">${field('Add a comment', 'body', 'textarea')}<div class="form-error" role="alert"></div><div class="editor-actions"><button class="secondary" type="submit">Post comment</button></div></form></section>` +
+    `<div id="lifecycle-slot">${lifecycle(o.status)}</div>${stampBar}<div class="ticket-fields">${fields}${cell('Description of work', `<span class="detail-description">${escape(o.description) || 'No additional details.'}</span>`, 'wide')}</div>${
+      o.answers?.length
+        ? `<div class="ticket-fields answers">${o.answers.map(a => cell(escape(a.label), `<span class="detail-description">${escape(a.value)}</span>`, a.kind === 'textarea' ? 'wide' : '')).join('')}</div>`
+        : ''
+    }<div class="detail-toolbar">${canEditDetails ? `<button class="secondary" id="edit-order">${icon('edit')}${textEdit ? 'Edit text' : 'Edit details'}</button>` : ''}<button class="secondary" id="show-history">${icon('history')}Activity</button>${can('requests.delete') ? '<button class="secondary danger" id="delete-order">Delete request</button>' : ''}</div>${reservation}${canUpdate ? `<section class="detail-section stamp-forward"><div class="section-head compact"><h2>${canAssign ? 'Reassign or correct' : 'Correct the status'}</h2></div>${update}</section>` : `<p class="muted-line">Assigned to ${escape(o.assignee) || 'no one yet'}.</p>`}<div id="history" hidden></div>${attachments}${parts}<section class="detail-section"><div class="section-head compact"><h2>Conversation</h2></div><div id="comments" aria-live="polite">Loading comments…</div><form id="comment-form">${field('Add a comment', 'body', 'textarea')}<div class="form-error" role="alert"></div><div class="editor-actions"><button class="secondary" type="submit">Post comment</button></div></form></section>` +
     `</div></article>`;
   const reopen = async message => {
     await hooks.refresh();
@@ -373,18 +379,24 @@ export async function ticketPage(ref) {
 function editOrder(o) {
   dialog(
     'Edit request',
-    `<form id="edit-form"><div class="form-grid">${field('Title', 'title', 'text', o.title)}${select(
-      'Priority',
-      'priority',
-      ['Low', 'Normal', 'High', 'Urgent'].map(x => [x, x]),
-      o.priority,
-    )}${locationFields(o.building_id, o.asset_id || '')}<div class="timing" id="request-timing">${requestTiming(o.request_type, o)}</div>${field('Details', 'description', 'textarea', o.description, true)}</div>${formActions('Save details')}</form>`,
+    `<form id="edit-form"><div class="form-grid">${field('Title', 'title', 'text', o.title)}${
+      ruleFor(o.request_type, 'priority') === 'hidden'
+        ? ''
+        : select(
+            'Priority',
+            'priority',
+            ['Low', 'Normal', 'High', 'Urgent'].map(x => [x, x]),
+            o.priority,
+          )
+    }<div class="configurable" id="configurable">${configurableFields(o.request_type, {category: o.category_id || '', answers: Object.fromEntries((o.answers || []).map(a => [a.field_id, a.kind === 'checkbox' ? true : a.value]))})}</div>${locationFields(o.building_id, o.asset_id || '', ruleFor(o.request_type, 'asset') !== 'hidden', ruleFor(o.request_type, 'asset') === 'required')}<div class="timing" id="request-timing">${requestTiming(o.request_type, o)}</div>${field('Details', 'description', 'textarea', o.description, true)}</div>${formActions('Save details')}</form>`,
     {number: ticketNo(o.number)},
   );
   bindCancel();
   bindLocation();
   bindTiming(o.id);
-  bindForm($('#edit-form'), async data => {
+  bindConfigurable($('#edit-form'), o.request_type, $('#edit-form #configurable'));
+  bindForm($('#edit-form'), async (raw, form) => {
+    const data = withAnswers(raw, form);
     if (o.request_type === 'schedule') delete data.due_date;
     else {
       delete data.starts_at;

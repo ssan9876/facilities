@@ -1,7 +1,7 @@
 // Location and timing fields shared by request creation and editing.
 import {state, $, escape, today, fmt, api, field, select, activeBuildings, activeAssets} from './ui.js';
 
-export function locationFields(building = '', asset = '', withAsset = true) {
+export function locationFields(building = '', asset = '', withAsset = true, assetRequired = false) {
   return (
     select(
       'Building',
@@ -11,14 +11,19 @@ export function locationFields(building = '', asset = '', withAsset = true) {
     ) +
     (withAsset
       ? select(
-          'Asset (optional)',
+          assetRequired ? 'Asset' : 'Asset (optional)',
           'asset_id',
-          [['', 'No asset'], ...(building ? activeAssets(building, asset).map(a => [a.id, a.name]) : [])],
+          [
+            ['', assetRequired ? 'Choose asset' : 'No asset'],
+            ...(building ? activeAssets(building, asset).map(a => [a.id, a.name]) : []),
+          ],
           asset,
+          assetRequired,
         )
       : '')
   );
 }
+
 export function bindLocation(onChange, root = $('#editor')) {
   const building = root.querySelector('[name=building_id]'),
     asset = root.querySelector('[name=asset_id]');

@@ -1,6 +1,8 @@
 // Pure markup helpers keep request configuration separate from the workspace renderer.
 import {adminUI, bindAdmin, isAdminTab} from './admin-settings.js';
 import {auditUI, bindAudit} from './audit.js';
+import {formsUI, bindForms} from './settings-forms.js';
+import {dataUI, bindData} from './settings-data.js';
 function updatesUI(state, escape) {
   const release = state.release,
     agent = state.updateAgent,
@@ -31,6 +33,7 @@ export function settingsUI(state, escape, icon, heading) {
     modules = state.data.modules;
   const tabs = [
     ['modules', 'Features'],
+    ['forms', 'Request forms'],
     ['delivery', 'Notifications'],
     ['branding', 'Identity'],
     ['people', 'People'],
@@ -38,6 +41,7 @@ export function settingsUI(state, escape, icon, heading) {
     ['roles', 'Roles'],
     ['provisioning', 'Provisioning'],
     ['workspace', 'Workspace'],
+    ['data', 'Backups & data'],
     ['audit', 'Audit log'],
     ['updates', 'Updates'],
   ];
@@ -46,6 +50,8 @@ export function settingsUI(state, escape, icon, heading) {
   if (isAdminTab(state.settingsTab)) body = adminUI(state, escape);
   else if (state.settingsTab === 'updates') body = updatesUI(state, escape);
   else if (state.settingsTab === 'audit') body = auditUI(state, escape);
+  else if (state.settingsTab === 'forms') body = formsUI(state);
+  else if (state.settingsTab === 'data') body = dataUI(state);
   else if (state.settingsTab === 'workspace')
     body = `<section class="panel settings-list"><div><strong>Organization</strong><span>${escape(state.me.organization)}</span></div><div><strong>Authentication</strong><span>${state.me.mode === 'demo' ? 'Local development demo' : 'OpenID Connect SSO'}</span></div><div><strong>Timezone</strong><span>${escape(state.me.timezone)}</span></div><div><strong>Deployment</strong><span>Self hosted · Single organization</span></div></section><p class="settings-copy">Change your workspace identity and people in the administration tabs. SSO connection details and timezone are configured on your server. Provisioned roles remain under administrator control.</p><div class="section-head"><h2>Team</h2></div><section class="work-panel"><div class="table-wrap"><table><thead><tr><th>Name</th><th>Role</th></tr></thead><tbody>${state.data.users.map(u => `<tr><td>${escape(u.name)}</td><td>${escape(u.role)}</td></tr>`).join('')}</tbody></table></div></section>`;
   else {
@@ -140,6 +146,8 @@ export function notificationsUI(state, escape, icon, heading) {
 export function bindSettings(state, api, refresh, render, toast, openOrder) {
   bindAdmin(state, api, refresh, render, toast);
   bindAudit(state, api, render, toast);
+  bindForms(state, render, refresh);
+  bindData(state, render);
   const status = document.querySelector('[data-email-status]');
   if (status)
     status.onclick = async () => {

@@ -5,11 +5,12 @@ import {dateInTimezone, startOfDayUtc, addDays} from './dates.js';
 import {moduleSettings, requireModule, notify} from './requests.js';
 import {audit, auditQuery, changes} from './audit.js';
 import {reserveSpace} from './reservations.js';
+import {checkSubmission, saveAnswers, answersFor} from './requestforms.js';
 
 const orderColumns =
-  'w.*, b.name AS building, a.name AS asset, u.name AS assignee, r.name AS requester, s.name AS space';
+  'w.*, b.name AS building, a.name AS asset, u.name AS assignee, r.name AS requester, s.name AS space, c.name AS category';
 const orderJoins =
-  'FROM work_orders w JOIN buildings b ON b.id=w.building_id LEFT JOIN assets a ON a.id=w.asset_id LEFT JOIN users u ON u.id=w.assignee_id JOIN users r ON r.id=w.requester_id LEFT JOIN spaces s ON s.id=w.space_id';
+  'FROM work_orders w JOIN buildings b ON b.id=w.building_id LEFT JOIN assets a ON a.id=w.asset_id LEFT JOIN users u ON u.id=w.assignee_id JOIN users r ON r.id=w.requester_id LEFT JOIN spaces s ON s.id=w.space_id LEFT JOIN categories c ON c.id=w.category_id';
 const detailFields = [
   'title',
   'description',
@@ -20,6 +21,8 @@ const detailFields = [
   'starts_at',
   'ends_at',
   'space_id',
+  'category_id',
+  'answers',
 ];
 
 // Allocates the next ticket number atomically; safe across concurrent requests and processes.
@@ -46,9 +49,28 @@ export function orderFilter(user, modules, params, timezone) {
   if (!enabled.length) where.push('1=0');
   else add(`w.request_type IN (${enabled.map(() => '?').join(',')})`, ...enabled);
   if (!can(user, 'requests.view_all')) add('w.requester_id=?', user.id);
+  // List filters accept one value or a comma-separated list ("High,Urgent").
+  const list = (value, allowed, label) => {
+    const items = String(value)
+      .split(',')
+      .map(v => v.trim())
+      .filter(Boolean);
+    if (!items.length || items.length > 10 || items.some(v => allowed && !allowed.includes(v)))
+      throw error(`Choose a valid ${label} filter.`);
+    return items;
+  };
   if (params.type) {
-    if (!enabled.includes(params.type)) where.push('1=0');
-    else add('w.request_type=?', params.type);
+    const types = list(params.type, ['maintenance', 'schedule', 'technology'], 'type').filter(t => enabled.includes(t));
+    if (!types.length) where.push('1=0');
+    else add(`w.request_type IN (${types.map(() => '?').join(',')})`, ...types);
+  }
+  if (params.priority) {
+    const chosen = list(params.priority, priorities, 'priority');
+    add(`w.priority IN (${chosen.map(() => '?').join(',')})`, ...chosen);
+  }
+  if (params.statuses) {
+    const chosen = list(params.statuses, statuses, 'status');
+    add(`w.status IN (${chosen.map(() => '?').join(',')})`, ...chosen);
   }
   const today = dateInTimezone(timezone);
   if (params.status === 'Overdue') add("w.status<>'Completed' AND w.due_date<?", today);
@@ -63,13 +85,37 @@ export function orderFilter(user, modules, params, timezone) {
       .trim()
       .match(/^(?:wo-?)?0*(\d{1,9})$/i);
     values.push(likePattern(String(params.q).slice(0, 200)));
-    const like = `LOWER(w.title || ' ' || b.name || ' ' || COALESCE(a.name,'') || ' ' || COALESCE(u.name,'') || ' ' || COALESCE(s.name,'')) LIKE $${values.length} ESCAPE '\\'`;
+    const like = `LOWER(w.title || ' ' || b.name || ' ' || COALESCE(a.name,'') || ' ' || COALESCE(u.name,'') || ' ' || COALESCE(s.name,'') || ' ' || COALESCE(c.name,'')) LIKE $${values.length} ESCAPE '\\'`;
     if (ticket) {
       values.push(Number(ticket[1]));
       where.push(`(${like} OR w.number=$${values.length})`);
     } else where.push(like);
   }
-  if (params.building) add('w.building_id=?', params.building);
+  if (params.building) {
+    const chosen = list(params.building, null, 'building');
+    add(`w.building_id IN (${chosen.map(() => '?').join(',')})`, ...chosen);
+  }
+  if (params.space) add('w.space_id=?', params.space);
+  if (params.category) {
+    const chosen = list(params.category, null, 'category');
+    const ids = chosen.filter(c => c !== 'none');
+    const parts = [];
+    if (ids.length) {
+      for (const id of ids) values.push(id);
+      parts.push(`w.category_id IN (${ids.map((_, i) => '$' + (values.length - ids.length + 1 + i)).join(',')})`);
+    }
+    if (chosen.includes('none')) parts.push('w.category_id IS NULL');
+    where.push(`(${parts.join(' OR ')})`);
+  }
+  // Custom question filters: f_<question id>=<answer>.
+  const answerFilters = Object.entries(params).filter(([k]) => k.startsWith('f_'));
+  if (answerFilters.length > 5) throw error('Filter on at most five questions at a time.');
+  for (const [key, value] of answerFilters)
+    add(
+      'EXISTS (SELECT 1 FROM order_answers x WHERE x.order_id=w.id AND x.field_id=? AND x.value=?)',
+      key.slice(2),
+      String(value),
+    );
   if (params.asset) add('w.asset_id=?', params.asset);
   if (params.assignee === 'me') add('w.assignee_id=?', user.id);
   else if (params.assignee === 'none') where.push('w.assignee_id IS NULL');
@@ -82,13 +128,27 @@ export function orderFilter(user, modules, params, timezone) {
       throw error('Dates must use YYYY-MM-DD.');
     }
   };
+  if (params.overdue === '1' || params.overdue === 'true') add("w.status<>'Completed' AND w.due_date<?", today);
+  if (params.due_from) add('w.due_date>=?', day(params.due_from));
+  if (params.due_to) add('w.due_date<=?', day(params.due_to));
   if (params.from) add('w.created_at>=?', startOfDayUtc(day(params.from), timezone));
   if (params.to) add('w.created_at<?', startOfDayUtc(addDays(day(params.to), 1), timezone));
   return {where: where.length ? 'WHERE ' + where.join(' AND ') : '', values};
 }
+const priorityRank = "CASE w.priority WHEN 'Urgent' THEN 0 WHEN 'High' THEN 1 WHEN 'Normal' THEN 2 ELSE 3 END";
+const sortOrders = {
+  newest: 'w.created_at DESC, w.id DESC',
+  oldest: 'w.created_at ASC, w.id ASC',
+  due: 'w.due_date ASC, w.created_at DESC',
+  due_desc: 'w.due_date DESC, w.created_at DESC',
+  priority: `${priorityRank}, w.due_date ASC, w.created_at DESC`,
+  updated: 'COALESCE(w.updated_at, w.created_at) DESC, w.id DESC',
+  number: 'w.number DESC',
+};
 export async function listOrders(db, user, params, timezone, {limit = 50, offset = 0} = {}) {
   const {where, values} = orderFilter(user, await moduleSettings(db), params, timezone);
-  const order = params.sort === 'due' ? 'w.due_date ASC, w.created_at DESC' : 'w.created_at DESC, w.id DESC';
+  const order = sortOrders[params.sort || 'newest'];
+  if (!order) throw error('Choose a valid sort order.');
   const [rows, count] = await Promise.all([
     db.query(
       `SELECT ${orderColumns} ${orderJoins} ${where} ORDER BY ${order} LIMIT $${values.length + 1} OFFSET $${values.length + 2}`,
@@ -175,6 +235,49 @@ export function setupOrders(app, db, env) {
 
   app.get('/api/orders', async (req, res) => res.json(await listOrders(db, req.user, req.query, timezone, page(req))));
   app.get('/api/summary', async (req, res) => res.json(await orderSummary(db, req.user, timezone)));
+  app.get('/api/calendar', async (req, res) => {
+    let from, to;
+    try {
+      from = date(String(req.query.from));
+      to = date(String(req.query.to));
+    } catch {
+      throw error('Choose a date range with from and to (YYYY-MM-DD).');
+    }
+    if (from > to || Date.parse(to) - Date.parse(from) > 62 * 86400000)
+      throw error('Choose a range of up to two months.');
+    const params = {...req.query, due_from: from, due_to: to, sort: 'due'};
+    const {orders, total} = await listOrders(db, req.user, params, timezone, {limit: 3000, offset: 0});
+    const modules = await moduleSettings(db);
+    const plans = [];
+    if (modules.maintenance && can(req.user, 'maintenance.view') && req.query.plans !== '0') {
+      const rows = await q(
+        'SELECT m.id,m.title,m.next_due,m.interval_days,b.name AS building FROM maintenance m JOIN buildings b ON b.id=m.building_id WHERE m.active=1 AND m.next_due<=$1',
+        [to],
+      );
+      for (const plan of rows)
+        for (let due = plan.next_due; due <= to && plans.length < 2000; due = addDays(due, plan.interval_days))
+          if (due >= from) plans.push({id: plan.id, title: plan.title, building: plan.building, due_date: due});
+    }
+    res.json({
+      from,
+      to,
+      total,
+      orders: orders.map(o => ({
+        id: o.id,
+        number: o.number,
+        title: o.title,
+        status: o.status,
+        priority: o.priority,
+        request_type: o.request_type,
+        due_date: o.due_date,
+        starts_at: o.starts_at,
+        building: o.building,
+        assignee: o.assignee,
+        reservation_status: o.reservation_status,
+      })),
+      plans,
+    });
+  });
   app.get('/api/orders/:id', async (req, res) => {
     // Ticket pages address tickets by number ("WO-0042" or "42") as well as by id.
     const byNumber = req.params.id.match(/^(?:wo-?)?0*(\d{1,9})$/i);
@@ -198,13 +301,14 @@ export function setupOrders(app, db, env) {
           )
         : [],
     ]);
-    res.json({...order, attachments, parts});
+    res.json({...order, attachments, parts, answers: await answersFor(db, order.id)});
   });
 
   app.post('/api/orders', async (req, res) => {
     const body = req.body;
     const requestType = body.request_type || 'maintenance';
     await requireModule(db, requestType);
+    const form = await checkSubmission(db, requestType, body, {today: dateInTimezone(timezone)});
     const title = text(body, 'title'),
       description = text(body, 'description', 5000, true),
       building = text(body, 'building_id'),
@@ -221,7 +325,7 @@ export function setupOrders(app, db, env) {
       await checkLocation(tx, building, asset);
       const reserved = await reserveSpace(tx, {spaceId: space, buildingId: building, starts, ends, timezone});
       await tx.query(
-        'INSERT INTO work_orders(id,title,description,building_id,asset_id,priority,status,requester_id,due_date,created_at,request_type,starts_at,ends_at,space_id,reservation_status,updated_at) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$10)',
+        'INSERT INTO work_orders(id,title,description,building_id,asset_id,priority,status,requester_id,due_date,created_at,request_type,starts_at,ends_at,space_id,reservation_status,updated_at,category_id) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$10,$16)',
         [
           id,
           title,
@@ -238,9 +342,11 @@ export function setupOrders(app, db, env) {
           ends,
           reserved.space_id,
           reserved.reservation_status,
+          form.category_id,
         ],
       );
       await assignTicketNumber(tx, id);
+      await saveAnswers(tx, id, form.answers);
       await audit(
         tx,
         req.user,
@@ -332,6 +438,11 @@ export function setupOrders(app, db, env) {
         if ('space_id' in body) next.space_id = text(body, 'space_id', 200, true) || null;
       } else if ('due_date' in body) next.due_date = date(body.due_date);
     }
+    let form = null;
+    if ('category_id' in body || 'answers' in body) {
+      form = await checkSubmission(db, row.request_type, body, {existing: row});
+      next.category_id = form.category_id;
+    }
     const now = new Date().toISOString();
     next.completed_at = status === 'Completed' ? row.completed_at || now : null;
     const fields = [
@@ -372,7 +483,7 @@ export function setupOrders(app, db, env) {
           }),
         );
       await tx.query(
-        'UPDATE work_orders SET title=$1,description=$2,priority=$3,status=$4,assignee_id=$5,building_id=$6,asset_id=$7,due_date=$8,starts_at=$9,ends_at=$10,space_id=$11,reservation_status=$12,completed_at=$13,updated_at=$14 WHERE id=$15',
+        'UPDATE work_orders SET title=$1,description=$2,priority=$3,status=$4,assignee_id=$5,building_id=$6,asset_id=$7,due_date=$8,starts_at=$9,ends_at=$10,space_id=$11,reservation_status=$12,completed_at=$13,updated_at=$14,category_id=$16 WHERE id=$15',
         [
           next.title,
           next.description,
@@ -389,9 +500,11 @@ export function setupOrders(app, db, env) {
           next.completed_at,
           now,
           row.id,
+          next.category_id ?? null,
         ],
       );
-      const diff = changes(row, next, fields);
+      if (form?.replaceAnswers) await saveAnswers(tx, row.id, form.answers);
+      const diff = changes(row, next, [...fields, 'category_id']);
       if (Object.keys(diff).length)
         await audit(
           tx,
@@ -441,6 +554,7 @@ export function setupOrders(app, db, env) {
           'attachments WHERE work_order_id',
           'part_usage WHERE work_order_id',
           'maintenance_runs WHERE work_order_id',
+          'order_answers WHERE order_id',
         ])
           await tx.query(`DELETE FROM ${table}=$1`, [row.id]);
         await tx.query('DELETE FROM work_orders WHERE id=$1', [row.id]);

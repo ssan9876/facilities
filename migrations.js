@@ -175,6 +175,25 @@ export const migrations = [
       );
     },
   },
+  {
+    id: 11,
+    name: 'request-forms',
+    async up(q, dialect) {
+      // Admin-configured categories and questions for each request type, and the answers on tickets.
+      await q(
+        'CREATE TABLE IF NOT EXISTS categories (id TEXT PRIMARY KEY, request_type TEXT NOT NULL, name TEXT NOT NULL, description TEXT NOT NULL, sort INTEGER NOT NULL DEFAULT 0, archived_at TEXT, created_at TEXT NOT NULL)',
+      );
+      await q(
+        'CREATE TABLE IF NOT EXISTS form_fields (id TEXT PRIMARY KEY, request_type TEXT NOT NULL, category_id TEXT REFERENCES categories(id), label TEXT NOT NULL, kind TEXT NOT NULL, options TEXT NOT NULL, required INTEGER NOT NULL DEFAULT 0, help TEXT NOT NULL, sort INTEGER NOT NULL DEFAULT 0, archived_at TEXT, created_at TEXT NOT NULL)',
+      );
+      await q(
+        'CREATE TABLE IF NOT EXISTS order_answers (order_id TEXT NOT NULL REFERENCES work_orders(id), field_id TEXT NOT NULL REFERENCES form_fields(id), value TEXT NOT NULL, PRIMARY KEY(order_id, field_id))',
+      );
+      await q('CREATE INDEX IF NOT EXISTS order_answers_field ON order_answers(field_id, value)');
+      await addColumns(q, dialect, 'work_orders', [['category_id', 'TEXT REFERENCES categories(id)']]);
+      await q('CREATE INDEX IF NOT EXISTS work_orders_category ON work_orders(category_id)');
+    },
+  },
 ];
 
 export async function migrate(db, list = migrations) {

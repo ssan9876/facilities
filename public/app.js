@@ -30,6 +30,9 @@ import {
 import {hooks} from './hooks.js';
 import {orderEditor, ticketPage} from './order.js';
 import {locationFields, bindLocation, requestTiming, bindTiming} from './forms.js';
+import {configurableFields, bindConfigurable, withAnswers, ruleFor} from './requestform.js';
+import {filterBar, bindFilterBar, applyFilters, pageLimit} from './filters.js';
+import {calendarPage, bindCalendar} from './calendar.js';
 import {recordsPage, bindRecords, recordEditor} from './records.js';
 import {inventoryPage, bindInventory, partEditor} from './inventory.js';
 import {reportsPage, bindReports} from './reports.js';
@@ -90,7 +93,13 @@ function navGroups() {
   const d = state.data;
   if (requesterView())
     return [
-      ['Requests', [['dashboard', 'home', 'Your requests']]],
+      [
+        'Requests',
+        [
+          ['dashboard', 'home', 'Your requests'],
+          ...(enabledTypes().length ? [['calendar', 'calendar', 'Calendar']] : []),
+        ],
+      ],
       ['Office', [['notifications', 'bell', 'Notifications']]],
     ];
   const groups = [
@@ -98,7 +107,12 @@ function navGroups() {
       'Requests',
       [
         ['dashboard', 'home', 'Overview'],
-        ...(enabledTypes().length ? [['orders', 'work', 'All requests']] : []),
+        ...(enabledTypes().length
+          ? [
+              ['orders', 'work', 'All requests'],
+              ['calendar', 'calendar', 'Calendar'],
+            ]
+          : []),
         ...enabledTypes().map(key => [key + 'Requests', requestTypes[key].icon, requestTypes[key].label + ' requests']),
         ...(d.modules.maintenance && can('maintenance.view')
           ? [['maintenance', 'calendar', 'Preventive maintenance']]
@@ -227,6 +241,8 @@ function render() {
   labelTables();
   if ($('#quick-form')) bindQuickForm();
   if ($('#ticket-page')) ticketPage(state.ticketRef);
+  bindFilterBar(state.page, () => render());
+  if ($('#calendar-root')) bindCalendar();
   if ($('#order-table')) loadOrders(false);
 }
 
@@ -234,17 +250,9 @@ function render() {
 const quickTypes = () => enabledTypes().filter(t => t !== 'schedule');
 function requesterHome() {
   const types = quickTypes();
+  const type = types.includes(state.quickType) ? state.quickType : types[0];
   const form = types.length
-    ? `<section class="quick-report"><div class="section-head compact"><h2>Report a problem</h2></div><form id="quick-form"><div class="form-grid">${
-        types.length > 1
-          ? select(
-              'Request type',
-              'request_type',
-              types.map(key => [key, requestTypes[key].label]),
-              types[0],
-            )
-          : `<input type="hidden" name="request_type" value="${types[0]}">`
-      }${field('What needs attention?', 'title').replace('class="field ', `class="field ${types.length > 1 ? '' : 'full '}`)}${locationFields()}${field('Details', 'description', 'textarea', '', true)}<label class="field full">Photos (optional)<input type="file" name="files" multiple accept="image/jpeg,image/png,image/gif,image/webp,image/heic,application/pdf"></label></div><div class="form-error" role="alert"></div><div class="editor-actions">${enabledTypes().includes('schedule') ? '<button type="button" class="secondary" data-create="order">Book a space or event</button>' : ''}<span class="spacer"></span><button class="primary" type="submit">Submit request</button></div></form></section>`
+    ? `<section class="quick-report"><div class="section-head compact"><h2>Report a problem</h2></div><form id="quick-form" data-type="${escape(type)}"><div class="form-grid">${ticketFields(type, {quick: true, values: state.quickValues || {}})}</div><div class="form-error" role="alert"></div><div class="editor-actions">${enabledTypes().includes('schedule') ? '<button type="button" class="secondary" data-create="order">Book a space or event</button>' : ''}<span class="spacer"></span><button class="primary" type="submit">Submit request</button></div></form></section>`
     : '';
   return (
     heading(
@@ -260,22 +268,14 @@ function requesterHome() {
 }
 function bindQuickForm() {
   const form = $('#quick-form');
-  bindLocation(undefined, form);
+  bindTicketFields(form, form.dataset.type, (next, values) => {
+    state.quickType = next;
+    state.quickValues = {title: values.title, description: values.description};
+    render();
+  });
   bindForm(form, async (data, f) => {
-    const files = [...f.elements.files.files];
-    delete data.files;
-    const created = await api('/orders', {
-      method: 'POST',
-      body: JSON.stringify({...data, priority: 'Normal', due_date: today()}),
-    });
-    const failed = [];
-    for (const file of files) {
-      try {
-        await upload(created.id, file);
-      } catch (e) {
-        failed.push(file.name);
-      }
-    }
+    const {failed} = await submitTicket(f, {...data, priority: data.priority || 'Normal'});
+    state.quickValues = null;
     f.reset();
     await refresh();
     toast(
@@ -357,6 +357,7 @@ function pageContent() {
     s = d.summary;
   if (state.page === 'ticket')
     return '<div id="ticket-page" class="ticket-page"><div class="empty">Loading ticket…</div></div>';
+  if (state.page === 'calendar') return calendarPage();
   if (state.page === 'settings') return settingsUI(state, escape, icon, heading);
   if (state.page === 'notifications') return notificationsUI(state, escape, icon, heading);
   if (['buildings', 'assets', 'maintenance'].includes(state.page)) return recordsPage(state.page);
@@ -487,6 +488,7 @@ function listParams(compact = false) {
     if (!['Open', 'In progress', 'Overdue'].includes(state.filter)) p.set('status', 'Active');
   }
   if (state.search.trim()) p.set('q', state.search.trim());
+  if (!compact) applyFilters(p, state.page);
   return p;
 }
 function ordersPanel(compact = false) {
@@ -504,7 +506,7 @@ function ordersPanel(compact = false) {
     )
     .join(
       '',
-    )}</div><div class="filter-tools">${exportLink}<label class="search">${icon('search')}<input id="search" type="search" aria-label="Search requests" placeholder="Search title, place or WO number" value="${escape(state.search)}"></label></div></div><div id="order-table" data-compact="${compact}">${state.list?.rows ? ordersTable(compact) : '<div class="empty">Loading requests…</div>'}</div></section>`;
+    )}</div><div class="filter-tools">${exportLink}<label class="search">${icon('search')}<input id="search" type="search" aria-label="Search requests" placeholder="Search title, place or WO number" value="${escape(state.search)}"></label></div></div>${compact ? '' : filterBar(state.page, pageType())}<div id="order-table" data-compact="${compact}">${state.list?.rows ? ordersTable(compact) : '<div class="empty">Loading requests…</div>'}</div></section>`;
 }
 // The register loads one page at a time from the server; filters and search are applied there.
 async function loadOrders(reset) {
@@ -512,7 +514,7 @@ async function loadOrders(reset) {
   if (!el) return;
   const compact = el.dataset.compact === 'true';
   const params = listParams(compact);
-  params.set('limit', String(compact ? 8 : pageSize));
+  params.set('limit', String(compact ? 8 : pageLimit(state.page)));
   const key = params.toString();
   if (!reset && state.list?.key === key && state.list.rows && !state.list.stale) {
     el.innerHTML = ordersTable(compact);
@@ -544,7 +546,7 @@ function ordersTable(compact) {
   return `<div class="table-wrap"><table><thead><tr><th class="col-no">No.</th><th>Request</th>${showType ? '<th class="col-type">Type</th>' : ''}<th class="col-stamp">Status</th><th class="col-priority">Priority</th><th class="col-assignee">Assigned to</th><th class="col-due">Due</th></tr></thead><tbody>${rows
     .map(
       o =>
-        `<tr class="clickable ${overdue(o) ? 'is-overdue' : ''}" tabindex="0" data-order="${escape(o.id)}" aria-label="Open ${escape(ticketNo(o.number))} ${escape(o.title)}"><td class="col-no"><span class="ticket-no">${escape(ticketNo(o.number))}</span></td><td class="col-request"><span class="order-title">${escape(o.title)}</span><div class="order-sub">${escape(o.building)}${o.asset ? ' · ' + escape(o.asset) : ''}${o.space ? ' · ' + escape(o.space) : ''}</div><div class="row-more"><div>${o.description ? `<span>${escape(excerpt(o.description))}</span>` : ''}<span>Requested by ${escape(o.requester)}</span></div></div></td>${showType ? `<td class="col-type"><span class="request-kind">${icon(requestTypes[o.request_type].icon)}${requestTypes[o.request_type].label}</span></td>` : ''}<td class="col-stamp">${tag(o.status)}${o.reservation_status && o.reservation_status !== 'approved' ? ' ' + reservationTag(o.reservation_status) : ''}</td><td class="col-priority">${tag(o.priority)}</td><td class="col-assignee">${escape(o.assignee) || '<span class="unassigned">Unassigned</span>'}</td><td class="col-due due ${overdue(o) ? 'overdue' : ''}">${o.request_type === 'schedule' ? fmtTime(o.starts_at) : fmt(o.due_date)}${overdue(o) ? '<span class="overdue-mark">Overdue</span>' : ''}</td></tr>`,
+        `<tr class="clickable ${overdue(o) ? 'is-overdue' : ''}" tabindex="0" data-order="${escape(o.id)}" aria-label="Open ${escape(ticketNo(o.number))} ${escape(o.title)}"><td class="col-no"><span class="ticket-no">${escape(ticketNo(o.number))}</span></td><td class="col-request"><span class="order-title">${escape(o.title)}</span><div class="order-sub">${o.category ? `<span class="category-mark">${escape(o.category)}</span> · ` : ''}${escape(o.building)}${o.asset ? ' · ' + escape(o.asset) : ''}${o.space ? ' · ' + escape(o.space) : ''}</div><div class="row-more"><div>${o.description ? `<span>${escape(excerpt(o.description))}</span>` : ''}<span>Requested by ${escape(o.requester)}</span></div></div></td>${showType ? `<td class="col-type"><span class="request-kind">${icon(requestTypes[o.request_type].icon)}${requestTypes[o.request_type].label}</span></td>` : ''}<td class="col-stamp">${tag(o.status)}${o.reservation_status && o.reservation_status !== 'approved' ? ' ' + reservationTag(o.reservation_status) : ''}</td><td class="col-priority">${tag(o.priority)}</td><td class="col-assignee">${escape(o.assignee) || '<span class="unassigned">Unassigned</span>'}</td><td class="col-due due ${overdue(o) ? 'overdue' : ''}">${o.request_type === 'schedule' ? fmtTime(o.starts_at) : fmt(o.due_date)}${overdue(o) ? '<span class="overdue-mark">Overdue</span>' : ''}</td></tr>`,
     )
     .join(
       '',
@@ -569,6 +571,88 @@ function bindTable() {
   $$('#order-table [data-page]').forEach(b => (b.onclick = () => go(b.dataset.page)));
 }
 
+const fileTypes =
+  'image/jpeg,image/png,image/gif,image/webp,image/heic,application/pdf,text/plain,text/csv,.docx,.xlsx';
+// The new-ticket fields for one request type, honouring the administrator's form rules.
+function ticketFields(type, {prefill = {}, quick = false, values = {}} = {}) {
+  const r = key => ruleFor(type, key);
+  const types = quick ? quickTypes() : enabledTypes();
+  const typeSelect =
+    types.length > 1
+      ? select(
+          'Request type',
+          'request_type',
+          types.map(key => [key, requestTypes[key].label]),
+          type,
+        )
+      : `<input type="hidden" name="request_type" value="${escape(type)}">`;
+  const priority =
+    r('priority') === 'hidden'
+      ? ''
+      : select(
+          'Priority',
+          'priority',
+          ['Normal', 'Low', 'High', 'Urgent'].map(x => [x, x]),
+          values.priority || 'Normal',
+        );
+  const title = field(
+    quick ? 'What needs attention?' : 'What do you need?',
+    'title',
+    'text',
+    values.title || '',
+  ).replace('class="field ', 'class="field full ');
+  const location = locationFields(
+    prefill.building || '',
+    prefill.asset || '',
+    r('asset') !== 'hidden',
+    r('asset') === 'required',
+  );
+  const timing =
+    type === 'schedule' || (!quick && r('due_date') !== 'hidden')
+      ? `<div class="timing" id="request-timing">${requestTiming(type, {space_id: prefill.space})}</div>`
+      : '';
+  const details =
+    r('description') === 'hidden'
+      ? ''
+      : field(
+          r('description') === 'required' ? 'Details' : 'Details (optional)',
+          'description',
+          'textarea',
+          values.description || '',
+          r('description') !== 'required',
+        );
+  const photos =
+    r('photos') === 'hidden'
+      ? ''
+      : `<label class="field full">Photos or files${r('photos') === 'required' ? '' : ' (optional)'}<input type="file" name="files" multiple accept="${fileTypes}" ${r('photos') === 'required' ? 'required' : ''}></label>`;
+  const configurable = `<div class="configurable" id="configurable">${configurableFields(type, {category: prefill.category || ''})}</div>`;
+  return typeSelect + priority + title + configurable + location + timing + details + photos;
+}
+function bindTicketFields(root, type, onTypeChange) {
+  bindLocation(undefined, root);
+  bindTiming(undefined, root);
+  bindConfigurable(root, type, root.querySelector('#configurable'));
+  const pick = root.querySelector('select[name=request_type]');
+  if (pick) pick.onchange = () => onTypeChange(pick.value, Object.fromEntries(new FormData(root)));
+}
+async function submitTicket(form, data) {
+  const files = form.elements.files ? [...form.elements.files.files] : [];
+  delete data.files;
+  const body = withAnswers(data, form);
+  if (!body.due_date && body.request_type !== 'schedule' && ruleFor(body.request_type, 'due_date') !== 'hidden')
+    body.due_date = today();
+  const created = await api('/orders', {method: 'POST', body: JSON.stringify(body)});
+  const failed = [];
+  for (const file of files) {
+    try {
+      await upload(created.id, file);
+    } catch (e) {
+      failed.push(`${file.name}: ${e.message}`);
+    }
+  }
+  return {created, failed};
+}
+
 function createOrder(prefill = {}) {
   if (!enabledTypes().length) {
     toast('An administrator must enable a request type first.');
@@ -583,51 +667,22 @@ function createOrder(prefill = {}) {
     return;
   }
   const type =
-    prefill.space && enabledTypes().includes('schedule')
+    prefill.type ||
+    (prefill.space && enabledTypes().includes('schedule')
       ? 'schedule'
-      : pageType() || (prefill.building ? quickTypes()[0] || enabledTypes()[0] : enabledTypes()[0]);
-  const fields =
-    select(
-      'Request type',
-      'request_type',
-      enabledTypes().map(key => [key, requestTypes[key].label]),
-      type,
-    ) +
-    select(
-      'Priority',
-      'priority',
-      ['Normal', 'Low', 'High', 'Urgent'].map(x => [x, x]),
-    ) +
-    field('What do you need?', 'title').replace('class="field ', 'class="field full ') +
-    locationFields(prefill.building || '', prefill.asset || '') +
-    `<div class="timing" id="request-timing">${requestTiming(type, {space_id: prefill.space})}</div>` +
-    field('Details', 'description', 'textarea', '', true) +
-    `<label class="field full">Photos or files (optional)<input type="file" name="files" multiple accept="image/jpeg,image/png,image/gif,image/webp,image/heic,application/pdf,text/plain,text/csv,.docx,.xlsx"></label>`;
+      : pageType() || (prefill.building ? quickTypes()[0] || enabledTypes()[0] : enabledTypes()[0]));
   dialog(
     'New request',
-    `<form id="create-form"><div class="form-grid">${fields}</div>${formActions('Create request')}</form>`,
+    `<form id="create-form"><div class="form-grid">${ticketFields(type, {prefill, values: prefill.values})}</div>${formActions('Create request')}</form>`,
     {number: 'WO-NEW'},
   );
   bindCancel();
-  bindLocation();
-  bindTiming();
-  const input = $('[name=request_type]');
-  input.onchange = () => {
-    $('#request-timing').innerHTML = requestTiming(input.value);
-    bindTiming();
-  };
-  bindForm($('#create-form'), async (data, form) => {
-    const files = [...form.elements.files.files];
-    delete data.files;
-    const created = await api('/orders', {method: 'POST', body: JSON.stringify(data)});
-    const failed = [];
-    for (const file of files) {
-      try {
-        await upload(created.id, file);
-      } catch (e) {
-        failed.push(`${file.name}: ${e.message}`);
-      }
-    }
+  const form = $('#create-form');
+  bindTicketFields(form, type, (next, values) =>
+    createOrder({...prefill, type: next, building: values.building_id, asset: values.asset_id, values}),
+  );
+  bindForm(form, async (data, f) => {
+    const {created, failed} = await submitTicket(f, data);
     closeDialog();
     await refresh();
     toast(
@@ -681,7 +736,7 @@ setInterval(async () => {
     document.hidden ||
     $('#editor').open ||
     ['INPUT', 'SELECT', 'TEXTAREA'].includes(document.activeElement?.tagName) ||
-    ['settings', 'notifications', 'reports', 'inventory', 'ticket'].includes(state.page) ||
+    ['settings', 'notifications', 'reports', 'inventory', 'ticket', 'calendar'].includes(state.page) ||
     state.list?.rows?.length > pageSize
   )
     return;

@@ -36,11 +36,98 @@ Unit=facilities-update.service
 [Install]
 WantedBy=multi-user.target
 UNIT
+  local schedule
+  schedule=$(env_value BACKUP_SCHEDULE '*-*-* 02:30:00')
+  cat > /etc/systemd/system/facilities-backup.service <<UNIT
+[Unit]
+Description=Facilities database backup
+[Service]
+Type=oneshot
+ExecStart=$ROOT/bin/facilities-update --backup
+UNIT
+  cat > /etc/systemd/system/facilities-backup.timer <<UNIT
+[Unit]
+Description=Nightly Facilities database backup
+[Timer]
+OnCalendar=$schedule
+Persistent=true
+RandomizedDelaySec=300
+[Install]
+WantedBy=timers.target
+UNIT
+  cat > /etc/systemd/system/facilities-backup-request.path <<UNIT
+[Unit]
+Description=Watch for Facilities "back up now" requests
+[Path]
+PathExists=$RUN/backup-request.json
+Unit=facilities-backup.service
+[Install]
+WantedBy=multi-user.target
+UNIT
   systemctl daemon-reload
-  systemctl enable --now facilities-update.path >/dev/null
+  systemctl enable --now facilities-update.path facilities-backup.timer facilities-backup-request.path >/dev/null
   echo "Update agent installed: the Settings → Updates button can now install releases."
+  echo "Nightly backups scheduled ($schedule); Settings → Backups shows their status."
+}
+# Reads one KEY=value from .env without executing the file.
+env_value() {
+  local value
+  value=$(grep -E "^$1=" "$ROOT/.env" 2>/dev/null | tail -n 1 | cut -d= -f2- | sed -e 's/^"//' -e 's/"$//' -e "s/^'//" -e "s/'$//")
+  echo "${value:-$2}"
 }
 if [[ "${1:-}" == --install-agent ]]; then install_agent; exit 0; fi
+# Nightly (or on-demand) database backup with retention and an optional off-host copy.
+if [[ "${1:-}" == --backup ]]; then
+  rm -f -- "$RUN/backup-request.json" 2>/dev/null || true
+  exec 9>"$ROOT/update.lock"
+  flock -w 900 9 || { echo 'An update is still running; backup skipped.'; exit 1; }
+  current=$(readlink -f "$ROOT/current" || true)
+  [[ -d "$current" ]] || { echo 'Facilities is not installed.'; exit 1; }
+  keep=$(env_value BACKUP_KEEP_DAYS 14)
+  [[ "$keep" =~ ^[0-9]{1,4}$ ]] || keep=14
+  copy_to=$(env_value BACKUP_COPY_TO '')
+  tag=$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["version"])' "$current/package.json")
+  stamp=$(date -u +%Y%m%dT%H%M%SZ)
+  file="$ROOT/backups/nightly-$stamp.sql.gz"
+  report() {
+    python3 - "$RUN/backup.json" "$ROOT/backups" "$1" "$2" "$keep" "$copy_to" "$3" <<'PY'
+import json,os,sys,datetime
+path,folder,state,message,keep,copy_to,copied=sys.argv[1:8]
+files=sorted((f for f in os.listdir(folder) if f.endswith(('.sql','.sql.gz'))),reverse=True)
+recent=[{'name':f,'size':os.path.getsize(os.path.join(folder,f)),'at':datetime.datetime.fromtimestamp(os.path.getmtime(os.path.join(folder,f)),datetime.timezone.utc).isoformat()} for f in files[:12]]
+try: previous=json.load(open(path))
+except Exception: previous={}
+now=datetime.datetime.now(datetime.timezone.utc).isoformat()
+body={'state':state,'message':message,'at':now,'keep_days':int(keep),'copy_to':bool(copy_to),'copied':copied=='yes','recent':recent,
+      'last_success':now if state=='succeeded' else previous.get('last_success')}
+tmp=path+'.tmp'
+with open(tmp,'w') as f: json.dump(body,f)
+os.chmod(tmp,0o644); os.replace(tmp,path)
+PY
+    chown "$APP_UID:$APP_UID" "$RUN/backup.json" 2>/dev/null || true
+  }
+  [[ -d "$RUN" ]] && report running 'Backing up the database.' no
+  trap 'rm -f -- "$file.tmp"; [[ -d "$RUN" ]] && report failed "The backup failed. See journalctl -u facilities-backup on the server." no' ERR
+  FACILITIES_IMAGE="facilities:$tag" docker compose --project-name facilities --env-file "$ROOT/.env" -f "$current/compose.yaml" -f "$current/deployment/image.yaml" \
+    exec -T db pg_dump -U facilities facilities | gzip -9 > "$file.tmp"
+  [[ $(stat -c %s "$file.tmp") -gt 100 ]]
+  mv "$file.tmp" "$file"
+  chmod 600 "$file"
+  # Retention applies to nightly backups only; backups taken before updates are kept.
+  find "$ROOT/backups" -maxdepth 1 -name 'nightly-*.sql.gz' -mtime +"$keep" -delete
+  copied=no
+  if [[ -n "$copy_to" ]]; then
+    rsync -a --chmod=F600 -e 'ssh -o BatchMode=yes -o ConnectTimeout=20' "$file" "$copy_to/" && copied=yes
+  fi
+  trap - ERR
+  if [[ -n "$copy_to" && $copied == no ]]; then
+    [[ -d "$RUN" ]] && report failed "Saved $(basename "$file") on the server, but copying it to $copy_to failed." no
+    exit 1
+  fi
+  [[ -d "$RUN" ]] && report succeeded "Saved $(basename "$file")$([[ $copied == yes ]] && echo " and copied it off the server")." "$copied"
+  echo "Backup saved: $file"
+  exit 0
+fi
 # Status the web app reads while it waits for the new version.
 write_status() {
   [[ -d "$RUN" ]] || return 0
@@ -145,7 +232,7 @@ fi
 compose() {
   local release=$1; shift
   local tag; tag=$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["version"])' "$release/package.json")
-  FACILITIES_IMAGE="facilities:$tag" docker compose --project-name facilities --env-file "$ROOT/.env" -f "$release/compose.yaml" -f "$release/deployment/image.yaml" "$@"
+  COMPOSE_BAKE=false FACILITIES_IMAGE="facilities:$tag" docker compose --project-name facilities --env-file "$ROOT/.env" -f "$release/compose.yaml" -f "$release/deployment/image.yaml" "$@"
 }
 [[ $from_request == 1 ]] && write_status running "$version" 'Building the new version. The current version keeps running.'
 prepare_run_dir
