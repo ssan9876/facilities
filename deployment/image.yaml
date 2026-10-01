@@ -1,0 +1,5 @@
+services:
+  app:
+    image: ${FACILITIES_IMAGE:?Set FACILITIES_IMAGE}
+    environment:
+      RELEASE_REPOSITORY: ${RELEASE_REPOSITORY:-ssan9876/go-fmx-clone}

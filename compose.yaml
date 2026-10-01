@@ -1,0 +1,46 @@
+services:
+  app:
+    build: .
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:3000:3000"
+    environment:
+      NODE_ENV: production
+      AUTH_MODE: oidc
+      APP_URL: ${APP_URL:?Set APP_URL to your HTTPS address}
+      ORG_NAME: ${ORG_NAME:-My Organization}
+      ORG_TIMEZONE: ${ORG_TIMEZONE:-America/Phoenix}
+      SESSION_SECRET: ${SESSION_SECRET:?Set a random SESSION_SECRET}
+      DATABASE_URL: postgres://facilities:${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD}@db:5432/facilities
+      OIDC_ISSUER: ${OIDC_ISSUER:?Set OIDC_ISSUER}
+      OIDC_CLIENT_ID: ${OIDC_CLIENT_ID:?Set OIDC_CLIENT_ID}
+      OIDC_CLIENT_SECRET: ${OIDC_CLIENT_SECRET:?Set OIDC_CLIENT_SECRET}
+      OIDC_ALLOWED_GROUPS: ${OIDC_ALLOWED_GROUPS:-}
+      OIDC_ADMIN_GROUP: ${OIDC_ADMIN_GROUP:-facilities-admins}
+      OIDC_MANAGER_GROUP: ${OIDC_MANAGER_GROUP:-facilities-managers}
+      OIDC_TECHNICIAN_GROUP: ${OIDC_TECHNICIAN_GROUP:-facilities-technicians}
+      OIDC_ADMIN_SUBJECT: ${OIDC_ADMIN_SUBJECT:-}
+    depends_on:
+      db:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://localhost:3000/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+  db:
+    image: postgres:17-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: facilities
+      POSTGRES_USER: facilities
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U facilities -d facilities"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+volumes:
+  postgres_data:

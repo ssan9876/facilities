@@ -1,0 +1,12 @@
+node_modules
+.git
+.env
+.env.*
+deployment.local
+backups
+*.log
+data
+test-results
+.npm-cache
+.impeccable/review
+scripts/browser-check.cjs
