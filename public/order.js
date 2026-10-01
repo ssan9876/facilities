@@ -87,7 +87,7 @@ export async function ticketPage(ref) {
     number = ticketNo(o.number);
   if (o.number && location.pathname !== `/tickets/${number}`)
     history.replaceState(history.state, '', `/tickets/${number}`);
-  document.title = `${number} ${o.title} · ${state.me.branding?.name || 'Facilities'}`;
+  document.title = 'Facilities';
   const me = state.me.user,
     owner = o.requester_id === me.id;
   const canStamp = can('requests.update_any') || (can('requests.update_assigned') && o.assignee_id === me.id);

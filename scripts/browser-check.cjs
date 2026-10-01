@@ -229,7 +229,7 @@ const assert = require('node:assert/strict');
   await page.getByLabel('Workspace icon').selectOption('calendar');
   await page.getByRole('button', {name: 'Save changes', exact: true}).click();
   await page.getByText('Administration settings saved.', {exact: true}).waitFor();
-  assert.equal(await page.title(), 'Campus Operations · Work order pad');
+  assert.equal(await page.title(), 'Facilities', 'the tab always reads Facilities');
   await page.screenshot({path: '.impeccable/review/identity-desktop.png', fullPage: true});
   // Administration loads on its own; people and groups are ledgers edited in sheets.
   await page.getByRole('button', {name: 'Groups', exact: true}).click();
