@@ -58,8 +58,21 @@ const assert = require('node:assert/strict');
   const ticketUrl = page.url();
   await page.getByRole('button', {name: 'Stamp In progress', exact: true}).click();
   await page.locator('#ticket-page .lc-stamp.in-progress').waitFor();
-  await page.locator('[name=status]').selectOption('Completed');
-  await page.getByRole('button', {name: 'Save changes', exact: true}).click();
+  // Ticket controls save on change; there is no separate save step. A keyboard arrow alone does not save.
+  let patches = 0;
+  const countPatch = r => r.request().method() === 'PATCH' && patches++;
+  page.on('response', countPatch);
+  await page.getByLabel('Status', {exact: true}).focus();
+  await page.keyboard.press('ArrowDown');
+  await page.waitForTimeout(300);
+  assert.equal(patches, 0, 'an arrow key on a ticket control must not save');
+  await page.screenshot({path: '.impeccable/review/order-control-keyboard-desktop.png'});
+  await page.keyboard.press('Escape');
+  await page.getByRole('heading', {name: orderTitle, exact: true}).click();
+  page.off('response', countPatch);
+  await page.getByLabel('Status', {exact: true}).selectOption('Completed');
+  await page.locator('.control-status').getByText('Saving…').waitFor();
+  await page.screenshot({path: '.impeccable/review/order-control-saving-desktop.png'});
   await page.locator('#ticket-page .lc-stamp.completed').waitFor();
   await page.goBack();
   await page.locator('.order-title').first().waitFor();
@@ -87,7 +100,10 @@ const assert = require('node:assert/strict');
   await page.getByRole('switch', {name: 'Technology requests', exact: true}).uncheck();
   await page.getByRole('button', {name: 'Save settings', exact: true}).click();
   await page.getByText('Workspace settings saved.', {exact: true}).waitFor();
-  assert.equal(await page.locator('nav').getByRole('button', {name: 'Technology requests', exact: true}).count(), 0);
+  assert.equal(
+    await page.locator('#workspace-nav').getByRole('button', {name: 'Technology requests', exact: true}).count(),
+    0,
+  );
   await page.getByRole('button', {name: 'Overview', exact: true}).click();
   await page.getByRole('button', {name: 'New request', exact: true}).click();
   assert.equal(await page.locator('[name=request_type] option[value=technology]').count(), 0);
@@ -96,7 +112,7 @@ const assert = require('node:assert/strict');
   await page.getByRole('switch', {name: 'Technology requests', exact: true}).check();
   await page.getByRole('button', {name: 'Save settings', exact: true}).click();
   await page.getByText('Workspace settings saved.', {exact: true}).waitFor();
-  await page.locator('nav').getByRole('button', {name: 'Notifications', exact: true}).click();
+  await page.locator('#workspace-nav').getByRole('button', {name: 'Notifications', exact: true}).click();
   await page.getByRole('button', {name: 'Preferences', exact: true}).click();
   await page.getByRole('switch', {name: 'Comments', exact: true}).uncheck();
   await page.getByRole('button', {name: 'Save preferences', exact: true}).click();
@@ -108,11 +124,41 @@ const assert = require('node:assert/strict');
   await page.getByRole('heading', {name: 'All requests', exact: true}).waitFor();
   await page.getByText('Annual team meeting', {exact: true}).waitFor();
   await page.screenshot({path: '.impeccable/review/aggregate-desktop.png', fullPage: true});
+  // The topbar finder: "/" focuses it, a ticket number opens the ticket, words search the register.
+  await page.keyboard.press('/');
+  assert.equal(await page.evaluate(() => document.activeElement.id), 'top-search');
+  await page.keyboard.type('2');
+  await page.keyboard.press('Enter');
+  await page.locator('#ticket-page .ticket-no').filter({hasText: 'WO-0002'}).waitFor();
+  await page.getByRole('button', {name: 'Back', exact: true}).click();
+  await page.locator('#top-search').fill('Annual team');
+  await page.locator('#top-search').press('Enter');
+  await page.getByRole('heading', {name: 'All requests', exact: true}).waitFor();
+  assert.equal(await page.locator('#search').inputValue(), 'Annual team');
+  await page.getByText('Annual team meeting', {exact: true}).waitFor();
+  // Bulk updates: select rows, choose a stage, apply.
+  await Promise.all([
+    page.waitForResponse(r => r.url().includes('/api/orders?') && !r.url().includes('q=')),
+    page.locator('#search').fill(''),
+  ]);
+  await page.locator('#order-table [data-pick]').nth(1).waitFor();
+  const picks = page.locator('#order-table [data-pick]');
+  await picks.nth(0).check();
+  await picks.nth(1).check();
+  await page.getByText('2 selected', {exact: true}).waitFor();
+  await page.screenshot({path: '.impeccable/review/bulk-desktop.png', fullPage: false});
+  await page.locator('#bulk-status').selectOption('On hold');
+  await page.getByRole('button', {name: 'Apply to selected', exact: true}).click();
+  await page.getByText('2 requests updated.', {exact: true}).waitFor();
+  assert.equal(await page.locator('#bulk-bar').isHidden(), true, 'the bar closes once the selection is applied');
   await page.getByRole('button', {name: 'Settings', exact: true}).click();
   for (const name of ['Maintenance requests', 'Schedule requests', 'Technology requests'])
     await page.getByRole('switch', {name, exact: true}).uncheck();
   await page.getByRole('button', {name: 'Save settings', exact: true}).click();
-  await page.locator('nav').getByRole('button', {name: 'All requests', exact: true}).waitFor({state: 'hidden'});
+  await page
+    .locator('#workspace-nav')
+    .getByRole('button', {name: 'All requests', exact: true})
+    .waitFor({state: 'hidden'});
   await page.getByRole('button', {name: 'Overview', exact: true}).click();
   await page.getByText('Request types are disabled. Your existing records are preserved.', {exact: false}).waitFor();
   await page.screenshot({path: '.impeccable/review/disabled-desktop.png', fullPage: true});
@@ -121,15 +167,21 @@ const assert = require('node:assert/strict');
   for (const name of ['Maintenance requests', 'Schedule requests', 'Technology requests'])
     await page.getByRole('switch', {name, exact: true}).check();
   await page.getByRole('button', {name: 'Save settings', exact: true}).click();
-  await page.locator('nav').getByRole('button', {name: 'Technology requests', exact: true}).waitFor();
+  await page.locator('#workspace-nav').getByRole('button', {name: 'Technology requests', exact: true}).waitFor();
   const mobile = await browser.newPage({viewport: {width: 390, height: 844}});
   await mobile.goto(base);
   await mobile.getByRole('link', {name: 'Enter demo workspace'}).click();
   await mobile.getByRole('heading', {name: 'Today', exact: true}).waitFor();
+  await mobile.screenshot({path: '.impeccable/review/mobile-viewport.png'});
+  // Full-page phone captures park the dock at the end so it hides nothing; the viewport capture keeps it.
+  const parkDock = () =>
+    mobile.evaluate(() => document.querySelector('.dock')?.style.setProperty('position', 'static'));
+  await parkDock();
   await mobile.screenshot({path: '.impeccable/review/mobile.png', fullPage: true});
   await mobile.getByRole('button', {name: 'Menu', exact: true}).click();
   await mobile.screenshot({path: '.impeccable/review/menu-mobile.png', fullPage: true});
-  await mobile.locator('nav').getByRole('button', {name: 'Settings', exact: true}).click();
+  await mobile.locator('#workspace-nav').getByRole('button', {name: 'Settings', exact: true}).click();
+  await parkDock();
   await mobile.screenshot({path: '.impeccable/review/settings-mobile.png', fullPage: true});
   assert.equal(
     await mobile.evaluate(() => document.documentElement.scrollWidth > innerWidth),
@@ -228,7 +280,7 @@ const assert = require('node:assert/strict');
   await page.screenshot({path: '.impeccable/review/provisioning-desktop.png', fullPage: true});
   await mobile.reload();
   await mobile.getByRole('button', {name: 'Menu', exact: true}).click();
-  await mobile.locator('nav').getByRole('button', {name: 'Settings', exact: true}).click();
+  await mobile.locator('#workspace-nav').getByRole('button', {name: 'Settings', exact: true}).click();
   await mobile.getByRole('button', {name: 'Groups', exact: true}).click();
   await mobile.locator('[data-edit-group]').waitFor();
   await mobile.screenshot({path: '.impeccable/review/groups-mobile.png', fullPage: true});
@@ -245,7 +297,7 @@ const assert = require('node:assert/strict');
     'Identity settings must fit on mobile',
   );
   // Record lifecycle: edit a building in place.
-  await page.locator('nav').getByRole('button', {name: 'Buildings', exact: true}).click();
+  await page.locator('#workspace-nav').getByRole('button', {name: 'Buildings', exact: true}).click();
   await page.getByRole('button', {name: 'Edit North Campus', exact: true}).click();
   await page.getByLabel('Building name').fill('North Campus East');
   await page.getByRole('button', {name: 'Save changes', exact: true}).click();
@@ -253,7 +305,7 @@ const assert = require('node:assert/strict');
   await page.screenshot({path: '.impeccable/review/buildings-desktop.png', fullPage: true});
   // Space reservations refuse overlapping bookings.
   const reserve = async title => {
-    await page.locator('nav').getByRole('button', {name: 'Schedule requests', exact: true}).click();
+    await page.locator('#workspace-nav').getByRole('button', {name: 'Schedule requests', exact: true}).click();
     await page.getByRole('button', {name: 'New schedule request', exact: true}).click();
     await page.getByLabel('What do you need?').fill(title);
     await page.locator('[name=building_id]').selectOption('b2');
@@ -269,7 +321,7 @@ const assert = require('node:assert/strict');
   await page.screenshot({path: '.impeccable/review/reservation-conflict.png', fullPage: true});
   await page.getByRole('button', {name: 'Cancel', exact: true}).click();
   // Request details: edit, attach a photo, record a part and read the activity history.
-  await page.locator('nav').getByRole('button', {name: 'All requests', exact: true}).click();
+  await page.locator('#workspace-nav').getByRole('button', {name: 'All requests', exact: true}).click();
   await page.locator('.order-title').filter({hasText: orderTitle}).click();
   await page.getByRole('button', {name: 'Edit details', exact: true}).click();
   await page.getByLabel('Title').fill(orderTitle + ' (edited)');
@@ -299,20 +351,20 @@ const assert = require('node:assert/strict');
   await page.keyboard.press('Escape');
   await page.locator('#notif-pop').waitFor({state: 'detached'});
   // Inventory, reports and audit pages.
-  await page.locator('nav').getByRole('button', {name: 'Inventory', exact: true}).click();
+  await page.locator('#workspace-nav').getByRole('button', {name: 'Inventory', exact: true}).click();
   await page.getByText('12', {exact: true}).first().waitFor();
   await page.getByText('Low stock', {exact: true}).first().waitFor();
   await page.screenshot({path: '.impeccable/review/inventory-desktop.png', fullPage: true});
-  await page.locator('nav').getByRole('button', {name: 'Reports', exact: true}).click();
+  await page.locator('#workspace-nav').getByRole('button', {name: 'Reports', exact: true}).click();
   await page.getByText('Average time to complete', {exact: true}).waitFor();
   await page.screenshot({path: '.impeccable/review/reports-desktop.png', fullPage: true});
-  await page.locator('nav').getByRole('button', {name: 'Settings', exact: true}).click();
+  await page.locator('#workspace-nav').getByRole('button', {name: 'Settings', exact: true}).click();
   await page.getByRole('button', {name: 'Audit log', exact: true}).click();
   await page.locator('.audit-list').getByText('Updated building North Campus East', {exact: false}).waitFor();
   await page.screenshot({path: '.impeccable/review/audit-desktop.png', fullPage: true});
   for (const name of ['Inventory', 'Reports']) {
     await mobile.getByRole('button', {name: 'Menu', exact: true}).click();
-    await mobile.locator('nav').getByRole('button', {name, exact: true}).click();
+    await mobile.locator('#workspace-nav').getByRole('button', {name, exact: true}).click();
     await mobile.waitForTimeout(300);
     await mobile.screenshot({path: `.impeccable/review/${name.toLowerCase()}-mobile.png`, fullPage: true});
     assert.equal(
@@ -339,7 +391,7 @@ const assert = require('node:assert/strict');
   await db.query("UPDATE users SET role='requester' WHERE id='demo-admin'");
   await page.reload();
   await page.getByRole('heading', {name: 'Your requests', exact: true}).waitFor();
-  assert.equal(await page.locator('nav').getByRole('button', {name: 'Buildings', exact: true}).count(), 0);
+  assert.equal(await page.locator('#workspace-nav').getByRole('button', {name: 'Buildings', exact: true}).count(), 0);
   await page.locator('#quick-form').getByLabel('What needs attention?').fill('Flickering light in room 12');
   await page.locator('#quick-form [name=building_id]').selectOption('b1');
   await page.locator('#quick-form').getByRole('button', {name: 'Submit request'}).click();
@@ -350,7 +402,7 @@ const assert = require('node:assert/strict');
   // Request forms: a required category and a dropdown question shape new tickets.
   await page.reload();
   await page.getByRole('heading', {name: 'Today', exact: true}).waitFor();
-  await page.locator('nav').getByRole('button', {name: 'Settings', exact: true}).click();
+  await page.locator('#workspace-nav').getByRole('button', {name: 'Settings', exact: true}).click();
   await page.getByRole('button', {name: 'Request forms', exact: true}).click();
   await page.locator('#rules-form').waitFor();
   await page.locator('[data-new-category]').click();
@@ -368,12 +420,13 @@ const assert = require('node:assert/strict');
   await page.getByRole('button', {name: 'Save form rules', exact: true}).click();
   await page.getByText('Form rules saved.', {exact: true}).waitFor();
   await page.screenshot({path: '.impeccable/review/request-forms-desktop.png', fullPage: true});
-  await page.locator('nav').getByRole('button', {name: 'Overview', exact: true}).click();
+  await page.locator('#workspace-nav').getByRole('button', {name: 'Overview', exact: true}).click();
   await page.getByRole('button', {name: 'New request', exact: true}).click();
   await page.locator('#create-form').getByLabel('What do you need?').fill('Dripping tap in staff room');
   await page.locator('#create-form [name=building_id]').selectOption('b1');
   await page.locator('#create-form [name=category_id]').selectOption({label: 'Plumbing'});
   await page.locator('#create-form').getByLabel('Floor').selectOption('First');
+  await page.locator('#editor').evaluate(el => el.getAnimations().forEach(a => a.finish()));
   await page.screenshot({path: '.impeccable/review/new-request-form.png'});
   await page.getByRole('button', {name: 'Create request', exact: true}).click();
   await page.locator('#editor').waitFor({state: 'hidden'});
@@ -382,7 +435,7 @@ const assert = require('node:assert/strict');
   await page.locator('#ticket-page').getByText('First', {exact: true}).waitFor();
   await page.getByRole('button', {name: 'Back', exact: true}).click();
   // Filters narrow a large register and show what is applied.
-  await page.locator('nav').getByRole('button', {name: 'All requests', exact: true}).click();
+  await page.locator('#workspace-nav').getByRole('button', {name: 'All requests', exact: true}).click();
   await page.locator('[data-filters-toggle]').click();
   await page.locator('[data-adv=category]').selectOption({label: 'Maintenance · Plumbing'});
   await page.getByRole('button', {name: /^Remove filter Category/}).waitFor();
@@ -392,7 +445,7 @@ const assert = require('node:assert/strict');
   await page.getByRole('button', {name: 'Clear all', exact: true}).click();
   await page.waitForFunction(() => document.querySelectorAll('#order-table tbody tr').length > 1);
   // Calendar: tickets on their due days.
-  await page.locator('nav').getByRole('button', {name: 'Calendar', exact: true}).click();
+  await page.locator('#workspace-nav').getByRole('button', {name: 'Calendar', exact: true}).click();
   await page.locator('.cal-grid .cal-chip').first().waitFor();
   await page.screenshot({path: '.impeccable/review/calendar-desktop.png', fullPage: true});
   await page.getByRole('button', {name: 'Agenda', exact: true}).click();
@@ -403,7 +456,7 @@ const assert = require('node:assert/strict');
   await page.getByRole('heading', {name: 'Dripping tap in staff room', exact: true}).waitFor();
   await page.getByRole('button', {name: 'Back', exact: true}).click();
   // Backups and retention.
-  await page.locator('nav').getByRole('button', {name: 'Settings', exact: true}).click();
+  await page.locator('#workspace-nav').getByRole('button', {name: 'Settings', exact: true}).click();
   await page.getByRole('button', {name: 'Backups & data', exact: true}).click();
   await page.getByText('sudo /opt/facilities/bin/facilities-update --install-agent', {exact: true}).waitFor();
   await page.locator('#retention-form').getByLabel('Notifications (days)').fill('90');
@@ -412,8 +465,9 @@ const assert = require('node:assert/strict');
   await page.screenshot({path: '.impeccable/review/backups-desktop.png', fullPage: true});
   await mobile.reload();
   await mobile.getByRole('button', {name: 'Menu', exact: true}).click();
-  await mobile.locator('nav').getByRole('button', {name: 'Calendar', exact: true}).click();
+  await mobile.locator('#workspace-nav').getByRole('button', {name: 'Calendar', exact: true}).click();
   await mobile.locator('.agenda').waitFor();
+  await parkDock();
   await mobile.screenshot({path: '.impeccable/review/calendar-mobile.png', fullPage: true});
   assert.equal(
     await mobile.evaluate(() => document.documentElement.scrollWidth > innerWidth),

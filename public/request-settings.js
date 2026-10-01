@@ -31,21 +31,42 @@ export const requestTypes = {
 export function settingsUI(state, escape, icon, heading) {
   const types = requestTypes,
     modules = state.data.modules;
-  const tabs = [
-    ['modules', 'Features'],
-    ['forms', 'Request forms'],
-    ['delivery', 'Notifications'],
-    ['branding', 'Identity'],
-    ['people', 'People'],
-    ['groups', 'Groups'],
-    ['roles', 'Roles'],
-    ['provisioning', 'Provisioning'],
-    ['workspace', 'Workspace'],
-    ['data', 'Backups & data'],
-    ['audit', 'Audit log'],
-    ['updates', 'Updates'],
+  // Settings are grouped by what an administrator is trying to do.
+  const groups = [
+    [
+      'Workspace',
+      [
+        ['modules', 'Features'],
+        ['forms', 'Request forms'],
+        ['delivery', 'Notifications'],
+        ['branding', 'Identity'],
+        ['workspace', 'Workspace'],
+      ],
+    ],
+    [
+      'People & access',
+      [
+        ['people', 'People'],
+        ['groups', 'Groups'],
+        ['roles', 'Roles'],
+        ['provisioning', 'Provisioning'],
+      ],
+    ],
+    [
+      'System',
+      [
+        ['data', 'Backups & data'],
+        ['audit', 'Audit log'],
+        ['updates', 'Updates'],
+      ],
+    ],
   ];
-  const tabBar = `<div class="settings-tabs">${tabs.map(([key, label]) => `<button data-settings-tab="${key}" class="${state.settingsTab === key ? 'selected' : ''}">${label}</button>`).join('')}</div>`;
+  const tabBar = `<nav class="settings-nav" aria-label="Settings sections">${groups
+    .map(
+      ([label, items]) =>
+        `<div class="settings-group"><h2>${label}</h2>${items.map(([key, name]) => `<button type="button" data-settings-tab="${key}" class="${state.settingsTab === key ? 'selected' : ''}" ${state.settingsTab === key ? 'aria-current="page"' : ''}>${name}</button>`).join('')}</div>`,
+    )
+    .join('')}</nav>`;
   let body;
   if (isAdminTab(state.settingsTab)) body = adminUI(state, escape);
   else if (state.settingsTab === 'updates') body = updatesUI(state, escape);
@@ -97,7 +118,10 @@ export function settingsUI(state, escape, icon, heading) {
         );
     body = `<form id="module-form" class="settings-sheet"><div class="sheet-heading"><h2>${delivery ? 'Notification delivery' : 'Choose what your organization uses'}</h2><p>${delivery ? 'Control notifications for everyone. Members choose their own event and email preferences.' : 'Enabled request types appear in navigation and request forms. Turning a feature off preserves its records.'}</p></div>${rows}<div class="settings-footer"><p>${delivery ? 'Email is sent in the background and retried if the mail server is unavailable.' : 'Changes apply to the whole organization. Existing records return when a feature is re-enabled.'}</p><div class="form-error" role="alert"></div><button type="submit" class="primary">Save settings</button></div></form>${delivery ? emailStatus(state, escape) : ''}`;
   }
-  return heading('Workspace settings', 'Configure the workspace your organization actually needs.') + tabBar + body;
+  return (
+    heading('Workspace settings', 'Configure the workspace your organization actually needs.') +
+    `<div class="settings-layout">${tabBar}<div class="settings-main">${body}</div></div>`
+  );
 }
 function toggle(escape, name, label, description, checked, detail = '', disabled = false) {
   return `<label class="setting-row"><span><strong>${escape(label)}</strong><small>${escape(description)}</small>${detail ? `<em>${escape(detail)}</em>` : ''}</span><span class="toggle"><input type="checkbox" role="switch" name="${name}" aria-label="${escape(label)}" ${checked ? 'checked' : ''} ${disabled ? 'disabled' : ''}><span class="toggle-track" aria-hidden="true"></span></span></label>`;
@@ -181,6 +205,14 @@ export function bindSettings(state, api, refresh, render, toast, openOrder) {
         render();
       }),
   );
+  // On phones the section list is a scrolling strip; keep the open section in view.
+  const strip = document.querySelector('.settings-nav'),
+    current = strip?.querySelector('.selected');
+  if (strip && current && strip.scrollWidth > strip.clientWidth)
+    strip.scrollLeft +=
+      current.getBoundingClientRect().left -
+      strip.getBoundingClientRect().left -
+      (strip.clientWidth - current.offsetWidth) / 2;
   if (state.settingsTab === 'updates' && !state.updateAgent && !state.updateAgentLoading) {
     state.updateAgentLoading = true;
     api('/admin/update')

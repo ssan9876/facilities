@@ -42,10 +42,14 @@
   --done: #1d6a44;
   --done-wash: #e7f3ec;
   --condensed: 74%;
-  --semi: 88%;
   --shadow-sheet: -18px 0 60px rgb(20 24 32 / 0.2), -2px 0 6px rgb(20 24 32 / 0.08);
+  /* Utility sizing: every control is at least 40px tall, fields 44px; text never below 12px. */
+  --control: 40px;
+  --field: 44px;
+  --radius: 4px;
+  --focus-ring: 0 0 0 3px color-mix(in srgb, var(--carbon) 22%, transparent);
   font-family: 'Archivo', 'Segoe UI', system-ui, sans-serif;
-  font-size: 14px;
+  font-size: 15px;
   color: var(--ink);
   background: var(--desk);
   font-variant-numeric: tabular-nums;
@@ -142,12 +146,9 @@ h3 {
 .nav-tab,
 th,
 .cell-label,
-.field,
 .tally-label,
 .panel h2,
 .section-head.compact h2,
-.settings-tabs button,
-.tabs button,
 .copy-label,
 .lc-label {
   font-stretch: var(--condensed);
@@ -167,16 +168,18 @@ button.primary,
 .login-link {
   display: inline-flex;
   align-items: center;
+  justify-content: center;
   gap: 8px;
+  min-height: var(--control);
   background: var(--carbon);
   color: #fff;
   border: 1px solid var(--carbon);
-  padding: 10px 16px;
-  border-radius: 3px;
+  padding: 0 18px;
+  border-radius: var(--radius);
+  font-size: 15px;
   font-weight: 650;
-  font-stretch: var(--semi);
   text-decoration: none;
-  transition: background 0.14s ease-out;
+  transition: background 0.14s ease-out, box-shadow 0.14s ease-out;
 }
 button.primary:hover,
 .login-link:hover {
@@ -188,14 +191,16 @@ a.secondary,
 .upload-button {
   display: inline-flex;
   align-items: center;
-  gap: 7px;
+  justify-content: center;
+  gap: 8px;
+  min-height: var(--control);
   background: var(--paper);
   border: 1px solid var(--rule-strong);
-  border-radius: 3px;
-  padding: 8px 12px;
+  border-radius: var(--radius);
+  padding: 0 16px;
   color: var(--ink);
+  font-size: 15px;
   font-weight: 600;
-  font-stretch: var(--semi);
   text-decoration: none;
   transition: background 0.14s ease-out, border-color 0.14s ease-out;
 }
@@ -203,7 +208,7 @@ button.secondary:hover,
 a.secondary:hover,
 .upload-button:hover {
   background: var(--carbon-wash);
-  border-color: var(--ink);
+  border-color: var(--carbon);
   color: var(--ink);
 }
 button.secondary.danger {
@@ -220,21 +225,24 @@ button.armed:hover {
   color: #fff !important;
   border-color: var(--stamp) !important;
 }
+/* Text actions look like links: always underlined, with a comfortable hit area. */
 .quiet-button {
   display: inline-flex;
   align-items: center;
   gap: 6px;
+  min-height: 36px;
   border: 0;
   background: transparent;
   color: var(--carbon);
   font-weight: 650;
-  font-size: 13px;
-  padding: 4px 2px;
-  text-decoration: none;
+  font-size: 14px;
+  padding: 6px 4px;
+  text-decoration: underline;
+  text-decoration-color: color-mix(in srgb, var(--carbon) 35%, transparent);
+  text-underline-offset: 4px;
 }
 .quiet-button:hover {
-  text-decoration: underline;
-  text-underline-offset: 3px;
+  text-decoration-color: currentColor;
 }
 .quiet-button .icon,
 .link-button .icon,
@@ -245,7 +253,25 @@ button.armed:hover {
 }
 .link-button {
   white-space: nowrap;
-  font-size: 13px;
+  font-size: 15px;
+}
+/* Row actions are buttons, not bare words. */
+.row-actions .quiet-button {
+  border: 1px solid var(--rule-strong);
+  border-radius: var(--radius);
+  padding: 0 12px;
+  text-decoration: none;
+  color: var(--ink);
+}
+.row-actions .quiet-button:hover {
+  border-color: var(--carbon);
+  background: var(--carbon-wash);
+}
+.row-actions {
+  white-space: nowrap;
+}
+.row-actions > * + * {
+  margin-left: 6px;
 }
 
 /* Shell: tab-divider rail + desk */
@@ -344,9 +370,10 @@ button.armed:hover {
   background: transparent;
   color: var(--ink-2);
   text-align: left;
-  padding: 9px 14px 9px 12px;
+  min-height: 42px;
+  padding: 10px 14px 10px 12px;
   font-weight: 560;
-  font-size: 14px;
+  font-size: 15px;
   position: relative;
   border-radius: 3px 0 0 3px;
   transition: background 0.12s ease-out, color 0.12s ease-out;
@@ -729,20 +756,22 @@ button.panel-row:hover {
 }
 .tabs {
   display: flex;
-  gap: 2px;
+  gap: 4px;
   flex-wrap: wrap;
 }
 .tabs button {
-  border: 1px solid transparent;
-  background: transparent;
+  min-height: 38px;
+  border: 1px solid var(--rule);
+  background: var(--paper);
   color: var(--ink-2);
-  padding: 6px 10px 5px;
-  border-radius: 3px;
-  font-size: 12px;
-  font-weight: 700;
+  padding: 0 14px;
+  border-radius: var(--radius);
+  font-size: 14px;
+  font-weight: 600;
 }
 .tabs button:hover {
   color: var(--ink);
+  border-color: var(--rule-strong);
   background: var(--desk);
 }
 .tabs button.selected {
@@ -775,9 +804,10 @@ button.panel-row:hover {
 .search input {
   border: 0;
   outline: none;
-  width: 240px;
+  width: 260px;
+  min-height: 26px;
   background: transparent;
-  font-size: 13px;
+  font-size: 15px;
   color: var(--ink);
 }
 .search input::placeholder {
@@ -794,17 +824,17 @@ table {
   white-space: nowrap;
 }
 th {
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 750;
   color: var(--ink-3);
-  padding: 10px 14px 8px;
+  padding: 12px 16px 10px;
   border-bottom: 1px solid var(--ink);
   background: var(--paper);
 }
 td {
-  padding: 12px 14px;
+  padding: 14px 16px;
   border-top: 1px solid var(--row);
-  font-size: 13px;
+  font-size: 14px;
   vertical-align: top;
 }
 tbody tr:first-child td {
@@ -845,7 +875,7 @@ tr.clickable:focus-visible {
 .order-title {
   display: block;
   font-weight: 650;
-  font-size: 14px;
+  font-size: 15px;
   line-height: 1.35;
   white-space: normal;
   max-width: 420px;
@@ -1304,7 +1334,8 @@ dialog[data-copy='office'] .editor-head {
   font-stretch: var(--condensed);
   text-transform: uppercase;
   letter-spacing: 0.07em;
-  padding: 8px 12px 7px;
+  min-height: var(--control);
+  padding: 0 16px;
   background: var(--paper);
   border: 2px solid currentColor;
   border-radius: 3px;
@@ -1410,8 +1441,60 @@ dialog#editor.filing {
   color: var(--ink-3);
   white-space: nowrap;
 }
-.stamp-forward form {
-  padding: 0;
+/* Ticket controls: status, assignee and priority save on change. */
+.ticket-controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 12px 16px;
+  margin: 0 0 22px;
+  padding: 14px 16px;
+  background: var(--desk);
+  border: 1px solid var(--rule);
+  border-radius: var(--radius);
+}
+.ticket-control {
+  display: grid;
+  gap: 6px;
+  min-width: 180px;
+  flex: 1 1 180px;
+  font-size: 14px;
+  font-weight: 650;
+  color: var(--ink);
+}
+.ticket-control select {
+  min-height: var(--field);
+  border: 1px solid var(--rule-strong);
+  border-radius: var(--radius);
+  background: var(--paper)
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1.5l5 5 5-5' fill='none' stroke='%231c1f24' stroke-width='1.6'/%3E%3C/svg%3E")
+    no-repeat right 13px center;
+  appearance: none;
+  padding: 0 36px 0 12px;
+  font-size: 15px;
+  font-weight: 400;
+  color: var(--ink);
+  cursor: pointer;
+}
+.ticket-control select:hover {
+  border-color: var(--ink-2);
+}
+.ticket-control select:focus {
+  outline: none;
+  border-color: var(--carbon);
+  box-shadow: var(--focus-ring);
+}
+.ticket-control select:disabled {
+  opacity: 0.6;
+  cursor: progress;
+}
+.control-status {
+  flex-basis: 100%;
+  font-size: 13px;
+  color: var(--ink-2);
+}
+.control-status:empty {
+  display: none;
 }
 .reservation {
   display: flex;
@@ -1446,31 +1529,20 @@ dialog#editor.filing {
   margin-bottom: 12px;
 }
 
-/* Forms: ruled field cells sharing borders */
+/* Forms: a label above a clearly boxed control; required fields say nothing, optional ones say so. */
 .form-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  border-right: 1px solid var(--rule-strong);
-  border-bottom: 1px solid var(--rule-strong);
+  gap: 16px 18px;
 }
 .field {
   display: flex;
   flex-direction: column;
-  gap: 3px;
-  font-size: 10.5px;
-  font-weight: 700;
-  color: var(--ink-3);
-  border-left: 1px solid var(--rule-strong);
-  border-top: 1px solid var(--rule-strong);
-  padding: 8px 10px 6px;
-  background: var(--paper);
-  min-width: 0;
-  transition: background 0.12s ease-out;
-}
-.field:focus-within {
-  background: var(--carbon-wash);
+  gap: 6px;
+  font-size: 14px;
+  font-weight: 650;
   color: var(--ink);
-  box-shadow: inset 0 -2px 0 var(--carbon);
+  min-width: 0;
 }
 .field.full,
 .timing,
@@ -1481,56 +1553,76 @@ dialog#editor.filing {
 .field input,
 .field select,
 .field textarea {
-  border: 0;
-  background: transparent;
-  padding: 3px 0 4px;
-  font-size: 14px;
-  font-weight: 450;
-  font-stretch: 100%;
-  text-transform: none;
-  letter-spacing: 0;
+  min-height: var(--field);
+  border: 1px solid var(--rule-strong);
+  border-radius: var(--radius);
+  background: var(--paper);
+  padding: 0 12px;
+  font-size: 15px;
+  font-weight: 400;
   color: var(--ink);
   width: 100%;
   min-width: 0;
+  transition: border-color 0.12s ease-out, box-shadow 0.12s ease-out;
+}
+.field input:hover,
+.field select:hover,
+.field textarea:hover {
+  border-color: var(--ink-2);
+}
+.field input:focus,
+.field select:focus,
+.field textarea:focus {
   outline: none;
+  border-color: var(--carbon);
+  box-shadow: var(--focus-ring);
+}
+.field input:user-invalid,
+.field select:user-invalid,
+.field textarea:user-invalid {
+  border-color: var(--stamp);
 }
 .field select {
   cursor: pointer;
+  appearance: none;
+  padding-right: 36px;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1.5l5 5 5-5' fill='none' stroke='%231c1f24' stroke-width='1.6'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 13px center;
 }
 .field textarea {
-  min-height: 92px;
+  min-height: 120px;
+  padding: 10px 12px;
   resize: vertical;
   line-height: 1.55;
 }
 .field input[type='file'] {
-  font-size: 13px;
-  padding-top: 6px;
+  min-height: auto;
+  border-style: dashed;
+  padding: 10px 12px;
+  font-size: 14px;
 }
 .field input::file-selector-button {
   font: inherit;
   font-weight: 600;
+  min-height: 34px;
   border: 1px solid var(--rule-strong);
   background: var(--paper);
-  border-radius: 3px;
-  padding: 5px 10px;
-  margin-right: 10px;
+  border-radius: var(--radius);
+  padding: 0 12px;
+  margin-right: 12px;
   cursor: pointer;
 }
 .timing {
   padding: 0;
 }
 .timing > .form-grid {
-  border: 0;
+  margin-top: 0;
 }
 .form-context {
-  font-size: 12px;
-  color: var(--ink-3);
-  padding: 8px 10px 0;
-  margin: 0;
-}
-.timing > .form-context {
-  border-left: 1px solid var(--rule-strong);
-  border-top: 1px solid var(--rule-strong);
+  font-size: 14px;
+  color: var(--ink-2);
+  margin: 0 0 10px;
 }
 .availability {
   grid-column: 1 / -1;
@@ -1549,25 +1641,22 @@ dialog#editor.filing {
 .field-check {
   display: flex;
   align-items: center;
-  gap: 10px;
-  font-size: 14px;
+  gap: 12px;
+  min-height: var(--field);
+  font-size: 15px;
   color: var(--ink);
-  padding: 10px;
-  border-left: 1px solid var(--rule-strong);
-  border-top: 1px solid var(--rule-strong);
-  background: var(--paper);
+  cursor: pointer;
 }
 .field-check input,
 .admin-check input {
   accent-color: var(--carbon);
-  width: 17px;
-  height: 17px;
+  width: 20px;
+  height: 20px;
+  flex-shrink: 0;
 }
 .field-check.inline {
-  border: 0;
-  padding: 0;
-  background: transparent;
-  font-size: 13px;
+  min-height: 38px;
+  font-size: 14px;
   color: var(--ink-2);
   white-space: nowrap;
 }
@@ -1584,9 +1673,14 @@ dialog#editor.filing {
 }
 .form-error {
   color: var(--stamp);
-  font-size: 13px;
+  background: var(--stamp-wash);
+  border: 1px solid color-mix(in srgb, var(--stamp) 40%, white);
+  border-radius: var(--radius);
+  padding: 10px 12px;
+  font-size: 14px;
+  font-weight: 550;
   line-height: 1.5;
-  margin: 12px 0 0;
+  margin: 14px 0 0;
 }
 .form-error:empty {
   display: none;
@@ -1596,21 +1690,17 @@ dialog#editor.filing {
 }
 .inline-form {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 110px auto;
-  align-items: stretch;
+  grid-template-columns: minmax(0, 1fr) 120px auto;
+  align-items: end;
+  gap: 12px;
   margin: 12px 0 0;
-  border-right: 1px solid var(--rule-strong);
-  border-bottom: 1px solid var(--rule-strong);
 }
 .inline-form > button {
-  border-radius: 0;
-  border-width: 1px 0 0 1px;
-  border-color: var(--rule-strong);
-  justify-content: center;
+  min-height: var(--field);
 }
 .inline-form .form-error {
   grid-column: 1 / -1;
-  margin: 8px 0;
+  margin: 0;
 }
 
 /* Attachments, history and comments: the back of the ticket */
@@ -1753,49 +1843,7 @@ dialog#editor.filing {
 #comment-form {
   margin-top: 12px;
 }
-#comment-form .field {
-  border: 1px solid var(--rule-strong);
-}
 
-/* Settings and notifications: index tabs over a white sheet */
-.settings-tabs {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 4px;
-  margin: 0;
-  padding-left: 10px;
-  position: relative;
-  z-index: 1;
-}
-.settings-tabs button {
-  border: 1px solid var(--rule);
-  border-bottom: 0;
-  background: var(--rail);
-  color: var(--ink-2);
-  padding: 8px 14px 7px;
-  border-radius: 5px 9px 0 0;
-  font-size: 12px;
-  font-weight: 750;
-  white-space: nowrap;
-}
-.settings-tabs button:hover {
-  color: var(--ink);
-  background: var(--paper);
-}
-.settings-tabs button.selected {
-  background: var(--paper);
-  color: var(--ink);
-  border-color: var(--ink);
-  margin-bottom: -1px;
-  padding-bottom: 8px;
-}
-.settings-tabs + .settings-sheet,
-.settings-tabs + .notice,
-.settings-tabs + .panel,
-.settings-tabs + section,
-.settings-tabs + form {
-  border-top-left-radius: 0;
-}
 .settings-sheet {
   background: var(--paper);
   border: 1px solid var(--ink);
@@ -2168,17 +2216,16 @@ dialog#editor.filing {
 }
 .report-range {
   display: flex;
-  align-items: stretch;
+  gap: 12px;
+  align-items: flex-end;
   flex-wrap: wrap;
   margin: -4px 0 22px;
 }
 .report-range .field {
-  min-width: 170px;
-  border: 1px solid var(--rule-strong);
-  margin-right: -1px;
+  min-width: 180px;
 }
 .report-range > button {
-  border-radius: 0 3px 3px 0;
+  min-height: var(--field);
 }
 .report-range .form-error {
   flex-basis: 100%;
@@ -2205,14 +2252,12 @@ dialog#editor.filing {
 }
 .audit-filters {
   display: grid;
+  gap: 14px;
   grid-template-columns: repeat(4, minmax(0, 1fr));
   padding: 18px 26px;
   border-bottom: 1px solid var(--rule);
 }
-.audit-filters .field {
-  border: 1px solid var(--rule-strong);
-  margin: 0 -1px -1px 0;
-}
+
 .audit-buttons {
   grid-column: 1 / -1;
   display: flex;
@@ -2434,6 +2479,19 @@ dialog#editor[data-kind='ticket']::before {
 
 /* Phones: rail becomes a full-height sheet behind Menu; a dock carries the daily actions. */
 @media (max-width: 760px) {
+  .field input,
+  .field select,
+  .field textarea,
+  .search input,
+  .filter-field select,
+  .filter-field input {
+    font-size: 16px;
+  }
+  button.primary,
+  button.secondary,
+  a.secondary {
+    min-height: var(--field);
+  }
   .shell {
     display: block;
     padding-bottom: 72px;
@@ -2521,7 +2579,11 @@ dialog#editor[data-kind='ticket']::before {
   }
   .stamp-button {
     width: 100%;
+    min-height: var(--field);
     text-align: center;
+  }
+  .ticket-control select {
+    font-size: 16px;
   }
   .rail {
     position: fixed;
@@ -2610,7 +2672,7 @@ dialog#editor[data-kind='ticket']::before {
     background: var(--stamp);
     color: #fff;
     border-radius: 2px;
-    font-size: 10px;
+    font-size: 12px;
     padding: 0 4px;
   }
   #toast {
@@ -2734,7 +2796,7 @@ dialog#editor[data-kind='ticket']::before {
     padding: 6px;
   }
   .lc-label {
-    font-size: 10px;
+    font-size: 12px;
   }
   .lc-stamp {
     font-size: 11px;
@@ -2769,12 +2831,6 @@ dialog#editor[data-kind='ticket']::before {
   }
   .inline-form > button {
     padding: 11px;
-  }
-  .settings-tabs {
-    padding-left: 0;
-  }
-  .settings-tabs button {
-    padding: 7px 10px 6px;
   }
   .sheet-heading,
   .setting-row {
@@ -3423,5 +3479,355 @@ button.icon-only {
   .forms-sheet .setting-row {
     flex-direction: column;
     align-items: stretch;
+  }
+}
+
+/* Settings: grouped section list beside the active sheet */
+.settings-layout {
+  display: grid;
+  grid-template-columns: 220px minmax(0, 1fr);
+  gap: 26px;
+  align-items: start;
+}
+.settings-nav {
+  position: sticky;
+  top: 16px;
+  display: grid;
+  gap: 18px;
+  background: var(--paper);
+  border: 1px solid var(--rule);
+  border-radius: var(--radius);
+  padding: 14px 10px;
+}
+.settings-group {
+  display: grid;
+  gap: 2px;
+}
+.settings-group h2 {
+  font-size: 12px;
+  font-weight: 750;
+  font-stretch: var(--condensed);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--ink-3);
+  padding: 0 10px 6px;
+}
+.settings-group button {
+  min-height: 40px;
+  text-align: left;
+  border: 0;
+  border-radius: var(--radius);
+  background: transparent;
+  color: var(--ink-2);
+  font-size: 15px;
+  font-weight: 560;
+  padding: 0 10px;
+}
+.settings-group button:hover {
+  background: var(--desk);
+  color: var(--ink);
+}
+.settings-group button.selected {
+  background: var(--carbon-wash);
+  color: var(--carbon-deep);
+  font-weight: 700;
+}
+.settings-main > .settings-sheet,
+.settings-main > section,
+.settings-main > form {
+  max-width: none;
+}
+/* Two-way switches such as Inbox / Preferences use the same segmented control as filters. */
+.settings-tabs {
+  display: flex;
+  gap: 4px;
+  padding: 0;
+  margin: 0 0 16px;
+}
+.settings-tabs button {
+  min-height: 38px;
+  border: 1px solid var(--rule);
+  border-radius: var(--radius);
+  background: var(--paper);
+  color: var(--ink-2);
+  padding: 0 16px;
+  font-size: 14px;
+  font-weight: 600;
+  text-transform: none;
+  letter-spacing: 0;
+  font-stretch: 100%;
+  margin: 0;
+}
+.settings-tabs button.selected {
+  background: var(--ink);
+  border-color: var(--ink);
+  color: #fff;
+  padding-bottom: 0;
+  margin-bottom: 0;
+}
+.admin-form input:not([type='checkbox']),
+.admin-form select,
+.ledger-tools select,
+.forms-sheet .setting-row select {
+  min-height: var(--field);
+  font-size: 15px;
+  border-radius: var(--radius);
+}
+.admin-form label:not(.admin-check),
+.filter-field {
+  font-size: 14px;
+  font-weight: 650;
+  font-stretch: 100%;
+  text-transform: none;
+  letter-spacing: 0;
+  color: var(--ink);
+}
+.filter-field select,
+.filter-field input {
+  min-height: var(--control);
+  font-size: 15px;
+}
+.setting-row strong {
+  font-size: 16px;
+}
+.setting-row small {
+  font-size: 14px;
+}
+@media (max-width: 960px) {
+  .settings-layout {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 16px;
+  }
+  .settings-nav {
+    position: static;
+    grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+    gap: 10px 14px;
+  }
+}
+
+/* Topbar ticket finder: a ticket number opens it, words search the register. "/" focuses it. */
+.top-search {
+  flex: 0 1 380px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-left: auto;
+}
+.top-search .search {
+  flex: 1;
+  min-height: var(--control);
+  padding: 0 12px;
+  border-radius: var(--radius);
+}
+.top-search .search input {
+  width: 100%;
+}
+.top-search kbd {
+  font: 600 12px/1 'Archivo', sans-serif;
+  color: var(--ink-3);
+  border: 1px solid var(--rule-strong);
+  border-bottom-width: 2px;
+  border-radius: 3px;
+  padding: 3px 6px;
+}
+.search {
+  min-height: var(--control);
+  border-radius: var(--radius);
+}
+
+/* Register selection: the pick cell is the whole target; a bar appears once rows are chosen. */
+.ledger th.col-pick,
+.ledger td.col-pick {
+  width: 48px;
+  padding: 0;
+  text-align: center;
+  vertical-align: middle;
+  cursor: pointer;
+}
+.col-pick input {
+  width: 20px;
+  height: 20px;
+  margin: 14px;
+  accent-color: var(--carbon);
+  cursor: pointer;
+}
+tr.picked td {
+  background: var(--carbon-wash);
+}
+.bulk-bar {
+  position: sticky;
+  top: 8px;
+  z-index: 5;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 12px 16px;
+  margin: 0 0 14px;
+  padding: 12px 16px;
+  background: var(--paper);
+  border: 1px solid var(--carbon);
+  border-radius: var(--radius);
+  box-shadow: 0 6px 20px rgb(20 24 32 / 0.1);
+}
+.bulk-bar[hidden] {
+  display: none;
+}
+.bulk-bar > strong {
+  align-self: center;
+  font-size: 15px;
+  min-width: 90px;
+}
+.bulk-bar .ticket-control {
+  flex: 0 1 220px;
+  min-width: 160px;
+}
+.bulk-bar > button {
+  min-height: var(--field);
+}
+@media (max-width: 960px) {
+  .top-search kbd {
+    display: none;
+  }
+}
+@media (max-width: 760px) {
+  .top-search {
+    flex: 1 1 auto;
+    min-width: 0;
+  }
+  .top-search .search input {
+    font-size: 16px;
+  }
+  .bulk-bar {
+    top: 60px;
+  }
+  .bulk-bar .ticket-control {
+    flex: 1 1 100%;
+  }
+  .bulk-bar > button {
+    flex: 1 1 auto;
+  }
+  .ledger td.col-pick {
+    width: auto;
+  }
+}
+@media (max-width: 760px) {
+  .ledger tr.clickable:has(.col-pick) {
+    grid-template-columns: auto auto minmax(0, 1fr) auto;
+    grid-template-areas: 'pick no stamp due' 'pick req req req' 'pick assignee assignee priority';
+  }
+  .ledger td.col-pick {
+    grid-area: pick;
+    align-self: start;
+  }
+  .ledger td.col-pick input {
+    margin: 2px 4px 0 0;
+  }
+}
+
+/* Review pass: ticket cells read at body size, and a short last row closes the grid. */
+.cell {
+  padding: 8px 12px 10px;
+}
+.cell-label {
+  font-size: 12px;
+}
+.cell-value {
+  font-size: 15px;
+}
+.ticket-fields .cell:nth-child(3n + 1):nth-last-child(1 of :not(.wide)) {
+  grid-column: 1 / -1;
+}
+.ticket-fields .cell:nth-child(3n + 2):nth-last-child(1 of :not(.wide)) {
+  grid-column: span 2;
+}
+.stamp-button {
+  font-size: 14px;
+}
+/* Every select and date in filters and ledgers is a full field with the same chevron. */
+.filter-field select,
+.filter-field input,
+.ledger-tools select,
+.cal-options select {
+  min-height: var(--field);
+  border: 1px solid var(--rule-strong);
+  border-radius: var(--radius);
+  background-color: var(--paper);
+  padding: 0 12px;
+  font-size: 15px;
+  font-weight: 400;
+  color: var(--ink);
+}
+.filter-field select,
+.ledger-tools select,
+.cal-options select {
+  appearance: none;
+  cursor: pointer;
+  padding-right: 36px;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1.5l5 5 5-5' fill='none' stroke='%231c1f24' stroke-width='1.6'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 13px center;
+}
+.filter-field select:focus,
+.filter-field input:focus,
+.ledger-tools select:focus,
+.cal-options select:focus {
+  outline: none;
+  border-color: var(--carbon);
+  box-shadow: var(--focus-ring);
+}
+.filter-fields {
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 14px;
+}
+/* Row picks line up with the ticket number. */
+.ledger th.col-pick,
+.ledger td.col-pick {
+  vertical-align: top;
+}
+.ledger td.col-pick input {
+  margin: 12px 14px 0;
+}
+.ledger th.col-pick input {
+  margin: 0 14px;
+  vertical-align: middle;
+}
+@media (max-width: 760px) {
+  /* Settings sections become one scrolling strip so the page starts with its content. */
+  .settings-nav {
+    display: flex;
+    overflow-x: auto;
+    gap: 6px;
+    padding: 6px;
+    scrollbar-width: thin;
+  }
+  .settings-group {
+    display: contents;
+  }
+  .settings-group h2 {
+    display: none;
+  }
+  .settings-group button {
+    flex: 0 0 auto;
+    white-space: nowrap;
+    min-height: var(--field);
+    padding: 0 14px;
+  }
+  .cal-options {
+    justify-content: flex-start;
+    align-items: center;
+    gap: 6px 16px;
+  }
+  .cal-options .filter-field {
+    flex: 1 1 100%;
+  }
+  .cal-options .field-check.inline {
+    padding-left: 0;
+    margin-left: 0;
+  }
+  .cal-options .view-toggle {
+    flex: 1 1 100%;
+  }
+  .cal-options .view-toggle button {
+    flex: 1;
   }
 }

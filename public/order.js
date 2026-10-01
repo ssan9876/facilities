@@ -45,6 +45,12 @@ async function stampLand(status) {
   $('#lifecycle-slot').innerHTML = lifecycle(status, true);
   await pause(620);
 }
+// The ticket redraws after a save; put focus back on the matching control once it exists again.
+function refocus(selector, tries = 40) {
+  const el = $(selector);
+  if (el && !el.disabled && document.activeElement !== el) return el.focus();
+  if (tries) setTimeout(() => refocus(selector, tries - 1), 50);
+}
 const cell = (label, value, cls = '') =>
   `<div class="cell ${cls}"><span class="cell-label">${label}</span><span class="cell-value">${value}</span></div>`;
 // The fixed-scale lifecycle strip: stages before the current one are filed, the current one carries the stamp.
@@ -86,7 +92,6 @@ export async function ticketPage(ref) {
     owner = o.requester_id === me.id;
   const canStamp = can('requests.update_any') || (can('requests.update_assigned') && o.assignee_id === me.id);
   const canAssign = can('requests.assign');
-  const canUpdate = canStamp || canAssign;
   const fullEdit = can('requests.edit_any') || (owner && o.status === 'Open');
   const textEdit = !fullEdit && can('requests.edit_assigned') && o.assignee_id === me.id;
   const canEditDetails = fullEdit || textEdit;
@@ -106,7 +111,7 @@ export async function ticketPage(ref) {
     state.data.modules.inventory && can('inventory.view')
       ? `<section class="detail-section"><div class="section-head compact"><h2>Parts used</h2></div>${o.parts.length ? `<table class="mini-table"><tbody>${o.parts.map(p => `<tr><td>${p.quantity} × ${escape(p.name)}<div class="order-sub">${escape(p.sku) || 'No SKU'} · ${escape(p.used_by)}</div></td><td>${money(p.unit_cost_cents == null ? null : p.unit_cost_cents * p.quantity)}</td><td>${canRecordParts ? `<button class="quiet-button" data-return-part="${escape(p.id)}">Return to stock</button>` : ''}</td></tr>`).join('')}</tbody></table>` : '<p class="muted-line">No parts recorded.</p>'}${canRecordParts && activeParts.length ? `<form id="part-form" class="inline-form">${select('Part', 'part_id', [['', 'Choose part'], ...activeParts.map(p => [p.id, `${p.name} (${p.quantity} on hand)`])])}${field('Quantity', 'quantity', 'number', '1', false, 'min="1"')}<button class="secondary" type="submit">Record part</button><div class="form-error" role="alert"></div></form>` : ''}</section>`
       : '';
-  const stampBar = canUpdate
+  const stampBar = canStamp
     ? `<div class="stamp-bar" role="group" aria-label="Stamp this ticket">${nextStages[o.status]
 
         .map(
@@ -115,21 +120,39 @@ export async function ticketPage(ref) {
         )
         .join('')}</div>`
     : '';
-  const update = canUpdate
-    ? `<form id="update-form"><div class="form-grid">${select(
-        'Status',
-        'status',
-        statuses.map(x => [x, x]),
-        o.status,
-      )}${canAssign ? select('Assigned to', 'assignee_id', [['', 'Unassigned'], ...state.data.users.filter(u => u.assignable).map(u => [u.id, u.name])], o.assignee_id || '') : ''}</div><div class="form-error" role="alert"></div><div class="editor-actions"><button class="secondary" type="submit">Save changes</button></div></form>`
-    : '';
+  // Ticket controls save the moment they change: no separate "Save" step.
+  const canPriority = fullEdit && ruleFor(o.request_type, 'priority') !== 'hidden';
+  const control = (label, name, options, value) =>
+    `<label class="ticket-control">${label}<select name="${name}" data-ticket-control="${name}" aria-label="${label}">${options.map(([v, t]) => `<option value="${escape(v)}" ${String(v) === String(value ?? '') ? 'selected' : ''}>${escape(t)}</option>`).join('')}</select></label>`;
+  const controls =
+    canStamp || canAssign || canPriority
+      ? `<div class="ticket-controls" role="group" aria-label="Update this ticket">${
+          canStamp
+            ? control(
+                'Status',
+                'status',
+                statuses.map(x => [x, x]),
+                o.status,
+              )
+            : ''
+        }${canAssign ? control('Assigned to', 'assignee_id', [['', 'Unassigned'], ...state.data.users.filter(u => u.assignable).map(u => [u.id, u.name])], o.assignee_id || '') : ''}${
+          canPriority
+            ? control(
+                'Priority',
+                'priority',
+                ['Low', 'Normal', 'High', 'Urgent'].map(x => [x, x]),
+                o.priority,
+              )
+            : ''
+        }<span class="control-status" aria-live="polite"></span></div>`
+      : '';
   const copy = !can('requests.view_all') ? 'requester' : canAssign ? 'office' : 'technician';
   const fields = [
     cell(
       'Type',
       `<span class="request-kind">${icon(requestTypes[o.request_type].icon)}${requestTypes[o.request_type].label}</span>`,
     ),
-    cell('Priority', tag(o.priority)),
+    canPriority ? '' : cell('Priority', tag(o.priority)),
     cell('Category', o.category ? escape(o.category) : '<span class="unassigned">None</span>'),
     cell('Opened', fmtStamp(o.created_at)),
     cell('Building', escape(o.building)),
@@ -146,18 +169,18 @@ export async function ticketPage(ref) {
           `<span class="${o.status !== 'Completed' && o.due_date < new Date().toISOString().slice(0, 10) ? 'overdue' : ''}">${fmt(o.due_date)}</span>`,
         ),
     cell('Requested by', escape(o.requester)),
-    cell('Assigned to', escape(o.assignee) || '<span class="unassigned">Unassigned</span>'),
+    canAssign ? '' : cell('Assigned to', escape(o.assignee) || '<span class="unassigned">Unassigned</span>'),
     o.request_type === 'schedule'
       ? cell('When', when)
       : cell('Completed', o.completed_at ? fmtStamp(o.completed_at) : '—'),
   ].join('');
   $('#ticket-page').innerHTML =
     `<div class="ticket-bar"><button type="button" class="quiet-button" data-ticket-back>${icon('arrow-left')}Back</button><span class="copy-label"><span class="copies" data-copy="${copy}" aria-hidden="true"><i class="c-requester"></i><i class="c-technician"></i><i class="c-office"></i></span>${{requester: 'Requester copy', technician: 'Technician copy', office: 'Office copy'}[copy]}</span></div><article class="ticket-sheet" data-copy="${copy}"><header class="ticket-head"><span class="ticket-no">${escape(number)}</span><h1>${escape(o.title)}</h1></header><div class="ticket-body">` +
-    `<div id="lifecycle-slot">${lifecycle(o.status)}</div>${stampBar}<div class="ticket-fields">${fields}${cell('Description of work', `<span class="detail-description">${escape(o.description) || 'No additional details.'}</span>`, 'wide')}</div>${
+    `<div id="lifecycle-slot">${lifecycle(o.status)}</div>${stampBar}${controls}<div class="ticket-fields">${fields}${cell('Description of work', `<span class="detail-description">${escape(o.description) || 'No additional details.'}</span>`, 'wide')}</div>${
       o.answers?.length
         ? `<div class="ticket-fields answers">${o.answers.map(a => cell(escape(a.label), `<span class="detail-description">${escape(a.value)}</span>`, a.kind === 'textarea' ? 'wide' : '')).join('')}</div>`
         : ''
-    }<div class="detail-toolbar">${canEditDetails ? `<button class="secondary" id="edit-order">${icon('edit')}${textEdit ? 'Edit text' : 'Edit details'}</button>` : ''}<button class="secondary" id="show-history">${icon('history')}Activity</button>${can('requests.delete') ? '<button class="secondary danger" id="delete-order">Delete request</button>' : ''}</div>${reservation}${canUpdate ? `<section class="detail-section stamp-forward"><div class="section-head compact"><h2>${canAssign ? 'Reassign or correct' : 'Correct the status'}</h2></div>${update}</section>` : `<p class="muted-line">Assigned to ${escape(o.assignee) || 'no one yet'}.</p>`}<div id="history" hidden></div>${attachments}${parts}<section class="detail-section"><div class="section-head compact"><h2>Conversation</h2></div><div id="comments" aria-live="polite">Loading comments…</div><form id="comment-form">${field('Add a comment', 'body', 'textarea')}<div class="form-error" role="alert"></div><div class="editor-actions"><button class="secondary" type="submit">Post comment</button></div></form></section>` +
+    }<div class="detail-toolbar">${canEditDetails ? `<button class="secondary" id="edit-order">${icon('edit')}${textEdit ? 'Edit text' : 'Edit details'}</button>` : ''}<button class="secondary" id="show-history">${icon('history')}Activity</button>${can('requests.delete') ? '<button class="secondary danger" id="delete-order">Delete request</button>' : ''}</div>${reservation}<div id="history" hidden></div>${attachments}${parts}<section class="detail-section"><div class="section-head compact"><h2>Conversation</h2></div><div id="comments" aria-live="polite">Loading comments…</div><form id="comment-form">${field('Add a comment', 'body', 'textarea')}<div class="form-error" role="alert"></div><div class="editor-actions"><button class="secondary" type="submit">Post comment</button></div></form></section>` +
     `</div></article>`;
   const reopen = async message => {
     await hooks.refresh();
@@ -165,12 +188,66 @@ export async function ticketPage(ref) {
   };
   const back = $('[data-ticket-back]');
   if (back) back.onclick = () => hooks.leaveTicket();
-  if (canUpdate)
-    bindForm($('#update-form'), async data => {
-      await api(`/orders/${encodeURIComponent(id)}`, {method: 'PATCH', body: JSON.stringify(data)});
-      if (data.status !== o.status) await stampLand(data.status);
-      await reopen(data.status !== o.status ? `${number} stamped ${data.status}.` : 'Request updated.');
-    });
+  // A pick with the mouse or touch saves at once. Arrow keys on a closed select also fire "change" in some
+  // browsers, so keyboard changes wait for Enter or for focus to leave the control.
+  $$('[data-ticket-control]').forEach(sel => {
+    let keyed = false;
+    sel.onkeydown = e => {
+      if (['ArrowUp', 'ArrowDown', 'Home', 'End', 'PageUp', 'PageDown'].includes(e.key) || e.key.length === 1)
+        keyed = true;
+      if (e.key === 'Enter' && keyed) {
+        e.preventDefault();
+        keyed = false;
+        save();
+      }
+    };
+    sel.onblur = e => {
+      if (keyed) {
+        keyed = false;
+        // Keep the keyboard where it was going: the next control if Tab moved to one.
+        save(e.relatedTarget?.dataset?.ticketControl);
+      }
+    };
+    sel.onchange = () => {
+      if (!keyed) save();
+      else $('.control-status').textContent = 'Press Enter to save, or Tab away.';
+    };
+    const save = async (focusNext = sel.dataset.ticketControl) => {
+      if (
+        sel.value ===
+        String((sel.dataset.ticketControl === 'assignee_id' ? o.assignee_id || '' : o[sel.dataset.ticketControl]) ?? '')
+      ) {
+        $('.control-status').textContent = '';
+        return;
+      }
+      const key = sel.dataset.ticketControl,
+        value = sel.value,
+        note = $('.control-status');
+      const busy = on => $$('[data-ticket-control], [data-stamp]').forEach(x => (x.disabled = on));
+      busy(true);
+      note.textContent = 'Saving…';
+      try {
+        await api(`/orders/${encodeURIComponent(id)}`, {method: 'PATCH', body: JSON.stringify({[key]: value})});
+        if (key === 'status') await stampLand(value);
+        const person = state.data.users.find(u => u.id === value)?.name;
+        await reopen(
+          key === 'status'
+            ? `${number} stamped ${value}.`
+            : key === 'assignee_id'
+              ? value
+                ? `${number} assigned to ${person}.`
+                : `${number} unassigned.`
+              : `${number} priority set to ${value}.`,
+        );
+        refocus(`[data-ticket-control="${focusNext}"]`);
+      } catch (e) {
+        note.textContent = '';
+        toast(e.message);
+        busy(false);
+        sel.value = key === 'assignee_id' ? o.assignee_id || '' : o[key];
+      }
+    };
+  });
   $$('[data-stamp]').forEach(
     b =>
       (b.onclick = async () => {

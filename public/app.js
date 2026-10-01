@@ -185,7 +185,7 @@ function render() {
     ? [['dashboard', 'home', 'Requests']]
     : [['dashboard', 'home', 'Today'], ...(enabledTypes().length ? [['orders', 'work', 'Requests']] : [])];
   $('#app').innerHTML =
-    `<div class="shell"><aside class="rail"><div class="brand"><span class="brand-mark">${icon(me.branding?.icon || 'building')}</span><span class="brand-name">${escape(me.branding?.name || 'Facilities')}<small>${escape(me.organization)}</small></span></div><nav id="workspace-nav" aria-label="Main navigation">${groups.map(([label, items]) => `<section class="nav-group"><h2 class="nav-tab">${label}</h2>${items.map(navButton).join('')}</section>`).join('')}</nav><div class="rail-foot"><div class="user-line"><span class="avatar">${escape(initials)}</span><div><strong>${escape(me.user.name)}</strong><small>${escape(me.user.role_name || me.user.role)}</small></div></div><button class="logout" id="logout">Sign out</button></div></aside><main class="workspace"><header class="topbar"><span class="crumb"><span class="brand-mark small">${icon(me.branding?.icon || 'building')}</span><span class="crumb-path">${escape(me.branding?.name || 'Facilities')} <span aria-hidden="true">/</span></span> <strong>${title}</strong></span><div class="top-right"><span class="top-date">${new Date().toLocaleDateString(undefined, {weekday: 'long', month: 'long', day: 'numeric'})}</span><button class="notification-button" id="bell" type="button" aria-haspopup="true" aria-controls="notif-pop" aria-expanded="${state.notifOpen ? 'true' : 'false'}" aria-label="Open notifications${unread ? `, ${unread} unread` : ''}">${icon('bell')}${unread ? `<span>${unread}</span>` : ''}</button>${state.notifOpen ? notifPanel() : ''}</div></header><div class="content">${me.mode === 'demo' ? '<div class="notice demo-notice">Demo workspace — these records are illustrative. SSO and an empty database are used in the production deployment.</div>' : ''}${pageContent()}</div></main><div class="dock">${dock.map(([p, i, t]) => `<button data-page="${p}" class="${state.page === p ? 'active' : ''}">${icon(i)}<span>${t}</span></button>`).join('')}${enabledTypes().length ? `<button class="dock-new" data-create="order" aria-label="New request">${icon('plus')}<span>New</span></button>` : ''}<button data-page="notifications" class="${state.page === 'notifications' ? 'active' : ''}">${icon('bell')}<span>Inbox</span>${unread ? `<span class="count">${unread}</span>` : ''}</button><button id="nav-toggle" type="button" aria-controls="workspace-nav" aria-expanded="false">${icon('menu')}<span>Menu</span></button></div></div>`;
+    `<div class="shell"><aside class="rail"><div class="brand"><span class="brand-mark">${icon(me.branding?.icon || 'building')}</span><span class="brand-name">${escape(me.branding?.name || 'Facilities')}<small>${escape(me.organization)}</small></span></div><nav id="workspace-nav" aria-label="Main navigation">${groups.map(([label, items]) => `<section class="nav-group"><h2 class="nav-tab">${label}</h2>${items.map(navButton).join('')}</section>`).join('')}</nav><div class="rail-foot"><div class="user-line"><span class="avatar">${escape(initials)}</span><div><strong>${escape(me.user.name)}</strong><small>${escape(me.user.role_name || me.user.role)}</small></div></div><button class="logout" id="logout">Sign out</button></div></aside><main class="workspace"><header class="topbar"><span class="crumb"><span class="brand-mark small">${icon(me.branding?.icon || 'building')}</span><span class="crumb-path">${escape(me.branding?.name || 'Facilities')} <span aria-hidden="true">/</span></span> <strong>${title}</strong></span><form class="top-search" id="top-search-form" role="search"><label class="search">${icon('search')}<input id="top-search" type="search" aria-label="Find a ticket" placeholder="Find a ticket" title="Type a WO number to open it, or words to search" autocomplete="off" enterkeyhint="search"></label><kbd aria-hidden="true">/</kbd></form><div class="top-right"><span class="top-date">${new Date().toLocaleDateString(undefined, {weekday: 'long', month: 'long', day: 'numeric'})}</span><button class="notification-button" id="bell" type="button" aria-haspopup="true" aria-controls="notif-pop" aria-expanded="${state.notifOpen ? 'true' : 'false'}" aria-label="Open notifications${unread ? `, ${unread} unread` : ''}">${icon('bell')}${unread ? `<span>${unread}</span>` : ''}</button>${state.notifOpen ? notifPanel() : ''}</div></header><div class="content">${me.mode === 'demo' ? '<div class="notice demo-notice">Demo workspace — these records are illustrative. SSO and an empty database are used in the production deployment.</div>' : ''}${pageContent()}</div></main><div class="dock">${dock.map(([p, i, t]) => `<button data-page="${p}" class="${state.page === p ? 'active' : ''}">${icon(i)}<span>${t}</span></button>`).join('')}${enabledTypes().length ? `<button class="dock-new" data-create="order" aria-label="New request">${icon('plus')}<span>New</span></button>` : ''}<button data-page="notifications" class="${state.page === 'notifications' ? 'active' : ''}">${icon('bell')}<span>Inbox</span>${unread ? `<span class="count">${unread}</span>` : ''}</button><button id="nav-toggle" type="button" aria-controls="workspace-nav" aria-expanded="false">${icon('menu')}<span>Menu</span></button></div></div>`;
   $$('[data-page]').forEach(
     b =>
       (b.onclick = () => {
@@ -212,6 +212,17 @@ function render() {
         loadOrders(true);
       }),
   );
+  $('#top-search-form').onsubmit = e => {
+    e.preventDefault();
+    const q = $('#top-search').value.trim();
+    if (!q) return;
+    // A ticket number opens that ticket; anything else searches the full register.
+    if (/^(wo-?)?\d+$/i.test(q)) return openTicket(ticketNo(q.replace(/\D/g, '')));
+    const target = navs.some(n => n[0] === 'orders') ? 'orders' : 'dashboard';
+    go(target);
+    state.search = q;
+    render();
+  };
   const search = $('#search');
   let searchTimer;
   if (search)
@@ -522,6 +533,7 @@ async function loadOrders(reset) {
     return;
   }
   const offset = reset || state.list?.key !== key || state.list.stale ? 0 : state.list.rows.length;
+  if (state.list?.key !== key) selection().clear();
   if (offset === 0) state.list = {key, rows: state.list?.key === key ? state.list.rows : null, total: 0};
   params.set('offset', String(offset));
   const exportLink = $('#export-orders');
@@ -539,14 +551,24 @@ async function loadOrders(reset) {
     bindTable();
   }
 }
+// People who stamp or assign any ticket can select rows and update them together.
+const canBulk = () => can('requests.update_any') || can('requests.assign');
+const selection = () => (state.selected ||= new Set());
+function bulkBar() {
+  const n = selection().size;
+  const people = state.data.users.filter(u => u.assignable);
+  return `<div class="bulk-bar" id="bulk-bar" role="region" aria-label="Selected requests" ${n ? '' : 'hidden'}><strong id="bulk-count">${n} selected</strong>${can('requests.update_any') ? `<label class="ticket-control">Set status<select id="bulk-status"><option value="">Keep status</option>${['Open', 'In progress', 'On hold', 'Completed'].map(x => `<option>${x}</option>`).join('')}</select></label>` : ''}${can('requests.assign') ? `<label class="ticket-control">Assign to<select id="bulk-assign"><option value="">Keep assignee</option><option value="none">Unassigned</option>${people.map(u => `<option value="${escape(u.id)}">${escape(u.name)}</option>`).join('')}</select></label>` : ''}<button type="button" class="primary" id="bulk-apply">Apply to selected</button><button type="button" class="quiet-button" id="bulk-clear">Clear selection</button></div>`;
+}
 function ordersTable(compact) {
   const {rows = [], total = 0, error} = state.list || {};
   const showType = !pageType();
+  const bulk = !compact && canBulk() && rows.length > 0;
+  const sel = selection();
   const excerpt = text => (text.length > 160 ? text.slice(0, 157) + '…' : text);
-  return `<div class="table-wrap"><table><thead><tr><th class="col-no">No.</th><th>Request</th>${showType ? '<th class="col-type">Type</th>' : ''}<th class="col-stamp">Status</th><th class="col-priority">Priority</th><th class="col-assignee">Assigned to</th><th class="col-due">Due</th></tr></thead><tbody>${rows
+  return `${bulk ? bulkBar() : ''}<div class="table-wrap"><table><thead><tr>${bulk ? `<th class="col-pick"><input type="checkbox" id="pick-all" aria-label="Select all ${rows.length} shown" ${rows.every(o => sel.has(o.id)) ? 'checked' : ''}></th>` : ''}<th class="col-no">No.</th><th>Request</th>${showType ? '<th class="col-type">Type</th>' : ''}<th class="col-stamp">Status</th><th class="col-priority">Priority</th><th class="col-assignee">Assigned to</th><th class="col-due">Due</th></tr></thead><tbody>${rows
     .map(
       o =>
-        `<tr class="clickable ${overdue(o) ? 'is-overdue' : ''}" tabindex="0" data-order="${escape(o.id)}" aria-label="Open ${escape(ticketNo(o.number))} ${escape(o.title)}"><td class="col-no"><span class="ticket-no">${escape(ticketNo(o.number))}</span></td><td class="col-request"><span class="order-title">${escape(o.title)}</span><div class="order-sub">${o.category ? `<span class="category-mark">${escape(o.category)}</span> · ` : ''}${escape(o.building)}${o.asset ? ' · ' + escape(o.asset) : ''}${o.space ? ' · ' + escape(o.space) : ''}</div><div class="row-more"><div>${o.description ? `<span>${escape(excerpt(o.description))}</span>` : ''}<span>Requested by ${escape(o.requester)}</span></div></div></td>${showType ? `<td class="col-type"><span class="request-kind">${icon(requestTypes[o.request_type].icon)}${requestTypes[o.request_type].label}</span></td>` : ''}<td class="col-stamp">${tag(o.status)}${o.reservation_status && o.reservation_status !== 'approved' ? ' ' + reservationTag(o.reservation_status) : ''}</td><td class="col-priority">${tag(o.priority)}</td><td class="col-assignee">${escape(o.assignee) || '<span class="unassigned">Unassigned</span>'}</td><td class="col-due due ${overdue(o) ? 'overdue' : ''}">${o.request_type === 'schedule' ? fmtTime(o.starts_at) : fmt(o.due_date)}${overdue(o) ? '<span class="overdue-mark">Overdue</span>' : ''}</td></tr>`,
+        `<tr class="clickable ${overdue(o) ? 'is-overdue' : ''}" tabindex="0" data-order="${escape(o.id)}" aria-label="Open ${escape(ticketNo(o.number))} ${escape(o.title)}">${bulk ? `<td class="col-pick"><input type="checkbox" data-pick="${escape(o.id)}" aria-label="Select ${escape(ticketNo(o.number))}" ${sel.has(o.id) ? 'checked' : ''}></td>` : ''}<td class="col-no"><span class="ticket-no">${escape(ticketNo(o.number))}</span></td><td class="col-request"><span class="order-title">${escape(o.title)}</span><div class="order-sub">${o.category ? `<span class="category-mark">${escape(o.category)}</span> · ` : ''}${escape(o.building)}${o.asset ? ' · ' + escape(o.asset) : ''}${o.space ? ' · ' + escape(o.space) : ''}</div><div class="row-more"><div>${o.description ? `<span>${escape(excerpt(o.description))}</span>` : ''}<span>Requested by ${escape(o.requester)}</span></div></div></td>${showType ? `<td class="col-type"><span class="request-kind">${icon(requestTypes[o.request_type].icon)}${requestTypes[o.request_type].label}</span></td>` : ''}<td class="col-stamp">${tag(o.status)}${o.reservation_status && o.reservation_status !== 'approved' ? ' ' + reservationTag(o.reservation_status) : ''}</td><td class="col-priority">${tag(o.priority)}</td><td class="col-assignee">${escape(o.assignee) || '<span class="unassigned">Unassigned</span>'}</td><td class="col-due due ${overdue(o) ? 'overdue' : ''}">${o.request_type === 'schedule' ? fmtTime(o.starts_at) : fmt(o.due_date)}${overdue(o) ? '<span class="overdue-mark">Overdue</span>' : ''}</td></tr>`,
     )
     .join(
       '',
@@ -554,8 +576,12 @@ function ordersTable(compact) {
 }
 function bindTable() {
   $$('#order-table [data-order]').forEach(b => {
-    b.onclick = () => orderEditor(b.dataset.order);
+    b.onclick = e => {
+      if (e.target.closest('.col-pick')) return;
+      orderEditor(b.dataset.order);
+    };
     b.onkeydown = e => {
+      if (e.target.closest('.col-pick')) return;
       if (e.key === 'Enter') {
         e.preventDefault();
         orderEditor(b.dataset.order);
@@ -569,6 +595,77 @@ function bindTable() {
       loadOrders(false);
     };
   $$('#order-table [data-page]').forEach(b => (b.onclick = () => go(b.dataset.page)));
+  bindBulk();
+}
+function bindBulk() {
+  const bar = $('#bulk-bar');
+  if (!bar) return;
+  const sel = selection();
+  const sync = () => {
+    bar.hidden = !sel.size;
+    $('#bulk-count').textContent = `${sel.size} selected`;
+    const boxes = $$('[data-pick]');
+    $('#pick-all').checked = boxes.length > 0 && boxes.every(b => b.checked);
+    boxes.forEach(b => b.closest('tr').classList.toggle('picked', b.checked));
+  };
+  $$('[data-pick]').forEach(
+    b =>
+      (b.onchange = () => {
+        if (b.checked) sel.add(b.dataset.pick);
+        else sel.delete(b.dataset.pick);
+        sync();
+      }),
+  );
+  $$('#order-table .col-pick').forEach(
+    cell =>
+      (cell.onclick = e => {
+        // The whole cell toggles its box, so the target is the cell rather than a 20px square.
+        if (e.target === cell) cell.querySelector('input').click();
+      }),
+  );
+  $('#pick-all').onchange = e => {
+    $$('[data-pick]').forEach(b => {
+      b.checked = e.target.checked;
+      if (b.checked) sel.add(b.dataset.pick);
+      else sel.delete(b.dataset.pick);
+    });
+    sync();
+  };
+  $('#bulk-clear').onclick = () => {
+    sel.clear();
+    $$('[data-pick]').forEach(b => (b.checked = false));
+    sync();
+  };
+  $('#bulk-apply').onclick = async () => {
+    const change = {};
+    const status = $('#bulk-status')?.value,
+      assign = $('#bulk-assign')?.value;
+    if (status) change.status = status;
+    if (assign) change.assignee_id = assign === 'none' ? '' : assign;
+    if (!Object.keys(change).length) return toast('Choose a status or a person to apply.');
+    const ids = [...sel],
+      button = $('#bulk-apply');
+    button.disabled = true;
+    let done = 0;
+    const failed = [];
+    for (const id of ids) {
+      button.textContent = `Updating ${done + failed.length + 1} of ${ids.length}…`;
+      try {
+        await api(`/orders/${encodeURIComponent(id)}`, {method: 'PATCH', body: JSON.stringify(change)});
+        done++;
+        sel.delete(id);
+      } catch (e) {
+        failed.push(e.message);
+      }
+    }
+    toast(
+      failed.length
+        ? `${done} updated. ${failed.length} could not be updated: ${failed[0]}`
+        : `${done} request${done === 1 ? '' : 's'} updated.`,
+    );
+    await refresh();
+  };
+  sync();
 }
 
 const fileTypes =
@@ -736,6 +833,7 @@ setInterval(async () => {
     document.hidden ||
     $('#editor').open ||
     ['INPUT', 'SELECT', 'TEXTAREA'].includes(document.activeElement?.tagName) ||
+    state.selected?.size ||
     ['settings', 'notifications', 'reports', 'inventory', 'ticket', 'calendar'].includes(state.page) ||
     state.list?.rows?.length > pageSize
   )
@@ -748,6 +846,20 @@ setInterval(async () => {
 }, 30000);
 
 document.addEventListener('keydown', e => {
+  // "/" jumps to the ticket finder from anywhere that is not already a text field.
+  if (
+    e.key === '/' &&
+    !e.ctrlKey &&
+    !e.metaKey &&
+    !e.altKey &&
+    !['INPUT', 'SELECT', 'TEXTAREA'].includes(document.activeElement?.tagName) &&
+    !document.activeElement?.isContentEditable &&
+    !$('#editor')?.open &&
+    $('#top-search')
+  ) {
+    e.preventDefault();
+    $('#top-search').focus();
+  }
   if (e.key === 'Escape' && state.notifOpen) closeNotif();
   if (e.key === 'Escape' && $('.rail.menu-open')) {
     $('.rail').classList.remove('menu-open');
