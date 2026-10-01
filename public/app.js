@@ -149,7 +149,7 @@ function go(page, filter = 'All') {
 
 function render() {
   const me = state.me;
-  document.title = (me.branding?.name || 'Facilities') + ' · Work order pad';
+  document.title = 'Facilities';
   if (!me.user) {
     $('#app').innerHTML =
       `<main class="login"><div class="login-ticket">${reportLink ? '<p class="login-context">Sign in to report a problem. The location from the label is kept.</p>' : ''}<div class="login-head"><span class="brand-mark">${icon(me.branding?.icon || 'building')}</span><span class="brand-name">${escape(me.branding?.name || 'Facilities')}</span><span class="ticket-no">WO-0000</span></div><div class="login-body"><h1>${escape(me.branding?.welcome || 'Your facilities. One connected workspace.')}</h1><p>Maintenance, schedules, equipment and the places your organization depends on, kept on one shared pad.</p><a class="login-link" href="/auth/login${location.pathname !== '/' ? '?return=' + encodeURIComponent(location.pathname + location.search) : ''}">${me.mode === 'demo' ? 'Enter demo workspace' : 'Sign in with your organization'} ${icon('arrow')}</a></div><div class="login-foot"><span>${me.mode === 'demo' ? 'Local demo · Illustrative records · Administrator access' : escape(me.organization) + ' · Secure organization sign-in'}</span></div></div></main>`;
