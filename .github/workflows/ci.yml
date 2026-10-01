@@ -31,3 +31,7 @@ jobs:
       - run: npx playwright install --with-deps chromium
       - run: npm run test:browser
       - run: docker build -t facilities:test .
+      - name: Verify archived release serves the frontend
+        run: |
+          git archive --format=tar --prefix=facilities/ HEAD | gzip -n > facilities.tar.gz
+          bash scripts/release-smoke.sh facilities.tar.gz

@@ -37,6 +37,8 @@ jobs:
           test "$TAG" = "v$(node -p "require('./package.json').version")"
           git archive --format=tar --prefix=facilities/ "$TAG" | gzip -n > facilities.tar.gz
           sha256sum facilities.tar.gz > SHA256SUMS
+      - name: Verify archived release serves the frontend
+        run: bash scripts/release-smoke.sh facilities.tar.gz
       - name: Publish release
         env:
           GH_TOKEN: ${{ github.token }}

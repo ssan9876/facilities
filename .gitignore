@@ -15,3 +15,5 @@ __pycache__/
 cloudflare-token
 *.pem
 *.key
+facilities.tar.gz
+SHA256SUMS

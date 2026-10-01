@@ -53,6 +53,13 @@ with tarfile.open(sys.argv[1]) as archive:
         assert p.parts and p.parts[0]=='facilities' and '..' not in p.parts and not p.is_absolute()
         assert m.isfile() or m.isdir(), 'Links and special files are not accepted'
     archive.extractall(sys.argv[2],filter='data')
+root=pathlib.Path(sys.argv[2])/'facilities'
+# Python's data filter clears directory modes; a 077 updater umask would
+# otherwise leave public asset directories readable only by root.
+root.chmod(0o755)
+for path in root.rglob('*'):
+    if path.is_dir(): path.chmod(0o755)
+    elif path.is_file(): path.chmod(0o755 if path.stat().st_mode & 0o111 else 0o644)
 PY
 test "v$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["version"])' "$work/facilities/package.json")" = "$version"
 if [[ -e "$target" ]]; then
