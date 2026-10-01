@@ -156,7 +156,7 @@ For restore, first stop the application and restore into an empty `facilities` d
 docker compose exec -T db psql -U facilities facilities < facilities-backup.sql
 ```
 
-Verify restoration in a separate deployment before relying on backups. Store encrypted copies outside the host. Never run `docker compose down -v` unless intentionally deleting the database. For local SQLite backups, stop the server before copying the database file. Before updates, take a backup, then rebuild with `docker compose up -d --build`. Version 0.3.0 introduces versioned migrations (see Operations); upgrading from 0.2.0 adds the audit log, attachments, email outbox, inventory, spaces and session identity tables and columns without changing existing records. Attachments make the database larger, so check backup storage.
+Verify restoration in a separate deployment before relying on backups. Store encrypted copies outside the host. Never run `docker compose down -v` unless intentionally deleting the database. For local SQLite backups, stop the server before copying the database file. Before updates, take a backup, then rebuild with `docker compose up -d --build`. Version 0.2.1 introduces versioned migrations (see Operations); upgrading from 0.2.0 adds the audit log, attachments, email outbox, inventory, spaces, ticket numbers, roles and session identity tables and columns without changing existing records. Attachments make the database larger, so check backup storage.
 
 ## GitHub releases and updates
 
