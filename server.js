@@ -32,6 +32,7 @@ import {latestMigration} from './migrations.js';
 import {can, loadRoles, usersWith} from './permissions.js';
 import {setupAccess, loadAccessFile, accessStatus, autoAssign} from './access.js';
 import {setupLive} from './live.js';
+import {setupViews} from './views.js';
 
 const today = () => dateInTimezone();
 
@@ -121,6 +122,7 @@ export async function createApp(env = process.env, dbOverride, options = {}) {
   setupLabels(app, db, env);
   setupHousekeeping(app, db, env);
   setupRequestForms(app, db);
+  setupViews(app, db);
   // Reference data and counts. Requests themselves are paged through /api/orders.
   app.get('/api/data', async (req, res) => {
     const modules = await moduleSettings(db);
@@ -158,6 +160,10 @@ export async function createApp(env = process.env, dbOverride, options = {}) {
       preferences: await preferences(db, req.user.id),
       notifications: await visibleNotifications(db, req.user),
       forms: await formConfig(db),
+      views: (await q('SELECT * FROM saved_views WHERE user_id=$1 ORDER BY sort,created_at', [req.user.id])).map(v => ({
+        ...v,
+        state: JSON.parse(v.state),
+      })),
     });
   });
   app.post('/api/maintenance/generate', async (req, res, next) => {

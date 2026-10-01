@@ -1,4 +1,4 @@
-import {requestTypes, settingsUI, notificationsUI, bindSettings} from './request-settings.js';
+import {requestTypes, settingsUI, notificationsUI, bindSettings, allowedSettingsTabs} from './request-settings.js';
 import {
   state,
   $,
@@ -26,6 +26,8 @@ import {
   bindForm,
   formActions,
   bindCancel,
+  autosave,
+  applyAppearance,
 } from './ui.js';
 import {hooks} from './hooks.js';
 import {orderEditor, ticketPage} from './order.js';
@@ -37,7 +39,11 @@ import {recordsPage, bindRecords, recordEditor} from './records.js';
 import {inventoryPage, bindInventory, partEditor} from './inventory.js';
 import {reportsPage, bindReports} from './reports.js';
 import {connectLive} from './live.js';
+import {readUrl, syncUrl, viewsNav, viewTools, bindViews, openView} from './views.js';
+import {bindShortcuts} from './keys.js';
 
+// Theme and contrast are per device; apply them before the first render.
+applyAppearance();
 const enabledTypes = () => Object.keys(requestTypes).filter(key => state.data.modules[key]);
 const pageType = () => (state.page.endsWith('Requests') ? state.page.replace('Requests', '') : null);
 const pageSize = 50;
@@ -51,7 +57,7 @@ const ticketPath = path => path.match(/^\/tickets\/([^/]+)$/)?.[1];
 if (ticketPath(location.pathname)) {
   state.page = 'ticket';
   state.ticketRef = decodeURIComponent(ticketPath(location.pathname));
-}
+} else readUrl();
 function openTicket(ref) {
   if (state.page !== 'ticket') state.returnPage = {page: state.page, filter: state.filter, search: state.search};
   state.page = 'ticket';
@@ -157,7 +163,8 @@ function navGroups() {
 }
 
 function go(page, filter = 'All') {
-  if (location.pathname !== '/') history.pushState({page}, '', '/');
+  if (location.pathname !== '/' || location.search) history.pushState({page}, '', '/');
+  state.activeView = null;
   state.page = page;
   state.filter = filter;
   state.search = '';
@@ -202,7 +209,7 @@ function render() {
     ? [['dashboard', 'home', 'Requests']]
     : [['dashboard', 'home', 'Today'], ...(enabledTypes().length ? [['orders', 'work', 'Requests']] : [])];
   $('#app').innerHTML =
-    `<div class="shell"><aside class="rail"><div class="brand"><span class="brand-mark">${icon(me.branding?.icon || 'building')}</span><span class="brand-name">${escape(me.branding?.name || 'Facilities')}<small>${escape(me.organization)}</small></span></div><nav id="workspace-nav" aria-label="Main navigation">${groups.map(([label, items]) => `<section class="nav-group"><h2 class="nav-tab">${label}</h2>${items.map(navButton).join('')}</section>`).join('')}</nav><div class="rail-foot"><div class="user-line"><span class="avatar">${escape(initials)}</span><div><strong>${escape(me.user.name)}</strong><small>${escape(me.user.role_name || me.user.role)}</small></div></div><button class="logout" id="logout">Sign out</button></div></aside><main class="workspace"><header class="topbar"><span class="crumb"><span class="brand-mark small">${icon(me.branding?.icon || 'building')}</span><span class="crumb-path">${escape(me.branding?.name || 'Facilities')} <span aria-hidden="true">/</span></span> <strong>${title}</strong></span><form class="top-search" id="top-search-form" role="search"><label class="search">${icon('search')}<input id="top-search" type="search" aria-label="Find a ticket" placeholder="Find a ticket" title="Type a WO number to open it, or words to search" autocomplete="off" enterkeyhint="search"></label><kbd aria-hidden="true">/</kbd></form><div class="top-right"><span class="top-date">${new Date().toLocaleDateString(undefined, {weekday: 'long', month: 'long', day: 'numeric'})}</span><button class="notification-button" id="bell" type="button" aria-haspopup="true" aria-controls="notif-pop" aria-expanded="${state.notifOpen ? 'true' : 'false'}" aria-label="Open notifications${unread ? `, ${unread} unread` : ''}">${icon('bell')}${unread ? `<span>${unread}</span>` : ''}</button>${state.notifOpen ? notifPanel() : ''}</div></header><div class="content">${me.mode === 'demo' ? '<div class="notice demo-notice">Demo workspace — these records are illustrative. SSO and an empty database are used in the production deployment.</div>' : ''}${pageContent()}</div></main><div class="dock">${dock.map(([p, i, t]) => `<button data-page="${p}" class="${state.page === p ? 'active' : ''}">${icon(i)}<span>${t}</span></button>`).join('')}${enabledTypes().length ? `<button class="dock-new" data-create="order" aria-label="New request">${icon('plus')}<span>New</span></button>` : ''}<button data-page="notifications" class="${state.page === 'notifications' ? 'active' : ''}">${icon('bell')}<span>Inbox</span>${unread ? `<span class="count">${unread}</span>` : ''}</button><button id="nav-toggle" type="button" aria-controls="workspace-nav" aria-expanded="false">${icon('menu')}<span>Menu</span></button></div></div>`;
+    `<div class="shell"><aside class="rail"><div class="brand"><span class="brand-mark">${icon(me.branding?.icon || 'building')}</span><span class="brand-name">${escape(me.branding?.name || 'Facilities')}<small>${escape(me.organization)}</small></span></div><nav id="workspace-nav" aria-label="Main navigation">${groups.map(([label, items]) => `<section class="nav-group"><h2 class="nav-tab">${label}</h2>${items.map(navButton).join('')}</section>`).join('')}${viewsNav()}</nav><div class="rail-foot"><div class="user-line"><span class="avatar">${escape(initials)}</span><div><strong>${escape(me.user.name)}</strong><small>${escape(me.user.role_name || me.user.role)}</small></div></div><button class="logout" id="logout">Sign out</button></div></aside><main class="workspace"><header class="topbar"><span class="crumb"><span class="brand-mark small">${icon(me.branding?.icon || 'building')}</span><span class="crumb-path">${escape(me.branding?.name || 'Facilities')} <span aria-hidden="true">/</span></span> <strong>${title}</strong></span><form class="top-search" id="top-search-form" role="search"><label class="search">${icon('search')}<input id="top-search" type="search" aria-label="Find a ticket" placeholder="Find a ticket" title="Type a WO number to open it, or words to search" autocomplete="off" enterkeyhint="search"></label><kbd aria-hidden="true">/</kbd></form><div class="top-right"><span class="top-date">${new Date().toLocaleDateString(undefined, {weekday: 'long', month: 'long', day: 'numeric'})}</span><button class="notification-button" id="bell" type="button" aria-haspopup="true" aria-controls="notif-pop" aria-expanded="${state.notifOpen ? 'true' : 'false'}" aria-label="Open notifications${unread ? `, ${unread} unread` : ''}">${icon('bell')}${unread ? `<span>${unread}</span>` : ''}</button>${state.notifOpen ? notifPanel() : ''}</div></header><div class="content">${me.mode === 'demo' ? '<div class="notice demo-notice">Demo workspace — these records are illustrative. SSO and an empty database are used in the production deployment.</div>' : ''}${pageContent()}</div></main><div class="dock">${dock.map(([p, i, t]) => `<button data-page="${p}" class="${state.page === p ? 'active' : ''}">${icon(i)}<span>${t}</span></button>`).join('')}${enabledTypes().length ? `<button class="dock-new" data-create="order" aria-label="New request">${icon('plus')}<span>New</span></button>` : ''}<button data-page="notifications" class="${state.page === 'notifications' ? 'active' : ''}">${icon('bell')}<span>Inbox</span>${unread ? `<span class="count">${unread}</span>` : ''}</button><button id="nav-toggle" type="button" aria-controls="workspace-nav" aria-expanded="false">${icon('menu')}<span>Menu</span></button></div></div>`;
   $$('[data-page]').forEach(
     b =>
       (b.onclick = () => {
@@ -211,6 +218,7 @@ function render() {
       }),
   );
   bindNotifPanel();
+  bindViews(render);
   $$('[data-goto]').forEach(b => (b.onclick = () => go(b.dataset.goto, b.dataset.filter)));
   $$('[data-create]').forEach(
     b =>
@@ -537,7 +545,7 @@ function ordersPanel(compact = false) {
     )
     .join(
       '',
-    )}</div><div class="filter-tools">${exportLink}<label class="search">${icon('search')}<input id="search" type="search" aria-label="Search requests" placeholder="Search title, place or WO number" value="${escape(state.search)}"></label></div></div>${compact ? '' : filterBar(state.page, pageType())}<div id="order-table" data-compact="${compact}">${state.list?.rows ? ordersTable(compact) : '<div class="empty">Loading requests…</div>'}</div></section>`;
+    )}</div><div class="filter-tools">${compact ? '' : viewTools()}${exportLink}<label class="search">${icon('search')}<input id="search" type="search" aria-label="Search requests" placeholder="Search title, place or WO number" value="${escape(state.search)}"></label></div></div>${compact ? '' : filterBar(state.page, pageType())}<div id="order-table" data-compact="${compact}">${state.list?.rows ? ordersTable(compact) : '<div class="empty">Loading requests…</div>'}</div></section>`;
 }
 // The register loads one page at a time from the server; filters and search are applied there.
 async function loadOrders(reset) {
@@ -547,6 +555,7 @@ async function loadOrders(reset) {
   const params = listParams(compact);
   params.set('limit', String(compact ? 8 : pageLimit(state.page)));
   const key = params.toString();
+  if (!compact) syncUrl();
   if (!reset && state.list?.key === key && state.list.rows && !state.list.stale) {
     el.innerHTML = ordersTable(compact);
     bindTable();
@@ -666,23 +675,42 @@ function bindBulk() {
       button = $('#bulk-apply');
     button.disabled = true;
     let done = 0;
-    const failed = [];
+    const failed = [],
+      before = [];
     for (const id of ids) {
       button.textContent = `Updating ${done + failed.length + 1} of ${ids.length}…`;
+      const row = state.list.rows.find(o => o.id === id);
       try {
         await api(`/orders/${encodeURIComponent(id)}`, {method: 'PATCH', body: JSON.stringify(change)});
         done++;
         sel.delete(id);
+        if (row)
+          before.push([
+            id,
+            Object.fromEntries(Object.keys(change).map(k => [k, k === 'assignee_id' ? row.assignee_id || '' : row[k]])),
+          ]);
       } catch (e) {
         failed.push(e.message);
       }
     }
+    await refresh();
     toast(
       failed.length
         ? `${done} updated. ${failed.length} could not be updated: ${failed[0]}`
         : `${done} request${done === 1 ? '' : 's'} updated.`,
+      before.length
+        ? {
+            undo: async () => {
+              for (const [id, previous] of before)
+                await api(`/orders/${encodeURIComponent(id)}`, {
+                  method: 'PATCH',
+                  body: JSON.stringify({...previous, undo: true}),
+                });
+              await refresh();
+            },
+          }
+        : {},
     );
-    await refresh();
   };
   sync();
 }
@@ -800,8 +828,10 @@ function createOrder(prefill = {}) {
   bindTicketFields(form, type, (next, values) =>
     createOrder({...prefill, type: next, building: values.building_id, asset: values.asset_id, values}),
   );
+  const draft = autosave(form, 'new-request');
   bindForm(form, async (data, f) => {
     const {created, failed} = await submitTicket(f, data);
+    draft.clear();
     closeDialog();
     await refresh();
     toast(
@@ -948,6 +978,18 @@ function startLive() {
   });
 }
 hooks.startLive = startLive;
+hooks.go = go;
+hooks.navItems = () => navGroups().flatMap(([, items]) => items);
+hooks.openView = id => openView(id, render);
+hooks.createOrder = () => createOrder();
+hooks.canCreate = () => submitTypes().length > 0;
+hooks.settingsTabs = () => allowedSettingsTabs(state);
+hooks.searchRequests = q => {
+  go(hooks.navItems().some(([p]) => p === 'orders') ? 'orders' : 'dashboard');
+  state.search = q;
+  render();
+};
+bindShortcuts();
 // Boot ran refresh() before this point, so start the stream now (later sign-ins start it from refresh()).
 startLive();
 

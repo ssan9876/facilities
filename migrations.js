@@ -223,6 +223,17 @@ export const migrations = [
       );
     },
   },
+  {
+    id: 13,
+    name: 'saved-views',
+    async up(q) {
+      // A person's pinned register views: page, tab, search and filters.
+      await q(
+        'CREATE TABLE IF NOT EXISTS saved_views (id TEXT PRIMARY KEY, user_id TEXT NOT NULL REFERENCES users(id), name TEXT NOT NULL, page TEXT NOT NULL, state TEXT NOT NULL, sort INTEGER NOT NULL DEFAULT 0, created_at TEXT NOT NULL)',
+      );
+      await q('CREATE INDEX IF NOT EXISTS saved_views_user ON saved_views(user_id)');
+    },
+  },
 ];
 
 export async function migrate(db, list = migrations) {

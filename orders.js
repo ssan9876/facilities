@@ -316,6 +316,7 @@ export function setupOrders(app, db, env) {
       record_parts:
         canOn(req.user, 'parts.record_any', order) || (mine && canOn(req.user, 'requests.update_assigned', order)),
       approve: canOn(req.user, 'reservations.approve', order),
+      take: !order.assignee_id && canOn(req.user, 'requests.assignable', order),
     };
     const assignable = permissions.assign
       ? (await usersWith(db, 'requests.assignable', order)).map(u => ({id: u.id, name: u.name}))
@@ -424,12 +425,29 @@ export function setupOrders(app, db, env) {
     // Resolving a ticket records how it was resolved; the note is kept as a comment.
     const resolving = status === 'Completed' && row.status !== 'Completed';
     const resolution = resolving ? String(body.resolution ?? '').trim() : '';
-    if (resolving && !resolution) throw error('Add a note describing how the request was resolved.');
+    // Undo: the same person reopened this resolved ticket in the last ten minutes, so it can go back to
+    // Completed without a second note (the original resolution stays in the conversation).
+    const undoing =
+      resolving &&
+      !resolution &&
+      body.undo === true &&
+      (
+        await q(
+          "SELECT details FROM audit_log WHERE entity_type='work_order' AND entity_id=$1 AND action='order.update' AND actor_id=$2 AND created_at>$3 ORDER BY created_at DESC LIMIT 1",
+          [row.id, req.user.id, new Date(Date.now() - 600000).toISOString()],
+        )
+      ).some(a => JSON.parse(a.details || '{}').status?.[0] === 'Completed');
+    if (resolving && !resolution && !undoing) throw error('Add a note describing how the request was resolved.');
     if (resolution.length > 5000) throw error('The resolution note must be 5000 characters or fewer.');
     let assignee = row.assignee_id;
     if ('assignee_id' in body) {
       assignee = body.assignee_id || null;
-      if (assignee !== row.assignee_id && !canOn(req.user, 'requests.assign', row))
+      // "Take it": anyone who can be assigned this ticket may take it while nobody has it.
+      const taking = assignee === req.user.id && !row.assignee_id && canOn(req.user, 'requests.assignable', row);
+      // ...and give back a ticket they hold (the undo of "Take it").
+      const releasing =
+        assignee === null && row.assignee_id === req.user.id && canOn(req.user, 'requests.assignable', row);
+      if (assignee !== row.assignee_id && !taking && !releasing && !canOn(req.user, 'requests.assign', row))
         throw error('Your role cannot assign work.', 403);
       if (assignee && !(await usersWith(db, 'requests.assignable', row)).some(u => u.id === assignee))
         throw error('Choose an enabled person whose role can be assigned work.');
