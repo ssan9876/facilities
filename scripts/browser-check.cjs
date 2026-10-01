@@ -238,6 +238,7 @@ const assert = require('node:assert/strict');
   await page.keyboard.press('g');
   await page.keyboard.press('r');
   await page.getByRole('heading', {name: 'All requests', exact: true}).waitFor();
+  await page.locator('#order-table tr[data-order]').first().waitFor();
   await page.keyboard.press('j');
   assert.equal(await page.evaluate(() => document.activeElement.matches('tr[data-order]')), true, 'j moves to a row');
   // Drafts survive closing the sheet.
