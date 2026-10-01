@@ -31,7 +31,6 @@ import {locationFields, bindLocation, requestTiming, bindTiming} from './forms.j
 import {configurableFields, bindConfigurable, withAnswers, ruleFor} from './requestform.js';
 
 const statuses = ['Open', 'In progress', 'On hold', 'Completed'];
-const reducedMotion = () => matchMedia('(prefers-reduced-motion: reduce)').matches;
 // Legal next stages from each stage; Completed tickets can only be reopened.
 const nextStages = {
   Open: ['In progress', 'On hold', 'Completed'],
@@ -39,29 +38,19 @@ const nextStages = {
   'On hold': ['In progress', 'Completed'],
   Completed: ['Open'],
 };
-const pause = ms => new Promise(resolve => setTimeout(resolve, reducedMotion() ? 0 : ms));
-// The new stage is stamped onto the strip before the ticket redraws with its new state.
-async function stampLand(status) {
-  $('#lifecycle-slot').innerHTML = lifecycle(status, true);
-  await pause(620);
-}
+const stageAction = {
+  'In progress': 'Mark in progress',
+  'On hold': 'Put on hold',
+  Completed: 'Mark completed',
+  Open: 'Reopen',
+};
+const fact = (label, value) => `<div><dt>${label}</dt><dd>${value}</dd></div>`;
+const none = text => `<span class="unassigned">${text}</span>`;
 // The ticket redraws after a save; put focus back on the matching control once it exists again.
 function refocus(selector, tries = 40) {
   const el = $(selector);
   if (el && !el.disabled && document.activeElement !== el) return el.focus();
   if (tries) setTimeout(() => refocus(selector, tries - 1), 50);
-}
-const cell = (label, value, cls = '') =>
-  `<div class="cell ${cls}"><span class="cell-label">${label}</span><span class="cell-value">${value}</span></div>`;
-// The fixed-scale lifecycle strip: stages before the current one are filed, the current one carries the stamp.
-export function lifecycle(status, landing = false) {
-  const at = statuses.indexOf(status);
-  return `<ol class="lifecycle" aria-label="Progress: ${escape(status)}">${statuses
-    .map(
-      (stage, i) =>
-        `<li class="${i < at ? 'done' : i === at ? 'current' : ''}"><span class="lc-label">${stage}</span>${i === at ? `<span class="lc-stamp ${stage.toLowerCase().replaceAll(' ', '-')} ${landing ? 'landing' : ''}" aria-hidden="true">${stage}</span>` : ''}</li>`,
-    )
-    .join('')}</ol>`;
 }
 const describeChange = (key, [from, to]) => {
   const label = key.replace(/_id$/, '').replaceAll('_', ' ');
@@ -103,22 +92,22 @@ export async function ticketPage(ref) {
       ? `${fmtTime(o.starts_at)} – ${fmtTime(o.ends_at)} · ${escape(state.me.timezone)}`
       : 'Due ' + fmt(o.due_date);
   const reservation = o.space_id
-    ? `<section class="detail-section reservation"><div><strong>${icon('door')}${escape(o.space)}</strong> ${reservationTag(o.reservation_status)}<p>${o.reservation_status === 'pending' ? 'This space reservation is waiting for a manager.' : o.reservation_status === 'approved' ? 'The space is reserved for this time.' : 'The space is not reserved for this request.'}</p></div><div class="inline-actions">${can('reservations.approve') && o.reservation_status === 'pending' ? '<button class="primary" data-reservation="approved">Approve</button><button class="secondary" data-reservation="declined">Decline</button>' : ''}${(can('reservations.approve') || owner) && ['pending', 'approved'].includes(o.reservation_status) ? '<button class="quiet-button" data-reservation="cancelled">Cancel reservation</button>' : ''}</div></section>`
+    ? `<section class="tp-card reservation"><div><strong>${icon('door')}${escape(o.space)}</strong> ${reservationTag(o.reservation_status)}<p>${o.reservation_status === 'pending' ? 'This space reservation is waiting for a manager.' : o.reservation_status === 'approved' ? 'The space is reserved for this time.' : 'The space is not reserved for this request.'}</p></div><div class="inline-actions">${can('reservations.approve') && o.reservation_status === 'pending' ? '<button class="primary" data-reservation="approved">Approve</button><button class="secondary" data-reservation="declined">Decline</button>' : ''}${(can('reservations.approve') || owner) && ['pending', 'approved'].includes(o.reservation_status) ? '<button class="quiet-button" data-reservation="cancelled">Cancel reservation</button>' : ''}</div></section>`
     : '';
-  const attachments = `<section class="detail-section"><div class="section-head compact"><h2>Attachments</h2></div>${o.attachments.length ? `<ul class="attachment-list">${o.attachments.map(a => `<li>${a.content_type.startsWith('image/') && a.content_type !== 'image/heic' ? `<a href="/api/attachments/${escape(a.id)}" target="_blank" rel="noopener" tabindex="-1" aria-hidden="true"><img src="/api/attachments/${escape(a.id)}" alt="" loading="lazy"></a>` : `<span class="file-symbol">${icon('clip')}</span>`}<div><a href="/api/attachments/${escape(a.id)}?download" download>${escape(a.file_name)}</a><small>${bytes(a.size)} · ${escape(a.uploader)} · ${fmtStamp(a.created_at)}</small></div>${a.uploaded_by === me.id || can('requests.moderate') ? `<button class="quiet-button" data-remove-attachment="${escape(a.id)}">Remove</button>` : ''}</li>`).join('')}</ul>` : '<p class="muted-line">No photos or files yet.</p>'}<label class="upload-button secondary">${icon('clip')}Add photos or files<input type="file" id="attach-input" multiple accept="image/jpeg,image/png,image/gif,image/webp,image/heic,application/pdf,text/plain,text/csv,.docx,.xlsx"></label></section>`;
+  const attachments = `<section class="tp-card"><h2>Attachments</h2>${o.attachments.length ? `<ul class="attachment-list">${o.attachments.map(a => `<li>${a.content_type.startsWith('image/') && a.content_type !== 'image/heic' ? `<a href="/api/attachments/${escape(a.id)}" target="_blank" rel="noopener" tabindex="-1" aria-hidden="true"><img src="/api/attachments/${escape(a.id)}" alt="" loading="lazy"></a>` : `<span class="file-symbol">${icon('clip')}</span>`}<div><a href="/api/attachments/${escape(a.id)}?download" download>${escape(a.file_name)}</a><small>${bytes(a.size)} · ${escape(a.uploader)} · ${fmtStamp(a.created_at)}</small></div>${a.uploaded_by === me.id || can('requests.moderate') ? `<button class="quiet-button" data-remove-attachment="${escape(a.id)}">Remove</button>` : ''}</li>`).join('')}</ul>` : '<p class="muted-line">No photos or files yet.</p>'}<label class="upload-button secondary">${icon('clip')}Add photos or files<input type="file" id="attach-input" multiple accept="image/jpeg,image/png,image/gif,image/webp,image/heic,application/pdf,text/plain,text/csv,.docx,.xlsx"></label></section>`;
   const activeParts = (state.data.parts || []).filter(p => !p.archived_at);
   const parts =
     state.data.modules.inventory && can('inventory.view')
-      ? `<section class="detail-section"><div class="section-head compact"><h2>Parts used</h2></div>${o.parts.length ? `<table class="mini-table"><tbody>${o.parts.map(p => `<tr><td>${p.quantity} × ${escape(p.name)}<div class="order-sub">${escape(p.sku) || 'No SKU'} · ${escape(p.used_by)}</div></td><td>${money(p.unit_cost_cents == null ? null : p.unit_cost_cents * p.quantity)}</td><td>${canRecordParts ? `<button class="quiet-button" data-return-part="${escape(p.id)}">Return to stock</button>` : ''}</td></tr>`).join('')}</tbody></table>` : '<p class="muted-line">No parts recorded.</p>'}${canRecordParts && activeParts.length ? `<form id="part-form" class="inline-form">${select('Part', 'part_id', [['', 'Choose part'], ...activeParts.map(p => [p.id, `${p.name} (${p.quantity} on hand)`])])}${field('Quantity', 'quantity', 'number', '1', false, 'min="1"')}<button class="secondary" type="submit">Record part</button><div class="form-error" role="alert"></div></form>` : ''}</section>`
+      ? `<section class="tp-card"><h2>Parts used</h2>${o.parts.length ? `<table class="mini-table"><tbody>${o.parts.map(p => `<tr><td>${p.quantity} × ${escape(p.name)}<div class="order-sub">${escape(p.sku) || 'No SKU'} · ${escape(p.used_by)}</div></td><td>${money(p.unit_cost_cents == null ? null : p.unit_cost_cents * p.quantity)}</td><td>${canRecordParts ? `<button class="quiet-button" data-return-part="${escape(p.id)}">Return to stock</button>` : ''}</td></tr>`).join('')}</tbody></table>` : '<p class="muted-line">No parts recorded.</p>'}${canRecordParts && activeParts.length ? `<form id="part-form" class="inline-form">${select('Part', 'part_id', [['', 'Choose part'], ...activeParts.map(p => [p.id, `${p.name} (${p.quantity} on hand)`])])}${field('Quantity', 'quantity', 'number', '1', false, 'min="1"')}<button class="secondary" type="submit">Record part</button><div class="form-error" role="alert"></div></form>` : ''}</section>`
       : '';
-  const stampBar = canStamp
-    ? `<div class="stamp-bar" role="group" aria-label="Stamp this ticket">${nextStages[o.status]
-
+  // Quick actions: the next stages as plain buttons, the likeliest one first.
+  const actions = canStamp
+    ? nextStages[o.status]
         .map(
           (stage, i) =>
-            `<button type="button" class="stamp-button ${i === 0 ? 'next' : ''}" data-stamp="${stage}">${stage === 'Open' && o.status === 'Completed' ? 'Reopen' : 'Stamp ' + stage}</button>`,
+            `<button type="button" class="${i === 0 ? 'primary' : 'secondary'}" data-stamp="${stage}">${stageAction[stage]}</button>`,
         )
-        .join('')}</div>`
+        .join('')
     : '';
   // Ticket controls save the moment they change: no separate "Save" step.
   const canPriority = fullEdit && ruleFor(o.request_type, 'priority') !== 'hidden';
@@ -126,7 +115,7 @@ export async function ticketPage(ref) {
     `<label class="ticket-control">${label}<select name="${name}" data-ticket-control="${name}" aria-label="${label}">${options.map(([v, t]) => `<option value="${escape(v)}" ${String(v) === String(value ?? '') ? 'selected' : ''}>${escape(t)}</option>`).join('')}</select></label>`;
   const controls =
     canStamp || canAssign || canPriority
-      ? `<div class="ticket-controls" role="group" aria-label="Update this ticket">${
+      ? `<section class="tp-card ticket-controls" aria-label="Update this ticket"><h2>Update</h2>${
           canStamp
             ? control(
                 'Status',
@@ -144,44 +133,44 @@ export async function ticketPage(ref) {
                 o.priority,
               )
             : ''
-        }<span class="control-status" aria-live="polite"></span></div>`
+        }<span class="control-status" aria-live="polite"></span></section>`
       : '';
-  const copy = !can('requests.view_all') ? 'requester' : canAssign ? 'office' : 'technician';
-  const fields = [
-    cell(
+  const late = o.status !== 'Completed' && o.due_date < new Date().toISOString().slice(0, 10);
+  const facts = [
+    fact(
       'Type',
       `<span class="request-kind">${icon(requestTypes[o.request_type].icon)}${requestTypes[o.request_type].label}</span>`,
     ),
-    canPriority ? '' : cell('Priority', tag(o.priority)),
-    cell('Category', o.category ? escape(o.category) : '<span class="unassigned">None</span>'),
-    cell('Opened', fmtStamp(o.created_at)),
-    cell('Building', escape(o.building)),
-    cell('Asset', escape(o.asset) || '<span class="unassigned">None</span>'),
+    o.category ? fact('Category', escape(o.category)) : '',
+    canStamp ? '' : fact('Status', tag(o.status)),
+    canPriority ? '' : fact('Priority', tag(o.priority)),
+    canAssign ? '' : fact('Assigned to', escape(o.assignee) || none('Unassigned')),
     o.request_type === 'schedule'
-      ? cell(
-          'Space',
-          o.space
-            ? `${escape(o.space)} ${reservationTag(o.reservation_status)}`
-            : '<span class="unassigned">None</span>',
-        )
-      : cell(
-          'Due',
-          `<span class="${o.status !== 'Completed' && o.due_date < new Date().toISOString().slice(0, 10) ? 'overdue' : ''}">${fmt(o.due_date)}</span>`,
-        ),
-    cell('Requested by', escape(o.requester)),
-    canAssign ? '' : cell('Assigned to', escape(o.assignee) || '<span class="unassigned">Unassigned</span>'),
-    o.request_type === 'schedule'
-      ? cell('When', when)
-      : cell('Completed', o.completed_at ? fmtStamp(o.completed_at) : '—'),
+      ? fact('When', when) +
+        fact('Space', o.space ? `${escape(o.space)} ${reservationTag(o.reservation_status)}` : none('None'))
+      : fact('Due', `<span class="${late ? 'overdue' : ''}">${fmt(o.due_date)}${late ? ' · Overdue' : ''}</span>`),
+    fact('Building', escape(o.building)),
+    fact('Asset', escape(o.asset) || none('None')),
+    fact('Requested by', escape(o.requester)),
+    fact('Opened', fmtStamp(o.created_at)),
+    o.completed_at ? fact('Completed', fmtStamp(o.completed_at)) : '',
   ].join('');
+  const answers = o.answers?.length
+    ? `<dl class="tp-answers">${o.answers.map(a => fact(escape(a.label), escape(a.value))).join('')}</dl>`
+    : '';
+  const summary = [
+    tag(o.status),
+    tag(o.priority),
+    o.request_type === 'schedule'
+      ? escape(fmtTime(o.starts_at))
+      : `<span class="${late ? 'overdue' : ''}">Due ${fmt(o.due_date)}${late ? ' · Overdue' : ''}</span>`,
+    escape(o.building),
+    o.assignee ? escape(o.assignee) : none('Unassigned'),
+  ].join('<span class="sep" aria-hidden="true">·</span>');
   $('#ticket-page').innerHTML =
-    `<div class="ticket-bar"><button type="button" class="quiet-button" data-ticket-back>${icon('arrow-left')}Back</button><span class="copy-label"><span class="copies" data-copy="${copy}" aria-hidden="true"><i class="c-requester"></i><i class="c-technician"></i><i class="c-office"></i></span>${{requester: 'Requester copy', technician: 'Technician copy', office: 'Office copy'}[copy]}</span></div><article class="ticket-sheet" data-copy="${copy}"><header class="ticket-head"><span class="ticket-no">${escape(number)}</span><h1>${escape(o.title)}</h1></header><div class="ticket-body">` +
-    `<div id="lifecycle-slot">${lifecycle(o.status)}</div>${stampBar}${controls}<div class="ticket-fields">${fields}${cell('Description of work', `<span class="detail-description">${escape(o.description) || 'No additional details.'}</span>`, 'wide')}</div>${
-      o.answers?.length
-        ? `<div class="ticket-fields answers">${o.answers.map(a => cell(escape(a.label), `<span class="detail-description">${escape(a.value)}</span>`, a.kind === 'textarea' ? 'wide' : '')).join('')}</div>`
-        : ''
-    }<div class="detail-toolbar">${canEditDetails ? `<button class="secondary" id="edit-order">${icon('edit')}${textEdit ? 'Edit text' : 'Edit details'}</button>` : ''}<button class="secondary" id="show-history">${icon('history')}Activity</button>${can('requests.delete') ? '<button class="secondary danger" id="delete-order">Delete request</button>' : ''}</div>${reservation}<div id="history" hidden></div>${attachments}${parts}<section class="detail-section"><div class="section-head compact"><h2>Conversation</h2></div><div id="comments" aria-live="polite">Loading comments…</div><form id="comment-form">${field('Add a comment', 'body', 'textarea')}<div class="form-error" role="alert"></div><div class="editor-actions"><button class="secondary" type="submit">Post comment</button></div></form></section>` +
-    `</div></article>`;
+    `<div class="tp"><header class="tp-head"><button type="button" class="quiet-button tp-back" data-ticket-back>${icon('arrow-left')}Back</button><div class="tp-title"><span class="ticket-no">${escape(number)}</span><h1>${escape(o.title)}</h1></div><p class="tp-summary">${summary}</p><div class="tp-actions">${actions}${canEditDetails ? `<button class="secondary" id="edit-order">${icon('edit')}${textEdit ? 'Edit text' : 'Edit details'}</button>` : ''}<button class="secondary" id="show-history">${icon('history')}Activity</button></div></header>` +
+    `<div class="tp-grid"><aside class="tp-side">${controls}<section class="tp-card"><h2>Details</h2><dl class="tp-facts">${facts}</dl></section>${can('requests.delete') ? '<button class="quiet-button danger" id="delete-order">Delete request</button>' : ''}</aside>` +
+    `<div class="tp-main"><section class="tp-card"><h2>Description</h2><p class="detail-description">${escape(o.description) || none('No additional details.')}</p>${answers}</section>${reservation}<div id="history" hidden></div><section class="tp-card"><h2>Conversation</h2><div id="comments" aria-live="polite">Loading comments…</div><form id="comment-form">${field('Add a comment', 'body', 'textarea')}<div class="form-error" role="alert"></div><div class="editor-actions"><button class="primary" type="submit">Post comment</button></div></form></section>${attachments}${parts}</div></div></div>`;
   const reopen = async message => {
     await hooks.refresh();
     if (message) toast(message);
@@ -228,11 +217,10 @@ export async function ticketPage(ref) {
       note.textContent = 'Saving…';
       try {
         await api(`/orders/${encodeURIComponent(id)}`, {method: 'PATCH', body: JSON.stringify({[key]: value})});
-        if (key === 'status') await stampLand(value);
         const person = state.data.users.find(u => u.id === value)?.name;
         await reopen(
           key === 'status'
-            ? `${number} stamped ${value}.`
+            ? `${number} marked ${value}.`
             : key === 'assignee_id'
               ? value
                 ? `${number} assigned to ${person}.`
@@ -257,8 +245,7 @@ export async function ticketPage(ref) {
             method: 'PATCH',
             body: JSON.stringify({status: b.dataset.stamp}),
           });
-          await stampLand(b.dataset.stamp);
-          await reopen(`${number} stamped ${b.dataset.stamp}.`);
+          await reopen(`${number} marked ${b.dataset.stamp}.`);
         } catch (e) {
           toast(e.message);
           $$('[data-stamp]').forEach(x => (x.disabled = false));
@@ -290,7 +277,7 @@ export async function ticketPage(ref) {
     box.innerHTML = '<p class="muted-line">Loading activity…</p>';
     try {
       const rows = await api(`/orders/${encodeURIComponent(id)}/history`);
-      box.innerHTML = `<section class="detail-section"><div class="section-head compact"><h2>Activity</h2></div>${
+      box.innerHTML = `<section class="tp-card"><h2>Activity</h2>${
         rows.length
           ? `<ol class="history-list">${rows
               .map(

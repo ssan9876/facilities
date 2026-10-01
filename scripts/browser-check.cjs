@@ -56,8 +56,8 @@ const assert = require('node:assert/strict');
   await page.getByRole('heading', {name: orderTitle, exact: true}).waitFor();
   assert.match(new URL(page.url()).pathname, /^\/tickets\/WO-\d{4}$/, 'each ticket has its own URL');
   const ticketUrl = page.url();
-  await page.getByRole('button', {name: 'Stamp In progress', exact: true}).click();
-  await page.locator('#ticket-page .lc-stamp.in-progress').waitFor();
+  await page.getByRole('button', {name: 'Mark in progress', exact: true}).click();
+  await page.locator('#ticket-page .tp-summary .tag.in-progress').waitFor();
   // Ticket controls save on change; there is no separate save step. A keyboard arrow alone does not save.
   let patches = 0;
   const countPatch = r => r.request().method() === 'PATCH' && patches++;
@@ -73,7 +73,7 @@ const assert = require('node:assert/strict');
   await page.getByLabel('Status', {exact: true}).selectOption('Completed');
   await page.locator('.control-status').getByText('Saving…').waitFor();
   await page.screenshot({path: '.impeccable/review/order-control-saving-desktop.png'});
-  await page.locator('#ticket-page .lc-stamp.completed').waitFor();
+  await page.locator('#ticket-page .tp-summary .tag.completed').waitFor();
   await page.goBack();
   await page.locator('.order-title').first().waitFor();
   await page.goto(ticketUrl);
@@ -469,6 +469,11 @@ const assert = require('node:assert/strict');
   await mobile.locator('.agenda').waitFor();
   await parkDock();
   await mobile.screenshot({path: '.impeccable/review/calendar-mobile.png', fullPage: true});
+  await mobile.locator('.agenda .cal-chip').first().click();
+  await mobile.locator('#ticket-page .tp-head').waitFor();
+  await mobile.screenshot({path: '.impeccable/review/ticket-mobile.png'});
+  await parkDock();
+  await mobile.screenshot({path: '.impeccable/review/ticket-mobile-full.png', fullPage: true});
   assert.equal(
     await mobile.evaluate(() => document.documentElement.scrollWidth > innerWidth),
     false,

@@ -842,7 +842,6 @@ tbody tr:first-child td {
 }
 tr.clickable {
   cursor: pointer;
-  transition: background 0.12s ease-out, opacity 0.18s ease-out;
 }
 tr.clickable:hover,
 tr.clickable:focus-visible {
@@ -850,14 +849,6 @@ tr.clickable:focus-visible {
 }
 tr.clickable:focus-visible {
   outline-offset: -2px;
-}
-.ledger tbody:has(tr:focus-visible) tr:not(:focus-visible) {
-  opacity: 0.55;
-}
-@media (hover: hover) {
-  .ledger tbody:has(tr.clickable:hover) tr.clickable:not(:hover) {
-    opacity: 0.6;
-  }
 }
 .col-no {
   width: 1%;
@@ -889,31 +880,6 @@ tr.clickable:focus-visible {
   white-space: normal;
   max-width: 420px;
 }
-/* The focused ticket opens in place: its description and requester appear under the title. */
-.row-more {
-  display: grid;
-  grid-template-rows: 0fr;
-  max-width: 460px;
-  white-space: normal;
-  font-size: 12px;
-  line-height: 1.45;
-  color: var(--ink-2);
-  opacity: 0;
-  transition: grid-template-rows 0.22s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.18s ease-out;
-}
-.row-more > div {
-  overflow: hidden;
-  display: grid;
-  gap: 2px;
-}
-.row-more > div > :first-child {
-  margin-top: 6px;
-}
-tr.clickable:hover .row-more,
-tr.clickable:focus-visible .row-more {
-  grid-template-rows: 1fr;
-  opacity: 1;
-}
 .request-kind {
   display: inline-flex;
   align-items: center;
@@ -938,16 +904,9 @@ tr.clickable:focus-visible .row-more {
   display: block;
   margin-top: 4px;
   width: max-content;
-  font-size: 10.5px;
-  font-weight: 800;
-  font-stretch: var(--condensed);
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
+  font-size: 13px;
+  font-weight: 650;
   color: var(--stamp);
-  border: 1.5px solid var(--stamp);
-  padding: 1px 5px 0;
-  border-radius: 2px;
-  transform: rotate(-2deg);
 }
 .table-footer {
   display: flex;
@@ -994,66 +953,76 @@ tr.clickable:focus-visible .row-more {
   text-align: right;
 }
 
-/* Rubber stamps: status, priority and lifecycle marks. Words always carry the state. */
+/* Status and priority pills: sentence-case words on a light wash, with a dot for the state. */
 .tag {
   display: inline-flex;
   align-items: center;
-  font-size: 11px;
-  font-weight: 800;
-  font-stretch: var(--condensed);
-  text-transform: uppercase;
-  letter-spacing: 0.07em;
+  gap: 6px;
+  font-size: 13px;
+  font-weight: 600;
   line-height: 1;
-  padding: 4px 6px 3px;
-  border: 1.5px solid currentColor;
-  border-radius: 2px;
+  padding: 5px 10px;
+  border-radius: 999px;
+  background: var(--desk);
   color: var(--ink);
   white-space: nowrap;
 }
 .tag .dot {
-  display: none;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: currentColor;
+  flex-shrink: 0;
 }
 .tag.open {
+  background: color-mix(in srgb, var(--ink) 8%, white);
   color: var(--ink);
 }
 .tag.in-progress {
-  color: var(--carbon);
+  background: var(--carbon-wash);
+  color: var(--carbon-deep);
 }
 .tag.on-hold {
-  color: var(--hold);
+  background: color-mix(in srgb, var(--hold) 16%, white);
+  color: color-mix(in srgb, var(--hold) 75%, black);
 }
 .tag.completed {
-  color: var(--done);
+  background: var(--done-wash);
+  color: color-mix(in srgb, var(--done) 80%, black);
 }
 .tag.urgent {
   background: var(--stamp);
-  border-color: var(--stamp);
   color: #fff;
 }
 .tag.high {
+  background: var(--stamp-wash);
   color: var(--stamp);
 }
 .tag.normal,
 .tag.low {
-  border-color: transparent;
-  color: var(--ink-3);
+  background: transparent;
+  color: var(--ink-2);
   padding-left: 0;
   padding-right: 0;
 }
+.tag.normal .dot,
+.tag.low .dot {
+  display: none;
+}
 .tag.reservation-pending {
-  color: var(--hold);
-  border-style: dashed;
+  background: color-mix(in srgb, var(--hold) 16%, white);
+  color: color-mix(in srgb, var(--hold) 75%, black);
 }
 .tag.reservation-approved {
-  color: var(--done);
+  background: var(--done-wash);
+  color: color-mix(in srgb, var(--done) 80%, black);
 }
 .tag.reservation-declined,
 .tag.reservation-cancelled,
 .tag.archived {
+  background: var(--desk);
   color: var(--ink-3);
-  border-color: var(--rule-strong);
   text-decoration: line-through;
-  text-decoration-thickness: 1.5px;
 }
 .col-stamp .tag + .tag {
   margin-left: 4px;
@@ -2449,14 +2418,6 @@ dialog#editor[data-kind='ticket']::before {
   pointer-events: none;
   z-index: 5;
 }
-.ledger th.col-no,
-.ledger td.col-no {
-  border-right: 3px double var(--rule-strong);
-  padding-right: 16px;
-}
-.ledger td.col-request {
-  padding-left: 16px;
-}
 
 /* Medium screens */
 @media (max-width: 1180px) {
@@ -2777,12 +2738,6 @@ dialog#editor[data-kind='ticket']::before {
   }
   .ledger .overdue-mark {
     margin-left: auto;
-  }
-  .row-more {
-    display: none;
-  }
-  .ledger tbody:has(tr:focus-visible) tr:not(:focus-visible) {
-    opacity: 1;
   }
   .ticket-fields {
     grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -3829,5 +3784,168 @@ tr.picked td {
   }
   .cal-options .view-toggle button {
     flex: 1;
+  }
+}
+
+/* Ticket page: a header with the quick actions, a side panel to update it, and the work in the main column. */
+.tp-head {
+  display: grid;
+  gap: 10px;
+  margin-bottom: 20px;
+}
+.tp-back {
+  justify-self: start;
+}
+.tp-title {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 4px 14px;
+}
+.tp-title .ticket-no {
+  font-size: 18px;
+}
+.tp-title h1 {
+  font-size: 26px;
+  line-height: 1.2;
+  font-weight: 750;
+  font-stretch: 100%;
+  text-transform: none;
+  letter-spacing: 0;
+  margin: 0;
+}
+.tp-summary {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 10px;
+  margin: 0;
+  font-size: 15px;
+  color: var(--ink-2);
+}
+.tp-summary .sep {
+  color: var(--rule-strong);
+}
+.tp-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 4px;
+}
+.tp-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 340px;
+  grid-template-areas: 'main side';
+  gap: 20px;
+  align-items: start;
+}
+.tp-main {
+  grid-area: main;
+  display: grid;
+  gap: 20px;
+  min-width: 0;
+}
+.tp-side {
+  grid-area: side;
+  display: grid;
+  gap: 16px;
+  position: sticky;
+  top: 16px;
+}
+.tp-side > .danger {
+  justify-self: start;
+  color: var(--stamp);
+}
+.tp-card {
+  background: var(--paper);
+  border: 1px solid var(--rule);
+  border-radius: 6px;
+  padding: 18px 20px;
+  min-width: 0;
+}
+.tp-card > h2 {
+  font-size: 16px;
+  font-weight: 700;
+  font-stretch: 100%;
+  text-transform: none;
+  letter-spacing: 0;
+  margin: 0 0 12px;
+  color: var(--ink);
+}
+.tp-card .detail-description {
+  font-size: 16px;
+  line-height: 1.6;
+  margin: 0;
+  white-space: pre-wrap;
+}
+.tp-card.ticket-controls {
+  display: grid;
+  gap: 14px;
+  margin: 0;
+  background: var(--paper);
+  border: 1px solid var(--rule);
+}
+.tp-card.ticket-controls .ticket-control {
+  min-width: 0;
+}
+.tp-facts,
+.tp-answers {
+  display: grid;
+  gap: 12px;
+  margin: 0;
+}
+.tp-answers {
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  margin-top: 16px;
+  padding-top: 16px;
+  border-top: 1px solid var(--row);
+}
+.tp-facts > div,
+.tp-answers > div {
+  display: grid;
+  gap: 2px;
+}
+.tp-facts dt,
+.tp-answers dt {
+  font-size: 13px;
+  color: var(--ink-3);
+}
+.tp-facts dd,
+.tp-answers dd {
+  margin: 0;
+  font-size: 15px;
+  overflow-wrap: anywhere;
+}
+.tp-facts .overdue {
+  color: var(--stamp);
+  font-weight: 650;
+}
+.tp-card .history-list {
+  margin: 0;
+}
+.tp-card #comment-form {
+  margin-top: 14px;
+}
+.tp-card.reservation {
+  border-style: solid;
+}
+@media (max-width: 1000px) {
+  .tp-grid {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-areas: 'side' 'main';
+  }
+  .tp-side {
+    position: static;
+  }
+}
+@media (max-width: 760px) {
+  .tp-title h1 {
+    font-size: 22px;
+  }
+  .tp-actions > button {
+    flex: 1 1 auto;
+  }
+  .tp-card {
+    padding: 16px;
   }
 }
