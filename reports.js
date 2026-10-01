@@ -79,10 +79,28 @@ export async function buildReport(db, user, timezone, {from, to}) {
       totalCostCents: rows.reduce((s, r) => s + n(r.cost), 0),
     };
   }
+  // Labor: time logged on visible tickets, by when the time was logged.
+  const laborFrom =
+    'FROM time_entries t JOIN users tu ON tu.id=t.user_id JOIN work_orders w ON w.id=t.order_id JOIN buildings b ON b.id=w.building_id LEFT JOIN assets a ON a.id=w.asset_id LEFT JOIN users u ON u.id=w.assignee_id LEFT JOIN spaces s ON s.id=w.space_id';
+  const laborWhere = and(all, `t.ended_at>=$${all.values.length + 1} AND t.ended_at<$${all.values.length + 2}`);
+  const laborGroup = async (key, label) =>
+    (
+      await db.query(
+        `SELECT ${key} AS key, ${label} AS label, SUM(t.minutes) AS minutes ${laborFrom} ${laborWhere} GROUP BY ${key}, ${label} ORDER BY minutes DESC`,
+        [...all.values, startUtc, endUtc],
+      )
+    ).map(r => ({key: r.key, label: r.label, minutes: n(r.minutes)}));
+  const laborByPerson = await laborGroup('t.user_id', 'tu.name');
+  const labor = {
+    totalMinutes: laborByPerson.reduce((sum, r) => sum + r.minutes, 0),
+    byPerson: laborByPerson,
+    byBuilding: await laborGroup('w.building_id', 'b.name'),
+  };
   return {
     from,
     to,
     timezone,
+    labor,
     created: n(created.count),
     completed: n(completed.count),
     averageHoursToComplete: completed.avg_hours == null ? null : Math.round(Number(completed.avg_hours) * 10) / 10,
@@ -115,7 +133,8 @@ export function setupReports(app, db, env) {
   app.get('/api/reports/orders.csv', exportCsv, async (req, res) => {
     const {orders} = await listOrders(db, req.user, req.query, timezone, {limit: 100000, offset: 0});
     // Custom answers export as one "Question: answer" cell per request.
-    const answers = new Map();
+    const answers = new Map(),
+      labor = new Map();
     for (let i = 0; i < orders.length; i += 500) {
       const ids = orders.slice(i, i + 500).map(o => o.id);
       if (!ids.length) continue;
@@ -124,6 +143,11 @@ export function setupReports(app, db, env) {
         ids,
       );
       for (const r of rows) answers.set(r.order_id, [...(answers.get(r.order_id) || []), `${r.label}: ${r.value}`]);
+      for (const r of await db.query(
+        `SELECT order_id, SUM(minutes) AS minutes FROM time_entries WHERE order_id IN (${ids.map((_, n) => '$' + (n + 1)).join(',')}) GROUP BY order_id`,
+        ids,
+      ))
+        labor.set(r.order_id, n(r.minutes));
     }
     res
       .attachment(`requests-${stamp()}.csv`)
@@ -151,6 +175,7 @@ export function setupReports(app, db, env) {
             'Completed',
             'Description',
             'Answers',
+            'Labor minutes',
           ],
           orders.map(o => [
             ticketLabel(o.number),
@@ -173,6 +198,7 @@ export function setupReports(app, db, env) {
             o.completed_at,
             o.description,
             (answers.get(o.id) || []).join('; '),
+            labor.get(o.id) || 0,
           ]),
         ),
       );

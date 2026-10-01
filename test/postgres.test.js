@@ -369,3 +369,63 @@ assignment:
     }
   },
 );
+
+test(
+  'PostgreSQL runs similar tickets, followers, checklists, time, labor and escalation SQL',
+  {skip: !process.env.TEST_DATABASE_URL},
+  async () => {
+    const db = await openDatabase(process.env.TEST_DATABASE_URL);
+    const {app, live} = await createApp(
+      {AUTH_MODE: 'demo', SEED_DEMO: 'true', SESSION_SECRET: 'postgres-integration-test-secret', LOG_LEVEL: 'silent'},
+      db,
+    );
+    const server = app.listen(0, '127.0.0.1');
+    await new Promise(resolve => server.once('listening', resolve));
+    const base = `http://127.0.0.1:${server.address().port}`;
+    let cookie = '',
+      csrf = '';
+    const call = async (path, method = 'GET', body) => {
+      const response = await fetch(base + path, {
+        method,
+        redirect: 'manual',
+        headers: {cookie, 'x-csrf-token': csrf, 'Content-Type': 'application/json'},
+        body: body === undefined ? undefined : JSON.stringify(body),
+      });
+      if (response.headers.get('set-cookie')) cookie = response.headers.get('set-cookie').split(';')[0];
+      const type = response.headers.get('content-type') || '';
+      return {status: response.status, body: type.includes('json') ? await response.json() : await response.text()};
+    };
+    try {
+      await call('/auth/login');
+      csrf = (await call('/api/me')).body.csrf;
+      const marker = 'pgt' + Date.now();
+      const id = (await call('/api/orders', 'POST', {title: `${marker} boiler pressure low`, building_id: 'b1'})).body
+        .id;
+      const similar = (await call(`/api/orders-similar?building_id=b1&title=${marker}%20boiler%20pressure`)).body;
+      assert.ok(similar.some(s => s.id === id));
+      assert.equal((await call(`/api/orders/${id}/follow`, 'POST', {})).status, 200);
+      assert.ok((await call(`/api/orders?q=${marker}`)).body.total >= 1);
+      assert.equal((await call(`/api/orders/${id}/checklist`, 'POST', {label: 'Check gauge'})).status, 201);
+      assert.equal((await call(`/api/orders/${id}/time`, 'POST', {minutes: 15})).status, 201);
+      assert.equal((await call(`/api/orders/${id}/time/start`, 'POST')).status, 201);
+      assert.equal((await call('/api/time/stop', 'POST', {})).status, 200);
+      const report = (await call('/api/reports/summary')).body;
+      assert.ok(report.labor.totalMinutes >= 15);
+      assert.equal((await call('/api/reports/orders.csv')).status, 200);
+      const {slaSweep} = await import('../ticket-tools.js');
+      const {notify} = await import('../requests.js');
+      await db.query("UPDATE work_orders SET due_date='2020-01-01' WHERE id=$1", [id]);
+      const swept = await slaSweep(db, {notify, timezone: 'America/Phoenix'});
+      assert.ok(swept.escalated >= 1);
+      assert.equal(
+        (await call('/api/views', 'POST', {name: marker, page: 'orders', state: {filter: 'Open'}})).status,
+        201,
+      );
+    } finally {
+      live.close();
+      server.closeAllConnections?.();
+      await new Promise(resolve => server.close(resolve));
+      await db.close();
+    }
+  },
+);

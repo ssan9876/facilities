@@ -234,6 +234,43 @@ export const migrations = [
       await q('CREATE INDEX IF NOT EXISTS saved_views_user ON saved_views(user_id)');
     },
   },
+  {
+    id: 14,
+    name: 'ticket-tools',
+    async up(q, dialect) {
+      // Followers (me too, mentions, by hand) see the ticket and hear about it.
+      await q(
+        'CREATE TABLE IF NOT EXISTS order_followers (order_id TEXT NOT NULL REFERENCES work_orders(id), user_id TEXT NOT NULL REFERENCES users(id), source TEXT NOT NULL, created_at TEXT NOT NULL, PRIMARY KEY(order_id, user_id))',
+      );
+      await q('CREATE INDEX IF NOT EXISTS order_followers_user ON order_followers(user_id)');
+      // Checklists on tickets, and reusable templates applied by category or maintenance plan.
+      await q(
+        'CREATE TABLE IF NOT EXISTS checklist_templates (id TEXT PRIMARY KEY, name TEXT NOT NULL, request_type TEXT, category_id TEXT REFERENCES categories(id), items TEXT NOT NULL, created_at TEXT NOT NULL)',
+      );
+      await q(
+        'CREATE TABLE IF NOT EXISTS checklist_items (id TEXT PRIMARY KEY, order_id TEXT NOT NULL REFERENCES work_orders(id), label TEXT NOT NULL, sort INTEGER NOT NULL, done_by TEXT REFERENCES users(id), done_at TEXT, created_at TEXT NOT NULL)',
+      );
+      await q('CREATE INDEX IF NOT EXISTS checklist_items_order ON checklist_items(order_id)');
+      await addColumns(q, dialect, 'maintenance', [
+        ['checklist_template_id', 'TEXT REFERENCES checklist_templates(id)'],
+      ]);
+      // Saved replies: shared (user_id NULL, managed by administrators) or personal.
+      await q(
+        'CREATE TABLE IF NOT EXISTS saved_replies (id TEXT PRIMARY KEY, user_id TEXT REFERENCES users(id), title TEXT NOT NULL, body TEXT NOT NULL, created_at TEXT NOT NULL)',
+      );
+      // Time on tickets: a running timer has no ended_at.
+      await q(
+        'CREATE TABLE IF NOT EXISTS time_entries (id TEXT PRIMARY KEY, order_id TEXT NOT NULL REFERENCES work_orders(id), user_id TEXT NOT NULL REFERENCES users(id), started_at TEXT NOT NULL, ended_at TEXT, minutes INTEGER, note TEXT NOT NULL, created_at TEXT NOT NULL)',
+      );
+      await q('CREATE INDEX IF NOT EXISTS time_entries_order ON time_entries(order_id)');
+      await q('CREATE INDEX IF NOT EXISTS time_entries_user ON time_entries(user_id, ended_at)');
+      // Due-date targets: when a ticket was warned as due and escalated as overdue.
+      await addColumns(q, dialect, 'work_orders', [
+        ['sla_warned_at', 'TEXT'],
+        ['sla_breached_at', 'TEXT'],
+      ]);
+    },
+  },
 ];
 
 export async function migrate(db, list = migrations) {

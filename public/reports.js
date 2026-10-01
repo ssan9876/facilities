@@ -1,3 +1,4 @@
+import {minutes} from './ticket-extras.js';
 import {requestTypes} from './request-settings.js';
 import {state, $, escape, icon, money, today, addDays, api, heading, fmt} from './ui.js';
 import {hooks} from './hooks.js';
@@ -31,6 +32,13 @@ export function reportsPage() {
       : '') +
     (parts
       ? `<section class="panel"><h2>Parts used</h2>${parts.items.length ? `<div class="table-wrap"><table><thead><tr><th>Part</th><th>Quantity</th><th>Cost</th></tr></thead><tbody>${parts.items.map(p => `<tr><td>${escape(p.name)}<div class="order-sub">${escape(p.sku) || 'No SKU'}</div></td><td>${p.quantity}</td><td>${money(p.costCents)}</td></tr>`).join('')}</tbody></table></div><div class="table-footer">Total ${money(parts.totalCostCents)}</div>` : '<div class="empty">No parts recorded in this period.</div>'}</section>`
+      : '') +
+    (r.labor
+      ? `<section class="panel"><h2>Labor</h2>${
+          r.labor.totalMinutes
+            ? `<div class="settings-list"><div><strong>Time logged</strong><span>${minutes(r.labor.totalMinutes)}</span></div></div><div class="table-wrap"><table><thead><tr><th>Person</th><th>Time</th></tr></thead><tbody>${r.labor.byPerson.map(x => `<tr><td>${escape(x.label)}</td><td>${minutes(x.minutes)}</td></tr>`).join('')}</tbody></table></div><div class="table-wrap"><table><thead><tr><th>Building</th><th>Time</th></tr></thead><tbody>${r.labor.byBuilding.map(x => `<tr><td>${escape(x.label)}</td><td>${minutes(x.minutes)}</td></tr>`).join('')}</tbody></table></div>`
+            : '<div class="empty">No time logged in this period. Technicians log time from the ticket.</div>'
+        }</section>`
       : '') +
     `</div>` +
     exports

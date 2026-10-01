@@ -2,6 +2,7 @@ import {randomUUID} from 'node:crypto';
 import {statuses, priorities, error, text, date, localTime, likePattern} from './validation.js';
 import {can, canOn, canSubmit, requireCap, scopeSql, usersWith} from './permissions.js';
 import {autoAssign} from './access.js';
+import {orderExtras, followerIds, addFollower, applyTemplates, targetDue, isFollower, canWork} from './ticket-tools.js';
 import {dateInTimezone, startOfDayUtc, addDays} from './dates.js';
 import {moduleSettings, requireModule, notify} from './requests.js';
 import {audit, auditQuery, changes} from './audit.js';
@@ -51,7 +52,14 @@ export function orderFilter(user, modules, params, timezone) {
   else add(`w.request_type IN (${enabled.map(() => '?').join(',')})`, ...enabled);
   // Everyone sees their own requests; "see every request" covers the request types and buildings in scope.
   const visible = scopeSql(user, 'requests.view_all');
-  if (visible.sql !== '1=1') add(`(w.requester_id=? OR ${visible.sql})`, user.id, ...visible.values);
+  if (visible.sql !== '1=1')
+    add(
+      `(w.requester_id=? OR w.assignee_id=? OR w.id IN (SELECT order_id FROM order_followers WHERE user_id=?) OR ${visible.sql})`,
+      user.id,
+      user.id,
+      user.id,
+      ...visible.values,
+    );
   // List filters accept one value or a comma-separated list ("High,Urgent").
   const list = (value, allowed, label) => {
     const items = String(value)
@@ -218,7 +226,15 @@ export function setupOrders(app, db, env) {
   };
   const accessibleOrder = async (req, id = req.params.id) => {
     const order = (await q('SELECT * FROM work_orders WHERE id=$1', [id]))[0];
-    if (!order || (!canOn(req.user, 'requests.view_all', order) && order.requester_id !== req.user.id))
+    if (
+      !order ||
+      !(
+        order.requester_id === req.user.id ||
+        order.assignee_id === req.user.id ||
+        canOn(req.user, 'requests.view_all', order) ||
+        (await isFollower(db, order.id, req.user.id))
+      )
+    )
       throw error('Work order not found.', 404);
     await requireModule(db, order.request_type);
     return order;
@@ -316,12 +332,22 @@ export function setupOrders(app, db, env) {
       record_parts:
         canOn(req.user, 'parts.record_any', order) || (mine && canOn(req.user, 'requests.update_assigned', order)),
       approve: canOn(req.user, 'reservations.approve', order),
-      take: !order.assignee_id && canOn(req.user, 'requests.assignable', order),
+      take: !order.assignee_id && order.status !== 'Completed' && canOn(req.user, 'requests.assignable', order),
+      work: canWork(req.user, order),
+      mention: canOn(req.user, 'requests.view_all', order) || canWork(req.user, order),
     };
     const assignable = permissions.assign
       ? (await usersWith(db, 'requests.assignable', order)).map(u => ({id: u.id, name: u.name}))
       : undefined;
-    res.json({...order, attachments, parts, answers: await answersFor(db, order.id), permissions, assignable});
+    res.json({
+      ...order,
+      attachments,
+      parts,
+      answers: await answersFor(db, order.id),
+      permissions,
+      assignable,
+      ...(await orderExtras(db, order, req.user)),
+    });
   });
 
   app.post('/api/orders', async (req, res) => {
@@ -339,7 +365,9 @@ export function setupOrders(app, db, env) {
     let starts = null,
       ends = null;
     if (requestType === 'schedule') [starts, ends] = schedule(body);
-    const due = date(requestType === 'schedule' ? starts.slice(0, 10) : body.due_date);
+    const due = date(
+      requestType === 'schedule' ? starts.slice(0, 10) : body.due_date || (await targetDue(db, priority, timezone)),
+    );
     const space = requestType === 'schedule' ? text(body, 'space_id', 200, true) || null : null;
     const id = randomUUID();
     const reservation = await db.transaction(async tx => {
@@ -368,6 +396,7 @@ export function setupOrders(app, db, env) {
       );
       await assignTicketNumber(tx, id);
       await saveAnswers(tx, id, form.answers);
+      await applyTemplates(tx, {id, request_type: requestType, category_id: form.category_id});
       await audit(
         tx,
         req.user,
@@ -539,6 +568,9 @@ export function setupOrders(app, db, env) {
         ],
       );
       if (form?.replaceAnswers) await saveAnswers(tx, row.id, form.answers);
+      // A new due date, or a reopened ticket, is watched again by the due-date escalation.
+      if (next.due_date !== row.due_date || (row.status === 'Completed' && status !== 'Completed'))
+        await tx.query('UPDATE work_orders SET sla_warned_at=NULL,sla_breached_at=NULL WHERE id=$1', [row.id]);
       if (resolution)
         await tx.query('INSERT INTO comments(id,work_order_id,user_id,body,created_at) VALUES($1,$2,$3,$4,$5)', [
           randomUUID(),
@@ -568,7 +600,7 @@ export function setupOrders(app, db, env) {
         db,
         row,
         'status',
-        [row.requester_id, assignee],
+        [row.requester_id, assignee, ...(await followerIds(db, row.id))],
         req.user.id,
         resolving ? `${req.user.name} resolved this request.` : `${req.user.name} changed the status to ${status}.`,
       );
@@ -642,11 +674,23 @@ export function setupOrders(app, db, env) {
       new Date().toISOString(),
     ]);
     await audit(db, req.user, 'comment.create', 'work_order', row.id, 'Added a comment');
+    // @mentions: people who work the ticket can bring others in; they follow it from now on.
+    const mentioned = [];
+    if (Array.isArray(req.body.mentions) && (canOn(req.user, 'requests.view_all', row) || canWork(req.user, row)))
+      for (const userId of [...new Set(req.body.mentions)].slice(0, 20)) {
+        if (typeof userId !== 'string' || userId === req.user.id) continue;
+        const person = (await q('SELECT id FROM users WHERE id=$1 AND active=1', [userId]))[0];
+        if (!person) continue;
+        await addFollower(db, row.id, userId, 'mention');
+        mentioned.push(userId);
+      }
+    if (mentioned.length)
+      await notify(db, row, 'mention', mentioned, req.user.id, `${req.user.name} mentioned you in a comment.`);
     await notify(
       db,
       row,
       'comment',
-      [row.requester_id, row.assignee_id],
+      [row.requester_id, row.assignee_id, ...(await followerIds(db, row.id))].filter(u => !mentioned.includes(u)),
       req.user.id,
       `${req.user.name} added a comment.`,
     );

@@ -166,6 +166,13 @@ const kinds = {
       field('Repeat every (days)', 'interval_days', 'number', r.interval_days ?? 30, false, 'min="1" max="3650"') +
       locationFields(r.building_id, r.asset_id || '') +
       field(r.id ? 'Next due date' : 'First due date', 'next_due', 'date', r.next_due || today()) +
+      select(
+        'Checklist for each request',
+        'checklist_template_id',
+        [['', 'None (or the maintenance default)'], ...(state.checklistTemplates || []).map(t => [t.id, t.name])],
+        r.checklist_template_id || '',
+        false,
+      ) +
       checkbox('Plan is active (generates requests)', 'active', r.id ? Number(r.active) : true),
   },
   space: {
@@ -187,6 +194,16 @@ const kinds = {
 };
 
 export function recordEditor(kind, id) {
+  // Plans offer the checklist templates; load them once before opening the sheet.
+  if (kind === 'maintenance' && !state.checklistTemplates) {
+    api('/checklist-templates')
+      .catch(() => [])
+      .then(t => {
+        state.checklistTemplates = t;
+        recordEditor(kind, id);
+      });
+    return;
+  }
   const k = kinds[kind];
   if (kind !== 'building' && !activeBuildings().length) {
     toast('Add a building first.');

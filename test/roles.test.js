@@ -83,7 +83,7 @@ test('custom roles grant exactly their capabilities', async () => {
       200,
     );
     await as(person.id);
-    assert.equal((await call('/api/orders')).body.total, 0);
+    assert.equal((await call('/api/orders')).body.total, 1, 'only the ticket assigned to them');
     assert.equal((await call('/api/parts')).status, 403);
     await as('demo-admin');
     await call('/api/orders', 'POST', {title: 'Spill in hallway', building_id: 'b1', due_date: '2026-10-05'});

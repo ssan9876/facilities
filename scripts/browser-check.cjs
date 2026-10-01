@@ -99,6 +99,27 @@ const assert = require('node:assert/strict');
   await page.getByLabel('Add a comment').fill('Browser verification completed.');
   await page.getByRole('button', {name: 'Post comment', exact: true}).click();
   await page.getByText('Browser verification completed.', {exact: true}).waitFor();
+  // Checklist, time and saved replies on the ticket.
+  await page.locator('#checklist-new').fill('Check the shut-off valve');
+  await page.locator('#checklist-form').getByRole('button', {name: 'Add', exact: true}).click();
+  await page.getByLabel('Check the shut-off valve', {exact: true}).check();
+  await page.getByText('1 of 1 done', {exact: true}).waitFor();
+  await page.getByRole('button', {name: 'Start timer', exact: true}).click();
+  await page.locator('.timer-badge').waitFor();
+  await page.screenshot({path: '.impeccable/review/ticket-tools-desktop.png', fullPage: true});
+  await page.locator('.time-card [data-timer-stop]').click();
+  await page.getByText(/Timer stopped: \d+ min logged\./).waitFor();
+  assert.equal(await page.locator('.timer-badge').count(), 0);
+  await page.getByRole('button', {name: 'Log time', exact: true}).click();
+  await page.locator('#time-form').getByLabel('Minutes').fill('20');
+  await page.locator('#time-form').getByRole('button', {name: 'Log time'}).click();
+  await page.getByText('20 min logged.', {exact: true}).waitFor();
+  await page.getByLabel('Add a comment').fill('We are on our way.');
+  await page.getByRole('button', {name: 'Save as reply', exact: true}).click();
+  await page.locator('#reply-form').getByLabel('Reply name').fill('On our way');
+  await page.locator('#reply-form').getByRole('button', {name: 'Save reply'}).click();
+  await page.getByText('Reply “On our way” saved.', {exact: true}).waitFor();
+  assert.equal(await page.locator('#insert-reply option', {hasText: 'On our way'}).count(), 1);
   await page.getByRole('button', {name: 'Back', exact: true}).click();
   for (const name of ['Assets', 'Buildings', 'Preventive maintenance', 'Settings', 'Overview']) {
     await page.getByRole('button', {name, exact: true}).click();
@@ -189,6 +210,14 @@ const assert = require('node:assert/strict');
   await page.getByRole('heading', {name: 'All requests', exact: true}).waitFor();
   assert.equal(await page.locator('[data-filter="Open"]').getAttribute('class'), 'selected', 'links reopen the list');
   await page.screenshot({path: '.impeccable/review/views-desktop.png'});
+  // Already reported? Similar open tickets in the same building appear while writing a request.
+  await page.getByRole('button', {name: 'New request', exact: true}).click();
+  await page.locator('#create-form [name=building_id]').selectOption('b1');
+  await page.locator('#create-form').getByLabel('What do you need?').fill('Air conditioning not cooling');
+  await page.locator('#similar').getByText('Already reported?').waitFor();
+  await page.screenshot({path: '.impeccable/review/similar-desktop.png'});
+  await page.getByRole('button', {name: 'Close dialog'}).click();
+  await page.evaluate(() => localStorage.removeItem('facilities.draft.new-request'));
   // Command palette and shortcuts.
   await page.keyboard.press('Control+k');
   await page.locator('#palette-input').fill('calend');
@@ -382,6 +411,18 @@ const assert = require('node:assert/strict');
   await page.locator('#rule-form').getByRole('button', {name: 'Create rule'}).click();
   await page.getByRole('cell', {name: 'Community Center plumbing', exact: true}).waitFor();
   await page.screenshot({path: '.impeccable/review/assignment-desktop.png', fullPage: true});
+  // Checklist templates, shared replies and due dates.
+  await page.getByRole('button', {name: 'Checklists & replies', exact: true}).click();
+  await page.locator('[data-new-template]').click();
+  await page.locator('#template-form').getByLabel('Template name').fill('Filter change');
+  await page.locator('#template-form').getByLabel('Steps (one per line)').fill('Power off\nReplace filter\nPower on');
+  await page.locator('#template-form').getByRole('button', {name: 'Create template'}).click();
+  await page.getByRole('cell', {name: 'Filter change', exact: true}).waitFor();
+  await page.screenshot({path: '.impeccable/review/checklists-desktop.png', fullPage: true});
+  await page.getByRole('button', {name: 'Due dates', exact: true}).click();
+  await page.locator('#sla-form').getByLabel('Urgent (days)').fill('0');
+  await page.locator('#sla-form').getByRole('button', {name: 'Save due dates'}).click();
+  await page.getByText('Due dates saved.', {exact: true}).waitFor();
   // Access as code: edit the document in Settings, check it, apply it.
   await page.getByRole('button', {name: 'Access as code', exact: true}).click();
   await page.locator('#access-editor').waitFor();

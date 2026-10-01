@@ -173,7 +173,16 @@ export function setupRecords(app, db, {checkLocation}) {
       interval_days: value('interval_days', () => integer(body.interval_days, 'Interval', 1, 3650)),
       next_due: value('next_due', () => date(body.next_due)),
       active: value('active', () => Number(body.active === undefined ? true : bool(body.active))),
+      checklist_template_id: value(
+        'checklist_template_id',
+        () => text(body, 'checklist_template_id', 200, true) || null,
+      ),
     };
+    if (
+      next.checklist_template_id &&
+      !(await db.query('SELECT id FROM checklist_templates WHERE id=$1', [next.checklist_template_id])).length
+    )
+      throw error('Choose an existing checklist template.');
     if (
       existing &&
       body.building_id !== undefined &&
@@ -190,7 +199,7 @@ export function setupRecords(app, db, {checkLocation}) {
     const next = await planFields(req.body || {}, null),
       id = randomUUID();
     await q(
-      'INSERT INTO maintenance(id,title,building_id,asset_id,interval_days,next_due,created_by,created_at,active) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9)',
+      'INSERT INTO maintenance(id,title,building_id,asset_id,interval_days,next_due,created_by,created_at,active,checklist_template_id) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)',
       [
         id,
         next.title,
@@ -201,6 +210,7 @@ export function setupRecords(app, db, {checkLocation}) {
         req.user.id,
         new Date().toISOString(),
         next.active,
+        next.checklist_template_id,
       ],
     );
     await audit(db, req.user, 'maintenance.create', 'maintenance', id, `Created maintenance plan ${next.title}`);
@@ -211,8 +221,17 @@ export function setupRecords(app, db, {checkLocation}) {
     const existing = await find('maintenance', req.params.id, 'Maintenance plan'),
       next = await planFields(req.body || {}, existing);
     await q(
-      'UPDATE maintenance SET title=$1,building_id=$2,asset_id=$3,interval_days=$4,next_due=$5,active=$6 WHERE id=$7',
-      [next.title, next.building_id, next.asset_id, next.interval_days, next.next_due, next.active, existing.id],
+      'UPDATE maintenance SET title=$1,building_id=$2,asset_id=$3,interval_days=$4,next_due=$5,active=$6,checklist_template_id=$7 WHERE id=$8',
+      [
+        next.title,
+        next.building_id,
+        next.asset_id,
+        next.interval_days,
+        next.next_due,
+        next.active,
+        next.checklist_template_id,
+        existing.id,
+      ],
     );
     const diff = changes(existing, next, ['title', 'building_id', 'asset_id', 'interval_days', 'next_due', 'active']);
     await audit(

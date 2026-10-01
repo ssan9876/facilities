@@ -4441,3 +4441,265 @@ kbd {
     display: none;
   }
 }
+
+/* Ticket tools: checklist, time, followers, replies, mentions */
+.card-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+.card-head h2 {
+  margin: 0;
+}
+.progress-label {
+  font-size: 13px;
+  color: var(--ink-2);
+}
+progress.progress {
+  appearance: none;
+  display: block;
+  width: 100%;
+  height: 6px;
+  border: 0;
+  border-radius: 999px;
+  background: var(--row);
+  overflow: hidden;
+  margin-bottom: 12px;
+}
+progress.progress::-webkit-progress-bar {
+  background: var(--row);
+}
+progress.progress::-webkit-progress-value {
+  background: var(--done);
+  border-radius: 999px;
+}
+progress.progress::-moz-progress-bar {
+  background: var(--done);
+}
+.checklist {
+  list-style: none;
+  margin: 0 0 12px;
+  padding: 0;
+  display: grid;
+}
+.checklist li {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 44px;
+  border-top: 1px solid var(--row);
+}
+.checklist li:first-child {
+  border-top: 0;
+}
+.checklist label {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-size: 15px;
+  cursor: pointer;
+  min-height: 44px;
+}
+.checklist input {
+  width: 20px;
+  height: 20px;
+  accent-color: var(--done);
+  flex-shrink: 0;
+}
+.checklist li.done span {
+  color: var(--ink-3);
+  text-decoration: line-through;
+}
+.checklist small {
+  font-size: 12px;
+  color: var(--ink-3);
+}
+.icon-button {
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  border: 0;
+  background: transparent;
+  color: var(--ink-3);
+  border-radius: var(--radius);
+  cursor: pointer;
+}
+.icon-button:hover {
+  color: var(--stamp);
+  background: var(--stamp-wash);
+}
+.icon-button .icon {
+  width: 15px;
+  height: 15px;
+}
+.checklist-add {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.checklist-add input,
+.checklist-add select {
+  min-height: var(--control);
+  border: 1px solid var(--rule-strong);
+  border-radius: var(--radius);
+  background: var(--paper);
+  color: var(--ink);
+  padding: 0 12px;
+  font: inherit;
+  font-size: 15px;
+}
+.checklist-add input {
+  flex: 1 1 200px;
+}
+.time-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+.time-list {
+  list-style: none;
+  margin: 12px 0 0;
+  padding: 0;
+  font-size: 14px;
+}
+.time-list li {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+  min-height: 36px;
+  border-top: 1px solid var(--row);
+  color: var(--ink-2);
+}
+.time-list strong {
+  color: var(--ink);
+}
+.comment-tools {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 14px;
+  margin-top: 8px;
+}
+.comment-tools select {
+  min-height: var(--control);
+  border: 1px solid var(--rule-strong);
+  border-radius: var(--radius);
+  background: var(--paper);
+  color: var(--ink);
+  padding: 0 10px;
+  font: inherit;
+  font-size: 14px;
+}
+.comment-tools .muted-line {
+  margin: 0;
+  font-size: 13px;
+}
+.mention-list {
+  list-style: none;
+  margin: 4px 0 0;
+  padding: 4px;
+  border: 1px solid var(--rule-strong);
+  border-radius: var(--radius);
+  background: var(--paper);
+  box-shadow: 0 10px 30px -12px rgb(20 24 32 / 0.35);
+  max-width: 320px;
+}
+.mention-list li {
+  padding: 8px 10px;
+  border-radius: var(--radius);
+  cursor: pointer;
+  font-size: 15px;
+}
+.mention-list li.active {
+  background: var(--carbon-wash);
+}
+/* Running timer in the top bar */
+.timer-badge {
+  display: inline-flex;
+  align-items: stretch;
+  border: 1px solid var(--done);
+  border-radius: 999px;
+  overflow: hidden;
+  background: var(--done-wash);
+}
+.timer-badge button {
+  border: 0;
+  background: transparent;
+  color: color-mix(in srgb, var(--done) 80%, var(--deepen));
+  font: inherit;
+  font-size: 13px;
+  font-weight: 650;
+  min-height: 34px;
+  padding: 0 10px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+}
+.timer-badge .timer-stop {
+  border-left: 1px solid var(--done);
+}
+.timer-badge .icon {
+  width: 14px;
+  height: 14px;
+}
+/* Already reported? */
+.similar {
+  border: 1px solid var(--hold);
+  background: color-mix(in srgb, var(--hold) 10%, var(--paper));
+  border-radius: var(--radius);
+  padding: 12px 14px;
+  font-size: 14px;
+}
+.similar ul {
+  list-style: none;
+  margin: 8px 0;
+  padding: 0;
+  display: grid;
+  gap: 8px;
+}
+.similar li {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+}
+.similar li > span {
+  display: grid;
+  gap: 2px;
+}
+.similar small {
+  color: var(--ink-2);
+  font-size: 13px;
+}
+.similar .muted-line {
+  margin: 0;
+  font-size: 13px;
+}
+.sla-grid {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  padding: 0 26px 18px;
+}
+.reply-text {
+  max-width: 480px;
+  white-space: pre-wrap;
+  color: var(--ink-2);
+}
+@media (max-width: 760px) {
+  .sla-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    padding: 0 16px 16px;
+  }
+  .timer-badge span:not([data-running-since]) {
+    display: none;
+  }
+}
+.form-grid > .similar {
+  grid-column: 1 / -1;
+}

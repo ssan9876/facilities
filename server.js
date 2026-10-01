@@ -33,6 +33,7 @@ import {can, loadRoles, usersWith} from './permissions.js';
 import {setupAccess, loadAccessFile, accessStatus, autoAssign} from './access.js';
 import {setupLive} from './live.js';
 import {setupViews} from './views.js';
+import {setupTicketTools, runningTimer, applyTemplates} from './ticket-tools.js';
 
 const today = () => dateInTimezone();
 
@@ -123,6 +124,7 @@ export async function createApp(env = process.env, dbOverride, options = {}) {
   setupHousekeeping(app, db, env);
   setupRequestForms(app, db);
   setupViews(app, db);
+  const tools = setupTicketTools(app, db, env, {accessibleOrder, notify});
   // Reference data and counts. Requests themselves are paged through /api/orders.
   app.get('/api/data', async (req, res) => {
     const modules = await moduleSettings(db);
@@ -160,6 +162,7 @@ export async function createApp(env = process.env, dbOverride, options = {}) {
       preferences: await preferences(db, req.user.id),
       notifications: await visibleNotifications(db, req.user),
       forms: await formConfig(db),
+      timer: await runningTimer(db, req.user.id),
       views: (await q('SELECT * FROM saved_views WHERE user_id=$1 ORDER BY sort,created_at', [req.user.id])).map(v => ({
         ...v,
         state: JSON.parse(v.state),
@@ -203,7 +206,7 @@ export async function createApp(env = process.env, dbOverride, options = {}) {
       request_id: req.id,
     });
   });
-  return {app, db, logger, metrics, email, live};
+  return {app, db, logger, metrics, email, live, tools};
 }
 
 export async function generateMaintenance(db, actor = systemActor) {
@@ -235,6 +238,11 @@ export async function generateMaintenance(db, actor = systemActor) {
     if (inserted.length) {
       count++;
       await assignTicketNumber(db, id);
+      await applyTemplates(
+        db,
+        {id, request_type: 'maintenance', category_id: null},
+        plan.checklist_template_id || null,
+      );
       await audit(
         db,
         actor,

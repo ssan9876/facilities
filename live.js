@@ -67,12 +67,16 @@ export function setupLive(app, db, env, {logger} = {}) {
             id,
           ])
         )[0];
+        const followers = order
+          ? new Set((await db.query('SELECT user_id FROM order_followers WHERE order_id=$1', [id])).map(r => r.user_id))
+          : new Set();
         for (const c of clients) {
           if (echo(tabs, c)) continue;
           if (!order) send(c, 'order', {id, deleted: true});
           else if (
             order.requester_id === c.user.id ||
             order.assignee_id === c.user.id ||
+            followers.has(c.user.id) ||
             canOn(c.user, 'requests.view_all', order)
           )
             send(c, 'order', {id});

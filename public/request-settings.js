@@ -4,6 +4,7 @@ import {auditUI, bindAudit} from './audit.js';
 import {formsUI, bindForms} from './settings-forms.js';
 import {dataUI, bindData} from './settings-data.js';
 import {accessUI, bindAccess} from './access-settings.js';
+import {toolsUI, bindTools} from './settings-tools.js';
 import {appearance, applyAppearance} from './ui.js';
 function updatesUI(state, escape) {
   const release = state.release,
@@ -36,6 +37,8 @@ const sectionCapability = {
   branding: 'admin.settings',
   workspace: 'admin.settings',
   forms: 'admin.forms',
+  checklists: 'admin.forms',
+  due: 'admin.settings',
   people: 'admin.people',
   groups: 'admin.people',
   provisioning: 'admin.people',
@@ -53,6 +56,8 @@ const settingsGroups = [
     [
       ['modules', 'Features'],
       ['forms', 'Request forms'],
+      ['checklists', 'Checklists & replies'],
+      ['due', 'Due dates'],
       ['delivery', 'Notifications'],
       ['branding', 'Identity'],
       ['workspace', 'Workspace'],
@@ -102,6 +107,7 @@ export function settingsUI(state, escape, icon, heading) {
     .join('')}</nav>`;
   let body;
   if (['access', 'assignment'].includes(state.settingsTab)) body = accessUI(state);
+  else if (['checklists', 'due'].includes(state.settingsTab)) body = toolsUI(state);
   else if (isAdminTab(state.settingsTab)) body = adminUI(state, escape);
   else if (state.settingsTab === 'updates') body = updatesUI(state, escape);
   else if (state.settingsTab === 'audit') body = auditUI(state, escape);
@@ -171,7 +177,9 @@ export function notificationsUI(state, escape, icon, heading) {
     email: ['Also send by email', 'Receive the updates you choose above by email as well as in this inbox.'],
     assigned: ['Assignments', 'When a request is assigned to you.'],
     status: ['Status updates', 'Changes to your requests or assigned work.'],
-    comment: ['Comments', 'Conversation on your requests or assigned work.'],
+    comment: ['Comments', 'Conversation on your requests, assigned work, or requests you follow.'],
+    mention: ['Mentions', 'When someone mentions you in a comment.'],
+    due: ['Due and overdue', 'When your work is due today or becomes overdue.'],
   };
   const tabBar = `<div class="settings-tabs"><button data-notification-tab="inbox" class="${state.notificationTab === 'inbox' ? 'selected' : ''}">Inbox</button><button data-notification-tab="preferences" class="${state.notificationTab === 'preferences' ? 'selected' : ''}">Preferences</button></div>`;
   const title = heading('Notifications', 'Stay connected to the requests that need you.');
@@ -218,6 +226,7 @@ export function bindSettings(state, api, refresh, render, toast, openOrder) {
   bindForms(state, render, refresh);
   bindData(state, render);
   bindAccess(state, render);
+  bindTools(state, render);
   document
     .querySelectorAll('.appearance-sheet [name=theme]')
     .forEach(r => (r.onchange = () => applyAppearance({theme: r.value})));
