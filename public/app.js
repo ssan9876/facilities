@@ -8,7 +8,6 @@ import {
   can,
   fmt,
   fmtTime,
-  today,
   overdue,
   ticketNo,
   tag,
@@ -28,6 +27,8 @@ import {
   bindCancel,
   autosave,
   applyAppearance,
+  flushQueue,
+  queuedChanges,
 } from './ui.js';
 import {hooks} from './hooks.js';
 import {orderEditor, ticketPage} from './order.js';
@@ -42,6 +43,7 @@ import {connectLive} from './live.js';
 import {readUrl, syncUrl, viewsNav, viewTools, bindViews, openView} from './views.js';
 import {bindShortcuts} from './keys.js';
 import {timerBadge, bindTimerBadge} from './ticket-extras.js';
+import {assetPage, openScanner} from './field.js';
 
 // Theme and contrast are per device; apply them before the first render.
 applyAppearance();
@@ -55,12 +57,25 @@ const reportLink = (() => {
 })();
 const requesterView = () => !can('requests.view_all');
 const ticketPath = path => path.match(/^\/tickets\/([^/]+)$/)?.[1];
+const assetPath = path => path.match(/^\/assets\/([^/]+)$/)?.[1];
+const detailPage = () => ['ticket', 'asset'].includes(state.page);
 if (ticketPath(location.pathname)) {
   state.page = 'ticket';
   state.ticketRef = decodeURIComponent(ticketPath(location.pathname));
+} else if (assetPath(location.pathname)) {
+  state.page = 'asset';
+  state.assetId = decodeURIComponent(assetPath(location.pathname));
 } else readUrl();
+function openAsset(id) {
+  if (!detailPage()) state.returnPage = {page: state.page, filter: state.filter, search: state.search};
+  state.page = 'asset';
+  state.assetId = String(id);
+  history.pushState({asset: state.assetId}, '', '/assets/' + encodeURIComponent(state.assetId));
+  render();
+  scrollTo(0, 0);
+}
 function openTicket(ref) {
-  if (state.page !== 'ticket') state.returnPage = {page: state.page, filter: state.filter, search: state.search};
+  if (!detailPage()) state.returnPage = {page: state.page, filter: state.filter, search: state.search};
   state.page = 'ticket';
   state.ticketRef = String(ref);
   history.pushState({ticket: state.ticketRef}, '', '/tickets/' + encodeURIComponent(state.ticketRef));
@@ -75,11 +90,15 @@ function leaveTicket() {
   render();
 }
 addEventListener('popstate', () => {
-  const ref = ticketPath(location.pathname);
+  const ref = ticketPath(location.pathname),
+    asset = assetPath(location.pathname);
   if (ref) {
     state.page = 'ticket';
     state.ticketRef = decodeURIComponent(ref);
-  } else if (state.page === 'ticket') Object.assign(state, state.returnPage || {page: 'dashboard'});
+  } else if (asset) {
+    state.page = 'asset';
+    state.assetId = decodeURIComponent(asset);
+  } else if (detailPage()) Object.assign(state, state.returnPage || {page: 'dashboard'});
   if (state.me?.user) render();
 });
 
@@ -184,12 +203,17 @@ function render() {
   if (!d) return;
   const groups = navGroups();
   const navs = groups.flatMap(([, items]) => items);
-  if (state.page !== 'ticket' && !navs.some(n => n[0] === state.page)) {
+  if (!detailPage() && !navs.some(n => n[0] === state.page)) {
     state.page = 'dashboard';
     state.filter = 'All';
     state.search = '';
   }
-  const title = state.page === 'ticket' ? 'Ticket' : navs.find(x => x[0] === state.page)?.[2] || 'Overview';
+  const title =
+    state.page === 'ticket'
+      ? 'Ticket'
+      : state.page === 'asset'
+        ? 'Asset'
+        : navs.find(x => x[0] === state.page)?.[2] || 'Overview';
   const initials = me.user.name
     .split(' ')
     .map(x => x[0])
@@ -210,7 +234,7 @@ function render() {
     ? [['dashboard', 'home', 'Requests']]
     : [['dashboard', 'home', 'Today'], ...(enabledTypes().length ? [['orders', 'work', 'Requests']] : [])];
   $('#app').innerHTML =
-    `<div class="shell"><aside class="rail"><div class="brand"><span class="brand-mark">${icon(me.branding?.icon || 'building')}</span><span class="brand-name">${escape(me.branding?.name || 'Facilities')}<small>${escape(me.organization)}</small></span></div><nav id="workspace-nav" aria-label="Main navigation">${groups.map(([label, items]) => `<section class="nav-group"><h2 class="nav-tab">${label}</h2>${items.map(navButton).join('')}</section>`).join('')}${viewsNav()}</nav><div class="rail-foot"><div class="user-line"><span class="avatar">${escape(initials)}</span><div><strong>${escape(me.user.name)}</strong><small>${escape(me.user.role_name || me.user.role)}</small></div></div><button class="logout" id="logout">Sign out</button></div></aside><main class="workspace"><header class="topbar"><span class="crumb"><span class="brand-mark small">${icon(me.branding?.icon || 'building')}</span><span class="crumb-path">${escape(me.branding?.name || 'Facilities')} <span aria-hidden="true">/</span></span> <strong>${title}</strong></span><form class="top-search" id="top-search-form" role="search"><label class="search">${icon('search')}<input id="top-search" type="search" aria-label="Find a ticket" placeholder="Find a ticket" title="Type a WO number to open it, or words to search" autocomplete="off" enterkeyhint="search"></label><kbd aria-hidden="true">/</kbd></form><div class="top-right">${timerBadge()}<span class="top-date">${new Date().toLocaleDateString(undefined, {weekday: 'long', month: 'long', day: 'numeric'})}</span><button class="notification-button" id="bell" type="button" aria-haspopup="true" aria-controls="notif-pop" aria-expanded="${state.notifOpen ? 'true' : 'false'}" aria-label="Open notifications${unread ? `, ${unread} unread` : ''}">${icon('bell')}${unread ? `<span>${unread}</span>` : ''}</button>${state.notifOpen ? notifPanel() : ''}</div></header><div class="content">${me.mode === 'demo' ? '<div class="notice demo-notice">Demo workspace — these records are illustrative. SSO and an empty database are used in the production deployment.</div>' : ''}${pageContent()}</div></main><div class="dock">${dock.map(([p, i, t]) => `<button data-page="${p}" class="${state.page === p ? 'active' : ''}">${icon(i)}<span>${t}</span></button>`).join('')}${enabledTypes().length ? `<button class="dock-new" data-create="order" aria-label="New request">${icon('plus')}<span>New</span></button>` : ''}<button data-page="notifications" class="${state.page === 'notifications' ? 'active' : ''}">${icon('bell')}<span>Inbox</span>${unread ? `<span class="count">${unread}</span>` : ''}</button><button id="nav-toggle" type="button" aria-controls="workspace-nav" aria-expanded="false">${icon('menu')}<span>Menu</span></button></div></div>`;
+    `<div class="shell"><aside class="rail"><div class="brand"><span class="brand-mark">${icon(me.branding?.icon || 'building')}</span><span class="brand-name">${escape(me.branding?.name || 'Facilities')}<small>${escape(me.organization)}</small></span></div><nav id="workspace-nav" aria-label="Main navigation">${groups.map(([label, items]) => `<section class="nav-group"><h2 class="nav-tab">${label}</h2>${items.map(navButton).join('')}</section>`).join('')}${viewsNav()}</nav><div class="rail-foot"><div class="user-line"><span class="avatar">${escape(initials)}</span><div><strong>${escape(me.user.name)}</strong><small>${escape(me.user.role_name || me.user.role)}</small></div></div><button class="logout" id="logout">Sign out</button></div></aside><main class="workspace"><header class="topbar"><span class="crumb"><span class="brand-mark small">${icon(me.branding?.icon || 'building')}</span><span class="crumb-path">${escape(me.branding?.name || 'Facilities')} <span aria-hidden="true">/</span></span> <strong>${title}</strong></span><form class="top-search" id="top-search-form" role="search"><label class="search">${icon('search')}<input id="top-search" type="search" aria-label="Find a ticket" placeholder="Find a ticket" title="Type a WO number to open it, or words to search" autocomplete="off" enterkeyhint="search"></label><kbd aria-hidden="true">/</kbd></form><div class="top-right">${timerBadge()}<button type="button" class="notification-button" data-scan aria-label="Scan a QR label" title="Scan a QR label">${icon('qr')}</button><span class="top-date">${new Date().toLocaleDateString(undefined, {weekday: 'long', month: 'long', day: 'numeric'})}</span><button class="notification-button" id="bell" type="button" aria-haspopup="true" aria-controls="notif-pop" aria-expanded="${state.notifOpen ? 'true' : 'false'}" aria-label="Open notifications${unread ? `, ${unread} unread` : ''}">${icon('bell')}${unread ? `<span>${unread}</span>` : ''}</button>${state.notifOpen ? notifPanel() : ''}</div></header><div class="content"><div id="offline-bar" class="offline-bar" role="status" hidden></div>${me.mode === 'demo' ? '<div class="notice demo-notice">Demo workspace — these records are illustrative. SSO and an empty database are used in the production deployment.</div>' : ''}${pageContent()}</div></main><div class="dock">${dock.map(([p, i, t]) => `<button data-page="${p}" class="${state.page === p ? 'active' : ''}">${icon(i)}<span>${t}</span></button>`).join('')}${enabledTypes().length ? `<button class="dock-new" data-create="order" aria-label="New request">${icon('plus')}<span>New</span></button>` : ''}<button data-page="notifications" class="${state.page === 'notifications' ? 'active' : ''}">${icon('bell')}<span>Inbox</span>${unread ? `<span class="count">${unread}</span>` : ''}</button><button id="nav-toggle" type="button" aria-controls="workspace-nav" aria-expanded="false">${icon('menu')}<span>Menu</span></button></div></div>`;
   $$('[data-page]').forEach(
     b =>
       (b.onclick = () => {
@@ -221,6 +245,8 @@ function render() {
   bindNotifPanel();
   bindViews(render);
   bindTimerBadge();
+  $$('[data-scan]').forEach(b => (b.onclick = () => openScanner()));
+  updateOfflineBar();
   $$('[data-goto]').forEach(b => (b.onclick = () => go(b.dataset.goto, b.dataset.filter)));
   $$('[data-create]').forEach(
     b =>
@@ -261,6 +287,7 @@ function render() {
   $('#logout').onclick = async () => {
     try {
       await api('/logout', {method: 'POST'});
+      navigator.serviceWorker?.controller?.postMessage('clear-data');
       location.reload();
     } catch (e) {
       toast(e.message);
@@ -279,6 +306,7 @@ function render() {
   labelTables();
   if ($('#quick-form')) bindQuickForm();
   if ($('#ticket-page')) ticketPage(state.ticketRef);
+  if ($('#asset-page')) assetPage(state.assetId);
   bindFilterBar(state.page, () => render());
   if ($('#calendar-root')) bindCalendar();
   if ($('#order-table')) loadOrders(false);
@@ -398,6 +426,8 @@ function pageContent() {
     s = d.summary;
   if (state.page === 'ticket')
     return '<div id="ticket-page" class="ticket-page"><div class="empty">Loading ticket…</div></div>';
+  if (state.page === 'asset')
+    return '<div id="asset-page" class="ticket-page"><div class="empty">Loading asset…</div></div>';
   if (state.page === 'calendar') return calendarPage();
   if (state.page === 'settings') return settingsUI(state, escape, icon, heading);
   if (state.page === 'notifications') return notificationsUI(state, escape, icon, heading);
@@ -866,17 +896,20 @@ async function submitTicket(form, data) {
   const files = form.elements.files ? [...form.elements.files.files] : [];
   delete data.files;
   const body = withAnswers(data, form);
-  if (!body.due_date && body.request_type !== 'schedule' && ruleFor(body.request_type, 'due_date') !== 'hidden')
-    body.due_date = today();
+  if (!body.due_date) delete body.due_date;
   const created = await api('/orders', {method: 'POST', body: JSON.stringify(body)});
   const failed = [];
-  for (const file of files) {
-    try {
-      await upload(created.id, file);
-    } catch (e) {
-      failed.push(`${file.name}: ${e.message}`);
+  // A request saved offline has no number yet, so its photos cannot be attached until it is sent.
+  if (created.queued && files.length)
+    failed.push('Photos need a connection: add them from the ticket once it is sent.');
+  else
+    for (const file of files) {
+      try {
+        await upload(created.id, file);
+      } catch (e) {
+        failed.push(`${file.name}: ${e.message}`);
+      }
     }
-  }
   return {created, failed};
 }
 
@@ -920,9 +953,11 @@ function createOrder(prefill = {}) {
     toast(
       failed.length
         ? `Request created, but ${failed.length} file${failed.length === 1 ? '' : 's'} could not be attached. ${failed[0]}`
-        : created.reservation_status === 'pending'
-          ? 'Request created. The space reservation is awaiting approval.'
-          : 'Saved to your workspace.',
+        : created.queued
+          ? 'Saved on this device. The request is sent when you are back online.'
+          : created.reservation_status === 'pending'
+            ? 'Request created. The space reservation is awaiting approval.'
+            : 'Saved to your workspace.',
     );
   });
 }
@@ -1056,12 +1091,24 @@ function startLive() {
       } catch {
         /* reload below */
       }
+      sendQueued();
       liveRefresh(0);
     },
   });
 }
 hooks.startLive = startLive;
 hooks.go = go;
+hooks.openAsset = openAsset;
+hooks.scan = () => openScanner();
+hooks.reportProblem = ({building, asset = '', space = ''}) => {
+  const b = state.data.buildings.find(x => x.id === building && !x.archived_at);
+  if (!b) return toast('That label points to a place that no longer exists. Choose the location yourself.');
+  createOrder({
+    building: b.id,
+    asset: state.data.assets.some(a => a.id === asset && a.building_id === b.id) ? asset : '',
+    space: state.data.spaces.some(x => x.id === space && x.building_id === b.id) ? space : '',
+  });
+};
 hooks.navItems = () => navGroups().flatMap(([, items]) => items);
 hooks.openView = id => openView(id, render);
 hooks.createOrder = () => createOrder();
@@ -1073,6 +1120,44 @@ hooks.searchRequests = q => {
   render();
 };
 bindShortcuts();
+
+async function updateOfflineBar() {
+  const bar = $('#offline-bar');
+  if (!bar) return;
+  const waiting = (await queuedChanges()).length;
+  const offline = !navigator.onLine;
+  bar.hidden = !offline && !waiting;
+  bar.textContent = offline
+    ? `You are offline. Changes are saved on this device${waiting ? ` (${waiting} waiting)` : ''} and sent when you reconnect.`
+    : `${waiting} change${waiting === 1 ? '' : 's'} waiting to send…`;
+}
+async function sendQueued() {
+  const {sent, failed} = await flushQueue();
+  await updateOfflineBar();
+  if (sent || failed.length) {
+    toast(
+      failed.length
+        ? `${sent} offline change${sent === 1 ? '' : 's'} sent. ${failed.length} could not be sent: ${failed[0]}`
+        : `${sent} offline change${sent === 1 ? '' : 's'} sent.`,
+    );
+    liveRefresh(0);
+  }
+}
+addEventListener('online', sendQueued);
+addEventListener('offline', updateOfflineBar);
+addEventListener('offline-queue', updateOfflineBar);
+if ('serviceWorker' in navigator && location.protocol !== 'file:')
+  navigator.serviceWorker.register('/sw.js').catch(() => {});
+if (state.me?.user) {
+  sendQueued();
+  // Home-screen shortcuts: /?new=1 opens a new request, /?scan=1 the scanner.
+  const params = new URLSearchParams(location.search);
+  if (params.has('new') || params.has('scan')) {
+    history.replaceState(null, '', '/');
+    if (params.has('new')) createOrder();
+    else openScanner();
+  }
+}
 // Boot ran refresh() before this point, so start the stream now (later sign-ins start it from refresh()).
 startLive();
 

@@ -421,6 +421,8 @@ test(
         (await call('/api/views', 'POST', {name: marker, page: 'orders', state: {filter: 'Open'}})).status,
         201,
       );
+      const history = (await call('/api/assets/a2/history')).body;
+      assert.ok(Array.isArray(history.tickets) && 'repeat' in history);
     } finally {
       live.close();
       server.closeAllConnections?.();

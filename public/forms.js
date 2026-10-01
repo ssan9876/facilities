@@ -37,7 +37,11 @@ export function bindLocation(onChange, root = $('#editor')) {
     });
 }
 export function requestTiming(type, order = {}) {
-  if (type !== 'schedule') return field('Due date', 'due_date', 'date', order.due_date || today());
+  // New requests may leave the due date blank: the server sets it from the priority's due-date target.
+  if (type !== 'schedule')
+    return order.due_date
+      ? field('Due date', 'due_date', 'date', order.due_date)
+      : field('Due date (optional: blank uses the priority’s target)', 'due_date', 'date', '', true);
   const spaces = state.data.spaces.filter(s => !s.archived_at || s.id === order.space_id);
   return `<p class="form-context">Event times · ${escape(state.me.timezone)}</p><div class="form-grid">${field('Starts', 'starts_at', 'datetime-local', order.starts_at || today() + 'T09:00')}${field('Ends', 'ends_at', 'datetime-local', order.ends_at || today() + 'T10:00')}${spaces.length ? select('Space (optional)', 'space_id', [['', 'No space reservation'], ...spaces.map(s => [s.id, s.name + (s.requires_approval ? ' · needs approval' : '')])], order.space_id || '') : ''}<div class="availability" id="availability" aria-live="polite"></div></div>`;
 }

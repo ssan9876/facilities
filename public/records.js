@@ -91,7 +91,7 @@ export function recordsPage(page) {
       )
         .map(
           a =>
-            `<tr><td><strong>${escape(a.name)}</strong>${archivedTag(a)}</td><td>${escape(a.category)}</td><td>${escape(d.buildings.find(b => b.id === a.building_id)?.name)}</td><td>${escape(a.serial) || '—'}</td>${can('records.manage') ? `<td class="row-actions">${editButton('asset', a.id, 'Edit ' + a.name)}</td>` : ''}</tr>`,
+            `<tr><td><button type="button" class="link-button asset-link" data-open-asset="${escape(a.id)}"><strong>${escape(a.name)}</strong></button>${archivedTag(a)}</td><td>${escape(a.category)}</td><td>${escape(d.buildings.find(b => b.id === a.building_id)?.name)}</td><td>${escape(a.serial) || '—'}</td>${can('records.manage') ? `<td class="row-actions">${editButton('asset', a.id, 'Edit ' + a.name)}</td>` : ''}</tr>`,
         )
         .join(
           '',
@@ -110,6 +110,7 @@ export function recordsPage(page) {
 }
 
 export function bindRecords() {
+  $$('[data-open-asset]').forEach(b => (b.onclick = () => hooks.openAsset(b.dataset.openAsset)));
   $$('[data-edit]').forEach(b => (b.onclick = () => recordEditor(b.dataset.edit, b.dataset.id)));
   const toggle = $('#show-archived');
   if (toggle)
