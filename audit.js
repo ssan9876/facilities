@@ -19,6 +19,8 @@ export async function audit(db, actor, action, entityType, entityId, summary, de
       details && Object.keys(details).length ? JSON.stringify(details) : null,
     ],
   );
+  // Every audited change is streamed to open browsers (live.js); db may be a transaction.
+  (db.root || db).live?.changed(entityType, entityId);
 }
 // Field-level before/after values for the audit record; unchanged fields are omitted.
 export function changes(before, after, fields) {

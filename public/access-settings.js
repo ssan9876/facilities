@@ -16,6 +16,7 @@ import {
   formActions,
   bindCancel,
   confirmButton,
+  tabId,
 } from './ui.js';
 import {requestTypes} from './request-settings.js';
 
@@ -139,7 +140,7 @@ export function bindAccess(state, render) {
     const send = async (url, method, body) => {
       const res = await fetch('/api' + url, {
         method,
-        headers: {'Content-Type': 'application/json', 'x-csrf-token': state.me?.csrf || ''},
+        headers: {'Content-Type': 'application/json', 'x-csrf-token': state.me?.csrf || '', 'x-live-client': tabId},
         body: JSON.stringify(body),
       });
       const data = await res.json().catch(() => ({error: 'The server did not answer. Try again.'}));

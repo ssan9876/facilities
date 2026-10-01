@@ -31,6 +31,22 @@ export function dataUI(state) {
 }
 
 export function bindData(state, render) {
+  // Backup progress is streamed (live:backup) instead of polled.
+  if (!state.backupListener) {
+    state.backupListener = true;
+    addEventListener('live:backup', async () => {
+      try {
+        state.backupInfo = await api('/admin/backups');
+      } catch {
+        return;
+      }
+      if (state.backupWatching && !state.backupInfo.pending && state.backupInfo.status?.state !== 'running') {
+        state.backupWatching = false;
+        toast(state.backupInfo.status?.state === 'failed' ? 'The backup failed.' : 'Backup finished.');
+      }
+      if (state.settingsTab === 'data' && state.page === 'settings') render();
+    });
+  }
   const load = async () => {
     [state.backupInfo, state.retention] = await Promise.all([api('/admin/backups'), api('/admin/retention')]);
   };
@@ -51,19 +67,7 @@ export function bindData(state, render) {
         state.backupInfo = await api('/admin/backups', {method: 'POST'});
         toast('Backup started. This page updates when it finishes.');
         render();
-        // Follow the backup until the server reports a result.
-        const timer = setInterval(async () => {
-          try {
-            state.backupInfo = await api('/admin/backups');
-            if (!state.backupInfo.pending && state.backupInfo.status?.state !== 'running') {
-              clearInterval(timer);
-              toast(state.backupInfo.status?.state === 'failed' ? 'The backup failed.' : 'Backup finished.');
-            }
-            if (state.settingsTab === 'data') render();
-          } catch {
-            clearInterval(timer);
-          }
-        }, 4000);
+        state.backupWatching = true;
       } catch (e) {
         toast(e.message);
         now.disabled = false;

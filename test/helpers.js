@@ -5,7 +5,7 @@ import {createApp} from '../server.js';
 // as(userId) switches the same signed session to another user, so role checks are exercised per request.
 export async function startWorkspace(env = {}, options = {}) {
   const db = await openDatabase(null, ':memory:');
-  const {app} = await createApp({AUTH_MODE: 'demo', SEED_DEMO: 'true', LOG_LEVEL: 'silent', ...env}, db, options);
+  const {app, live} = await createApp({AUTH_MODE: 'demo', SEED_DEMO: 'true', LOG_LEVEL: 'silent', ...env}, db, options);
   const server = app.listen(0, '127.0.0.1');
   await new Promise(r => server.once('listening', r));
   const base = `http://127.0.0.1:${server.address().port}`;
@@ -47,6 +47,8 @@ export async function startWorkspace(env = {}, options = {}) {
     ]);
   }
   const close = async () => {
+    live.close();
+    server.closeAllConnections?.();
     await new Promise(r => server.close(r));
     await db.close();
   };

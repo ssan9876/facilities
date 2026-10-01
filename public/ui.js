@@ -87,10 +87,17 @@ const reservationLabels = {
   cancelled: 'Cancelled',
 };
 export const reservationTag = s => (s ? tag('reservation-' + s, reservationLabels[s]) : '');
+// This tab's id: sent with every call and on the live stream, so the server does not echo our own changes.
+export const tabId = crypto.randomUUID?.() || String(Math.random()).slice(2) + Date.now();
 export async function api(url, options = {}) {
   const res = await fetch('/api' + url, {
     ...options,
-    headers: {'Content-Type': 'application/json', 'x-csrf-token': state.me?.csrf || '', ...options.headers},
+    headers: {
+      'Content-Type': 'application/json',
+      'x-csrf-token': state.me?.csrf || '',
+      'x-live-client': tabId,
+      ...options.headers,
+    },
   });
   const data = res.headers.get('content-type')?.includes('json') ? await res.json() : null;
   if (!res.ok)

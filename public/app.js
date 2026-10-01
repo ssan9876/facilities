@@ -36,6 +36,7 @@ import {calendarPage, bindCalendar} from './calendar.js';
 import {recordsPage, bindRecords, recordEditor} from './records.js';
 import {inventoryPage, bindInventory, partEditor} from './inventory.js';
 import {reportsPage, bindReports} from './reports.js';
+import {connectLive} from './live.js';
 
 const enabledTypes = () => Object.keys(requestTypes).filter(key => state.data.modules[key]);
 const pageType = () => (state.page.endsWith('Requests') ? state.page.replace('Requests', '') : null);
@@ -78,8 +79,24 @@ addEventListener('popstate', () => {
 async function refresh() {
   state.me = await api('/me');
   state.data = await api('/data');
+  // Settings data cached by the administration pages is replaced in place (never cleared under an open sheet).
+  if (state.settingsStale) {
+    state.settingsStale = false;
+    if (state.page === 'settings') {
+      const [admin, access] = await Promise.all([
+        state.admin ? api('/admin').catch(() => state.admin) : null,
+        state.accessInfo ? api('/admin/access').catch(() => state.accessInfo) : null,
+      ]);
+      if (admin) state.admin = admin;
+      if (access) state.accessInfo = access;
+    } else {
+      state.admin = null;
+      state.accessInfo = null;
+    }
+  }
   if (state.list) state.list.stale = true;
   render();
+  hooks.startLive?.();
 }
 hooks.refresh = refresh;
 hooks.openTicket = openTicket;
@@ -832,23 +849,107 @@ try {
 }
 window.addEventListener('hashchange', openFromHash);
 
-setInterval(async () => {
-  if (
-    !state.me?.user ||
-    document.hidden ||
-    $('#editor').open ||
-    ['INPUT', 'SELECT', 'TEXTAREA'].includes(document.activeElement?.tagName) ||
-    state.selected?.size ||
-    ['settings', 'notifications', 'reports', 'inventory', 'ticket', 'calendar'].includes(state.page) ||
-    state.list?.rows?.length > pageSize
-  )
-    return;
-  try {
-    await refresh();
-  } catch {
-    /* next poll retries */
+// Live updates: the server streams notifications and changes (public/live.js). Views refresh themselves,
+// but never underneath someone who is typing, has a sheet open, is selecting rows, or has paged far
+// down a long list; the refresh waits until they are done.
+let lastInput = 0;
+for (const type of ['pointerdown', 'keydown', 'wheel', 'touchstart'])
+  addEventListener(type, () => (lastInput = Date.now()), {capture: true, passive: true});
+const busy = () =>
+  Date.now() - lastInput < 1500 ||
+  !!$('.rail.menu-open') ||
+  state.notifOpen ||
+  $('#editor')?.open ||
+  ['INPUT', 'SELECT', 'TEXTAREA'].includes(document.activeElement?.tagName) ||
+  !!state.selected?.size ||
+  !!$('#comment-form textarea')?.value.trim() ||
+  state.list?.rows?.length > pageSize;
+let liveTimer = null;
+function liveRefresh(delay = 250) {
+  clearTimeout(liveTimer);
+  liveTimer = setTimeout(async function attempt() {
+    if (busy() || document.hidden) {
+      liveTimer = setTimeout(attempt, 1500);
+      return;
+    }
+    liveTimer = null;
+    try {
+      await refresh();
+    } catch {
+      /* the next event or reconnect retries */
+    }
+  }, delay);
+}
+// Badges change in place, so a notification never redraws the page someone is working in.
+function updateBadges() {
+  const unread = state.data.notifications.filter(n => !n.read_at).length;
+  const bell = $('#bell');
+  if (bell) {
+    bell.querySelector(':scope > span')?.remove();
+    if (unread) bell.insertAdjacentHTML('beforeend', `<span>${unread}</span>`);
+    bell.setAttribute('aria-label', `Open notifications${unread ? `, ${unread} unread` : ''}`);
   }
-}, 30000);
+  $$('[data-page="notifications"]').forEach(b => {
+    b.querySelector('.count')?.remove();
+    if (unread) b.insertAdjacentHTML('beforeend', `<span class="count">${unread}</span>`);
+  });
+}
+async function liveNotifications(data) {
+  try {
+    state.data.notifications = await api('/notifications');
+  } catch {
+    return;
+  }
+  updateBadges();
+  if (!data.read && data.message) toast(data.message);
+  if ((state.page === 'notifications' || state.notifOpen) && !busy()) render();
+}
+let bootVersion = null;
+function startLive() {
+  if (state.live || !state.me?.user) return;
+  fetch('/health', {cache: 'no-store'})
+    .then(r => r.json())
+    .then(h => (bootVersion = h.version))
+    .catch(() => {});
+  state.live = connectLive({
+    onNotification: liveNotifications,
+    onOrder: data => {
+      if (state.page === 'ticket' && data.id === state.ticketId && data.deleted) {
+        toast('This request was deleted.');
+        leaveTicket();
+      } else if (['ticket', 'dashboard', 'calendar', 'orders'].includes(state.page) || state.page.endsWith('Requests'))
+        liveRefresh();
+      else state.data.summary && liveRefresh(1000);
+    },
+    onData: () => {
+      // Reference data changed: settings pages reload what they show on the next refresh.
+      state.settingsStale = true;
+      liveRefresh();
+    },
+    onDisconnect: () => {
+      state.restarting = true;
+      if (state.page === 'settings' && state.settingsTab === 'updates' && !busy()) render();
+    },
+    // After a drop: a new version means the server was updated; otherwise catch up on missed changes.
+    onReconnect: async () => {
+      state.restarting = false;
+      try {
+        const health = await fetch('/health', {cache: 'no-store'}).then(r => r.json());
+        if (bootVersion && health.version !== bootVersion) {
+          toast(`Updated to ${health.version}. Reloading…`);
+          setTimeout(() => location.reload(), 1200);
+          return;
+        }
+      } catch {
+        /* reload below */
+      }
+      liveRefresh(0);
+    },
+  });
+}
+hooks.startLive = startLive;
+// Boot ran refresh() before this point, so start the stream now (later sign-ins start it from refresh()).
+startLive();
 
 document.addEventListener('keydown', e => {
   // "/" jumps to the ticket finder from anywhere that is not already a text field.
