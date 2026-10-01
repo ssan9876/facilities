@@ -94,7 +94,10 @@ test('request types, admin settings, hidden records and personal notifications',
     assert.equal((await request('technology')).status, 403);
     assert.ok(!(await call('/api/orders')).body.orders.some(o => o.id === tech));
     assert.equal((await call(`/api/orders/${tech}/comments`)).status, 403);
-    assert.equal((await call(`/api/orders/${tech}`, 'PATCH', {status: 'Completed'})).status, 403);
+    assert.equal(
+      (await call(`/api/orders/${tech}`, 'PATCH', {status: 'Completed', resolution: 'Fixed and checked.'})).status,
+      403,
+    );
     assert.equal((await call('/api/settings', 'PATCH', {technology: 'false'})).status, 400);
     assert.equal((await call('/api/settings', 'PATCH', {invented: true})).status, 400);
     await call('/api/settings', 'PATCH', {technology: true});

@@ -70,10 +70,23 @@ const assert = require('node:assert/strict');
   await page.keyboard.press('Escape');
   await page.getByRole('heading', {name: orderTitle, exact: true}).click();
   page.off('response', countPatch);
-  await page.getByLabel('Status', {exact: true}).selectOption('Completed');
-  await page.locator('.control-status').getByText('Saving…').waitFor();
-  await page.screenshot({path: '.impeccable/review/order-control-saving-desktop.png'});
+  assert.equal(
+    await page.locator('#ticket-page [name=status] option[value=Completed]').count(),
+    0,
+    'Completed is reached by Resolve',
+  );
+  assert.equal(await page.getByRole('button', {name: 'Put on hold', exact: true}).count(), 0);
+  await page.getByLabel('Status', {exact: true}).selectOption('On hold');
+  await page.locator('#ticket-page .tp-summary .tag.on-hold').waitFor();
+  // Resolving asks for a note; it cannot be skipped.
+  await page.getByRole('button', {name: 'Resolve', exact: true}).click();
+  await page.locator('#resolve-form').getByRole('button', {name: 'Resolve', exact: true}).click();
+  assert.equal(await page.locator('#editor').isVisible(), true, 'an empty note keeps the form open');
+  await page.getByLabel('Resolution note').fill('Replaced the cartridge and tested the tap.');
+  await page.screenshot({path: '.impeccable/review/resolve-desktop.png'});
+  await page.locator('#resolve-form').getByRole('button', {name: 'Resolve', exact: true}).click();
   await page.locator('#ticket-page .tp-summary .tag.completed').waitFor();
+  await page.getByText('Resolution: Replaced the cartridge and tested the tap.', {exact: true}).waitFor();
   await page.goBack();
   await page.locator('.order-title').first().waitFor();
   await page.goto(ticketUrl);

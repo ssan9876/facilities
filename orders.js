@@ -400,6 +400,11 @@ export function setupOrders(app, db, env) {
       throw error('Your role cannot change the status of this request.', 403);
     const status = body.status ?? row.status;
     if (!statuses.includes(status)) throw error('Choose a valid status.');
+    // Resolving a ticket records how it was resolved; the note is kept as a comment.
+    const resolving = status === 'Completed' && row.status !== 'Completed';
+    const resolution = resolving ? String(body.resolution ?? '').trim() : '';
+    if (resolving && !resolution) throw error('Add a note describing how the request was resolved.');
+    if (resolution.length > 5000) throw error('The resolution note must be 5000 characters or fewer.');
     let assignee = row.assignee_id;
     if ('assignee_id' in body) {
       assignee = body.assignee_id || null;
@@ -504,6 +509,14 @@ export function setupOrders(app, db, env) {
         ],
       );
       if (form?.replaceAnswers) await saveAnswers(tx, row.id, form.answers);
+      if (resolution)
+        await tx.query('INSERT INTO comments(id,work_order_id,user_id,body,created_at) VALUES($1,$2,$3,$4,$5)', [
+          randomUUID(),
+          row.id,
+          req.user.id,
+          `Resolution: ${resolution}`,
+          now,
+        ]);
       const diff = changes(row, next, [...fields, 'category_id']);
       if (Object.keys(diff).length)
         await audit(
@@ -527,7 +540,7 @@ export function setupOrders(app, db, env) {
         'status',
         [row.requester_id, assignee],
         req.user.id,
-        `${req.user.name} changed the status to ${status}.`,
+        resolving ? `${req.user.name} resolved this request.` : `${req.user.name} changed the status to ${status}.`,
       );
     else if (editsDetails)
       await notify(

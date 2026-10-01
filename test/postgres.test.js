@@ -138,7 +138,7 @@ test(
         'wildcards are literal',
       );
       assert.ok((await call('/api/summary')).body.active >= 1);
-      await call('/api/orders/' + created.body.id, 'PATCH', {status: 'Completed'});
+      await call('/api/orders/' + created.body.id, 'PATCH', {status: 'Completed', resolution: 'Fixed and checked.'});
       const report = await call('/api/reports/summary');
       assert.equal(report.status, 200);
       assert.ok(report.body.completed >= 1);

@@ -107,9 +107,23 @@ test('persistent workflows, CSRF, role boundaries and recurring maintenance', as
     });
     assert.equal(created.status, 201);
     const id = created.json.id;
-    assert.equal((await call(`/api/orders/${id}`, 'PATCH', {status: 'Completed'})).status, 200);
+    // Resolving needs a note, which is kept on the ticket as a comment.
+    const noNote = await call(`/api/orders/${id}`, 'PATCH', {status: 'Completed'});
+    assert.equal(noNote.status, 400);
+    assert.match(noNote.json.error, /resolved/);
+    assert.equal((await call(`/api/orders/${id}`, 'PATCH', {status: 'Completed', resolution: '  '})).status, 400);
+    assert.equal(
+      (await call(`/api/orders/${id}`, 'PATCH', {status: 'Completed', resolution: 'Fixed and checked.'})).status,
+      200,
+    );
+    assert.equal((await call(`/api/orders/${id}/comments`)).json[0].body, 'Resolution: Fixed and checked.');
+    assert.equal(
+      (await call(`/api/orders/${id}`, 'PATCH', {status: 'Completed'})).status,
+      200,
+      'an already resolved ticket needs no second note',
+    );
     assert.equal((await call(`/api/orders/${id}/comments`, 'POST', {body: 'Repair complete'})).status, 201);
-    assert.equal((await call(`/api/orders/${id}/comments`)).json[0].body, 'Repair complete');
+    assert.equal((await call(`/api/orders/${id}/comments`)).json[1].body, 'Repair complete');
     assert.equal(
       (
         await call('/api/maintenance', 'POST', {
