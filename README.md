@@ -48,6 +48,8 @@ The inbox shows the most recent 100 notifications eligible for your access. Use 
 
 ## Self hosting
 
+Choose **LAN**, **cloud VM**, or **Cloudflare Tunnel** access using the [hosting guide](deployment/HOSTING.md). All modes remain self hosted and single organization. The guide includes a server-side selector, certificate requirements, SSO callback changes, and a same-host Cloudflare connector for managed public HTTPS.
+
 1. Copy `.env.example` to `.env`. Set `AUTH_MODE=oidc`, `SEED_DEMO=false`, an HTTPS `APP_URL` (no path prefix), your organization name, the OIDC variables, `POSTGRES_PASSWORD`, and a random `SESSION_SECRET` with at least 32 characters. Generate secrets with `node -e "console.log(require('crypto').randomBytes(48).toString('hex'))"`. Use a hexadecimal database password so it works unescaped in the database URL.
 2. Configure your reverse proxy to terminate TLS and forward to `127.0.0.1:3000`. It must **overwrite** `X-Forwarded-Proto` with the actual scheme; do not expose the backend port directly. Production trusts one proxy hop. For a proxy in a container, adjust networking deliberately rather than exposing port 3000 publicly.
 3. Register an OIDC confidential web application at your identity provider with the exact redirect URI `https://your-host/auth/callback`. Use client-secret authentication and authorization code flow. Configure the ID token to contain the `groups` claim if using group-based authorization.

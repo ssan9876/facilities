@@ -4,5 +4,6 @@
 *.yaml text eol=lf
 *.js text eol=lf
 *.cjs text eol=lf
+*.py text eol=lf
 .impeccable/review export-ignore
 test export-ignore

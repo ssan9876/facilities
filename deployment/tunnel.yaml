@@ -1,0 +1,15 @@
+# Independent from the application project so release updates retain the connector.
+services:
+  cloudflared:
+    image: cloudflare/cloudflared:2026.9.3
+    restart: unless-stopped
+    network_mode: host
+    user: "0:0"
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    command: [tunnel, --no-autoupdate, --metrics, "127.0.0.1:49312", run, --token-file, /run/secrets/tunnel_token]
+    secrets: [tunnel_token]
+secrets:
+  tunnel_token:
+    file: ${CLOUDFLARE_TUNNEL_TOKEN_FILE:-/opt/facilities/cloudflare-token}

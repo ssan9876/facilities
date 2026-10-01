@@ -23,6 +23,12 @@ export async function setupAuth(app, db, env) {
   new Intl.DateTimeFormat('en-US',{timeZone:timezone}).format();
   if (env.NODE_ENV === 'production' && appUrl.protocol !== 'https:') throw new Error('Production APP_URL must use HTTPS.');
   if (env.NODE_ENV === 'production' && (!env.OIDC_ISSUER || !env.OIDC_CLIENT_ID || !env.OIDC_CLIENT_SECRET)) throw new Error('Production requires OIDC_ISSUER, OIDC_CLIENT_ID and OIDC_CLIENT_SECRET.');
+  // SSO state cookies and callback URLs must share one canonical browser origin.
+  // The health route is registered before this middleware for loopback probes.
+  if(env.NODE_ENV==='production') app.use((req,res,next)=>{
+    if(req.get('host')?.toLowerCase()!==appUrl.host.toLowerCase()) return res.redirect(308,appUrl.origin+req.originalUrl);
+    next();
+  });
   class Store extends session.Store {
     get(id, cb) { db.query('SELECT body FROM sessions WHERE id=$1 AND expires_at>$2', [id, new Date().toISOString()]).then(rows => cb(null, rows[0] ? JSON.parse(rows[0].body) : null)).catch(cb); }
     set(id, value, cb) { db.query('INSERT INTO sessions(id,body,expires_at) VALUES($1,$2,$3) ON CONFLICT(id) DO UPDATE SET body=$2, expires_at=$3', [id, JSON.stringify(value), new Date(Date.now()+8*3600000).toISOString()]).then(() => cb?.()).catch(cb); }

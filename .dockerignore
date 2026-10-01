@@ -5,6 +5,11 @@ node_modules
 deployment.local
 backups
 *.log
+__pycache__
+*.pyc
+cloudflare-token
+*.pem
+*.key
 data
 test-results
 .npm-cache

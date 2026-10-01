@@ -10,3 +10,8 @@ test-results/
 backups/
 .release.env
 deployment.local/
+__pycache__/
+*.pyc
+cloudflare-token
+*.pem
+*.key

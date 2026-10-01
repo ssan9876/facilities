@@ -8,6 +8,7 @@ services:
       NODE_ENV: production
       AUTH_MODE: oidc
       APP_URL: ${APP_URL:?Set APP_URL to your HTTPS address}
+      HOSTING_MODE: ${HOSTING_MODE:-lan}
       ORG_NAME: ${ORG_NAME:-My Organization}
       ORG_TIMEZONE: ${ORG_TIMEZONE:-America/Phoenix}
       SESSION_SECRET: ${SESSION_SECRET:?Set a random SESSION_SECRET}
