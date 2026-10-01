@@ -74,6 +74,7 @@ export const addDays = (day, n) => {
   return d.toISOString().slice(0, 10);
 };
 export const overdue = o => o.status !== 'Completed' && o.due_date < today();
+export const ticketNo = n => (n ? `WO-${String(n).padStart(4, '0')}` : 'WO-—');
 export const tag = (v, label = v) =>
   `<span class="tag ${String(v).toLowerCase().replaceAll(' ', '-')}"><span class="dot"></span>${escape(label)}</span>`;
 const reservationLabels = {
@@ -112,11 +113,17 @@ export function toast(message) {
 export function heading(title, sub, type, action, extra = '') {
   return `<div class="page-heading"><div><h1>${title}</h1><p>${sub}</p></div><div class="heading-actions">${extra}${type ? `<button class="primary" data-create="${type}">${icon('plus')}${action}</button>` : ''}</div></div>`;
 }
-export function dialog(title, body) {
+// Every editor is a sheet pulled from the pad. Ticket sheets carry their number and a copy band
+// naming whose copy is open: requester (white), technician (canary) or office (pink).
+const copyLabels = {requester: 'Requester copy', technician: 'Technician copy', office: 'Office copy'};
+export function dialog(title, body, {number, copy, kind = 'form'} = {}) {
+  const editor = $('#editor');
+  editor.dataset.kind = kind;
+  editor.dataset.copy = copy || '';
   $('#editor-content').innerHTML =
-    `<div class="editor-head"><h2>${escape(title)}</h2><button class="close" aria-label="Close dialog">${icon('close')}</button></div><div class="editor-body">${body}</div>`;
-  $('#editor .close').onclick = () => $('#editor').close();
-  if (!$('#editor').open) $('#editor').showModal();
+    `<div class="editor-head">${number ? `<span class="ticket-no">${escape(number)}</span>` : ''}<h2>${escape(title)}</h2>${copy ? `<span class="copy-label"><span class="copies" data-copy="${copy}" aria-hidden="true"><i class="c-requester"></i><i class="c-technician"></i><i class="c-office"></i></span>${copyLabels[copy]}</span>` : ''}<button class="close" aria-label="Close dialog">${icon('close')}</button></div><div class="editor-body">${body}</div>`;
+  $('#editor .close').onclick = () => editor.close();
+  if (!editor.open) editor.showModal();
 }
 export const closeDialog = () => $('#editor').close();
 export const field = (label, name, type = 'text', value = '', optional = false, attrs = '') =>
@@ -186,4 +193,22 @@ export const formActions = (submitLabel, extra = '') =>
   `<div class="form-error" role="alert"></div><div class="editor-actions">${extra}<span class="spacer"></span><button type="button" class="secondary" data-cancel>Cancel</button><button class="primary" type="submit">${escape(submitLabel)}</button></div>`;
 export function bindCancel() {
   $$('[data-cancel]').forEach(b => (b.onclick = closeDialog));
+}
+
+// Register tables stack into labelled ruled rows on phones; each cell carries its column name.
+export function labelTables(root = document) {
+  root.querySelectorAll('.table-wrap').forEach(wrap => {
+    if (wrap.closest('#order-table')) return;
+    const table = wrap.querySelector('table');
+    const heads = [...(table?.querySelectorAll('thead th') || [])].map(th =>
+      th.querySelector('.visually-hidden') ? '' : th.textContent.trim(),
+    );
+    if (!heads.length) return;
+    wrap.classList.add('stack-table');
+    table.querySelectorAll('tbody tr').forEach(tr =>
+      [...tr.children].forEach((td, i) => {
+        if (heads[i]) td.dataset.label = heads[i];
+      }),
+    );
+  });
 }

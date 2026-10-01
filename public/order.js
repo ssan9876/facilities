@@ -10,6 +10,7 @@ import {
   fmt,
   fmtTime,
   fmtStamp,
+  ticketNo,
   money,
   bytes,
   tag,
@@ -30,6 +31,36 @@ import {hooks} from './hooks.js';
 import {locationFields, bindLocation, requestTiming, bindTiming} from './forms.js';
 
 const statuses = ['Open', 'In progress', 'On hold', 'Completed'];
+const reducedMotion = () => matchMedia('(prefers-reduced-motion: reduce)').matches;
+// Legal next stages from each stage; Completed tickets can only be reopened.
+const nextStages = {
+  Open: ['In progress', 'On hold', 'Completed'],
+  'In progress': ['On hold', 'Completed'],
+  'On hold': ['In progress', 'Completed'],
+  Completed: ['Open'],
+};
+const pause = ms => new Promise(resolve => setTimeout(resolve, reducedMotion() ? 0 : ms));
+// The ticket is stamped, then filed away into the pad.
+async function stampAndFile(status) {
+  $('#lifecycle-slot').innerHTML = lifecycle(status, true);
+  await pause(560);
+  $('#editor').classList.add('filing');
+  await pause(240);
+  closeDialog();
+  $('#editor').classList.remove('filing');
+}
+const cell = (label, value, cls = '') =>
+  `<div class="cell ${cls}"><span class="cell-label">${label}</span><span class="cell-value">${value}</span></div>`;
+// The fixed-scale lifecycle strip: stages before the current one are filed, the current one carries the stamp.
+export function lifecycle(status, landing = false) {
+  const at = statuses.indexOf(status);
+  return `<ol class="lifecycle" aria-label="Progress: ${escape(status)}">${statuses
+    .map(
+      (stage, i) =>
+        `<li class="${i < at ? 'done' : i === at ? 'current' : ''}"><span class="lc-label">${stage}</span>${i === at ? `<span class="lc-stamp ${stage.toLowerCase().replaceAll(' ', '-')} ${landing ? 'landing' : ''}" aria-hidden="true">${stage}</span>` : ''}</li>`,
+    )
+    .join('')}</ol>`;
+}
 const describeChange = (key, [from, to]) => {
   const label = key.replace(/_id$/, '').replaceAll('_', ' ');
   const value = v => (v == null || v === '' ? '—' : typeof v === 'object' ? JSON.stringify(v) : String(v));
@@ -62,17 +93,54 @@ export async function orderEditor(id) {
     state.data.modules.inventory && staffRole()
       ? `<section class="detail-section"><div class="section-head compact"><h2>Parts used</h2></div>${o.parts.length ? `<table class="mini-table"><tbody>${o.parts.map(p => `<tr><td>${p.quantity} × ${escape(p.name)}<div class="order-sub">${escape(p.sku) || 'No SKU'} · ${escape(p.used_by)}</div></td><td>${money(p.unit_cost_cents == null ? null : p.unit_cost_cents * p.quantity)}</td><td>${canRecordParts ? `<button class="quiet-button" data-return-part="${escape(p.id)}">Return to stock</button>` : ''}</td></tr>`).join('')}</tbody></table>` : '<p class="muted-line">No parts recorded.</p>'}${canRecordParts && activeParts.length ? `<form id="part-form" class="inline-form">${select('Part', 'part_id', [['', 'Choose part'], ...activeParts.map(p => [p.id, `${p.name} (${p.quantity} on hand)`])])}${field('Quantity', 'quantity', 'number', '1', false, 'min="1"')}<button class="secondary" type="submit">Record part</button><div class="form-error" role="alert"></div></form>` : ''}</section>`
       : '';
+  const stampBar = canUpdate
+    ? `<div class="stamp-bar" role="group" aria-label="Stamp this ticket">${nextStages[o.status]
+
+        .map(
+          (stage, i) =>
+            `<button type="button" class="stamp-button ${i === 0 ? 'next' : ''}" data-stamp="${stage}">${stage === 'Open' && o.status === 'Completed' ? 'Reopen' : 'Stamp ' + stage}</button>`,
+        )
+        .join('')}</div>`
+    : '';
   const update = canUpdate
     ? `<form id="update-form"><div class="form-grid">${select(
         'Status',
         'status',
         statuses.map(x => [x, x]),
         o.status,
-      )}${manage() ? select('Assigned to', 'assignee_id', [['', 'Unassigned'], ...state.data.users.filter(u => u.role !== 'requester').map(u => [u.id, u.name])], o.assignee_id || '') : ''}</div><div class="form-error" role="alert"></div><div class="editor-actions"><button class="primary" type="submit">Save changes</button></div></form>`
-    : `<p>Assigned to ${escape(o.assignee) || 'no one yet'}.</p>`;
+      )}${manage() ? select('Assigned to', 'assignee_id', [['', 'Unassigned'], ...state.data.users.filter(u => u.role !== 'requester').map(u => [u.id, u.name])], o.assignee_id || '') : ''}</div><div class="form-error" role="alert"></div><div class="editor-actions"><button class="secondary" type="submit">Save changes</button></div></form>`
+    : '';
+  const copy = me.role === 'requester' ? 'requester' : me.role === 'technician' ? 'technician' : 'office';
+  const fields = [
+    cell(
+      'Type',
+      `<span class="request-kind">${icon(requestTypes[o.request_type].icon)}${requestTypes[o.request_type].label}</span>`,
+    ),
+    cell('Priority', tag(o.priority)),
+    cell('Opened', fmtStamp(o.created_at)),
+    cell('Building', escape(o.building)),
+    cell('Asset', escape(o.asset) || '<span class="unassigned">None</span>'),
+    o.request_type === 'schedule'
+      ? cell(
+          'Space',
+          o.space
+            ? `${escape(o.space)} ${reservationTag(o.reservation_status)}`
+            : '<span class="unassigned">None</span>',
+        )
+      : cell(
+          'Due',
+          `<span class="${o.status !== 'Completed' && o.due_date < new Date().toISOString().slice(0, 10) ? 'overdue' : ''}">${fmt(o.due_date)}</span>`,
+        ),
+    cell('Requested by', escape(o.requester)),
+    cell('Assigned to', escape(o.assignee) || '<span class="unassigned">Unassigned</span>'),
+    o.request_type === 'schedule'
+      ? cell('When', when)
+      : cell('Completed', o.completed_at ? fmtStamp(o.completed_at) : '—'),
+  ].join('');
   dialog(
     o.title,
-    `<div class="detail-meta"><span class="request-kind">${icon(requestTypes[o.request_type].icon)}${requestTypes[o.request_type].label}</span>${tag(o.priority)}${tag(o.status)}<span>${escape(o.building)}${o.asset ? ' · ' + escape(o.asset) : ''}</span><span>${when}</span></div><p class="detail-description">${escape(o.description) || 'No additional details.'}</p><div class="detail-toolbar">${canEditDetails ? `<button class="secondary" id="edit-order">${icon('edit')}Edit details</button>` : ''}<button class="secondary" id="show-history">${icon('history')}Activity</button>${manage() ? '<button class="secondary danger" id="delete-order">Delete request</button>' : ''}</div>${reservation}${update}<div id="history" hidden></div>${attachments}${parts}<div class="section-head"><h2>Conversation</h2></div><div id="comments" aria-live="polite">Loading comments…</div><form id="comment-form">${field('Add a comment', 'body', 'textarea')}<div class="form-error" role="alert"></div><div class="editor-actions"><button class="secondary" type="submit">Post comment</button></div></form>`,
+    `<div id="lifecycle-slot">${lifecycle(o.status)}</div>${stampBar}<div class="ticket-fields">${fields}${cell('Description of work', `<span class="detail-description">${escape(o.description) || 'No additional details.'}</span>`, 'wide')}</div><div class="detail-toolbar">${canEditDetails ? `<button class="secondary" id="edit-order">${icon('edit')}Edit details</button>` : ''}<button class="secondary" id="show-history">${icon('history')}Activity</button>${manage() ? '<button class="secondary danger" id="delete-order">Delete request</button>' : ''}</div>${reservation}${canUpdate ? `<section class="detail-section stamp-forward"><div class="section-head compact"><h2>${manage() ? 'Reassign or correct' : 'Correct the status'}</h2></div>${update}</section>` : `<p class="muted-line">Assigned to ${escape(o.assignee) || 'no one yet'}.</p>`}<div id="history" hidden></div>${attachments}${parts}<section class="detail-section"><div class="section-head compact"><h2>Conversation</h2></div><div id="comments" aria-live="polite">Loading comments…</div><form id="comment-form">${field('Add a comment', 'body', 'textarea')}<div class="form-error" role="alert"></div><div class="editor-actions"><button class="secondary" type="submit">Post comment</button></div></form></section>`,
+    {number: ticketNo(o.number), copy, kind: 'ticket'},
   );
   const reopen = async message => {
     await hooks.refresh();
@@ -82,10 +150,29 @@ export async function orderEditor(id) {
   if (canUpdate)
     bindForm($('#update-form'), async data => {
       await api(`/orders/${encodeURIComponent(id)}`, {method: 'PATCH', body: JSON.stringify(data)});
+      if (data.status !== o.status) await stampAndFile(data.status);
+      else closeDialog();
       await hooks.refresh();
-      closeDialog();
-      toast('Request updated.');
+      toast(data.status !== o.status ? `${ticketNo(o.number)} stamped ${data.status}.` : 'Request updated.');
     });
+  $$('[data-stamp]').forEach(
+    b =>
+      (b.onclick = async () => {
+        $$('[data-stamp]').forEach(x => (x.disabled = true));
+        try {
+          await api(`/orders/${encodeURIComponent(id)}`, {
+            method: 'PATCH',
+            body: JSON.stringify({status: b.dataset.stamp}),
+          });
+          await stampAndFile(b.dataset.stamp);
+          await hooks.refresh();
+          toast(`${ticketNo(o.number)} stamped ${b.dataset.stamp}.`);
+        } catch (e) {
+          toast(e.message);
+          $$('[data-stamp]').forEach(x => (x.disabled = false));
+        }
+      }),
+  );
   if ($('#edit-order')) $('#edit-order').onclick = () => editOrder(o);
   if ($('#delete-order'))
     confirmButton(
@@ -283,7 +370,8 @@ function editOrder(o) {
       'priority',
       ['Low', 'Normal', 'High', 'Urgent'].map(x => [x, x]),
       o.priority,
-    )}${locationFields(o.building_id, o.asset_id || '')}<div class="field full" id="request-timing">${requestTiming(o.request_type, o)}</div>${field('Details', 'description', 'textarea', o.description, true)}</div>${formActions('Save details')}</form>`,
+    )}${locationFields(o.building_id, o.asset_id || '')}<div class="timing" id="request-timing">${requestTiming(o.request_type, o)}</div>${field('Details', 'description', 'textarea', o.description, true)}</div>${formActions('Save details')}</form>`,
+    {number: ticketNo(o.number)},
   );
   bindCancel();
   bindLocation();

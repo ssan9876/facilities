@@ -1,7 +1,7 @@
 import {error, date, manager, staff} from './validation.js';
 import {dateInTimezone, startOfDayUtc, addDays} from './dates.js';
 import {moduleSettings} from './requests.js';
-import {orderFilter, listOrders} from './orders.js';
+import {orderFilter, listOrders, ticketLabel} from './orders.js';
 import {listParts} from './inventory.js';
 import {csv} from './csv.js';
 
@@ -116,6 +116,7 @@ export function setupReports(app, db, env) {
       .send(
         csv(
           [
+            'Ticket',
             'ID',
             'Type',
             'Title',
@@ -135,6 +136,7 @@ export function setupReports(app, db, env) {
             'Description',
           ],
           orders.map(o => [
+            ticketLabel(o.number),
             o.id,
             o.request_type,
             o.title,

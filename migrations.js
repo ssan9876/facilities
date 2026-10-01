@@ -151,6 +151,20 @@ export const migrations = [
       await q('CREATE INDEX IF NOT EXISTS sessions_expiry ON sessions(expires_at)');
     },
   },
+  {
+    id: 9,
+    name: 'ticket-numbers',
+    async up(q, dialect) {
+      // Human-facing sequential ticket numbers (WO-0001), allocated from an atomic counter.
+      await addColumns(q, dialect, 'work_orders', [['number', 'INTEGER']]);
+      await q('CREATE TABLE IF NOT EXISTS counters (id TEXT PRIMARY KEY, value INTEGER NOT NULL)');
+      const rows = await q('SELECT id FROM work_orders WHERE number IS NULL ORDER BY created_at, id');
+      let next = Number((await q('SELECT COALESCE(MAX(number),0) AS n FROM work_orders'))[0].n);
+      for (const row of rows) await q('UPDATE work_orders SET number=$1 WHERE id=$2', [++next, row.id]);
+      await q("INSERT INTO counters(id,value) VALUES('work_order',$1) ON CONFLICT(id) DO UPDATE SET value=$1", [next]);
+      await q('CREATE UNIQUE INDEX IF NOT EXISTS work_orders_number ON work_orders(number)');
+    },
+  },
 ];
 
 export async function migrate(db, list = migrations) {

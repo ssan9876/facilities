@@ -21,6 +21,14 @@ const detailFields = [
   'space_id',
 ];
 
+// Allocates the next ticket number atomically; safe across concurrent requests and processes.
+export async function assignTicketNumber(conn, id) {
+  const [{value}] = await conn.query("UPDATE counters SET value=value+1 WHERE id='work_order' RETURNING value");
+  await conn.query('UPDATE work_orders SET number=$1 WHERE id=$2 AND number IS NULL', [Number(value), id]);
+  return Number(value);
+}
+export const ticketLabel = number => (number ? `WO-${String(number).padStart(4, '0')}` : 'WO-—');
+
 // Shared by the register, CSV export and reports so every view applies identical access rules.
 export function orderFilter(user, modules, params, timezone) {
   const where = [],
@@ -48,11 +56,18 @@ export function orderFilter(user, modules, params, timezone) {
     if (!statuses.includes(params.status)) throw error('Choose a valid status filter.');
     add('w.status=?', params.status);
   }
-  if (params.q)
-    add(
-      "LOWER(w.title || ' ' || b.name || ' ' || COALESCE(a.name,'') || ' ' || COALESCE(u.name,'') || ' ' || COALESCE(s.name,'')) LIKE ? ESCAPE '\\'",
-      likePattern(String(params.q).slice(0, 200)),
-    );
+  if (params.q) {
+    // "WO-0042", "wo42" and "42" also find the ticket by number.
+    const ticket = String(params.q)
+      .trim()
+      .match(/^(?:wo-?)?0*(\d{1,9})$/i);
+    values.push(likePattern(String(params.q).slice(0, 200)));
+    const like = `LOWER(w.title || ' ' || b.name || ' ' || COALESCE(a.name,'') || ' ' || COALESCE(u.name,'') || ' ' || COALESCE(s.name,'')) LIKE $${values.length} ESCAPE '\\'`;
+    if (ticket) {
+      values.push(Number(ticket[1]));
+      where.push(`(${like} OR w.number=$${values.length})`);
+    } else where.push(like);
+  }
   if (params.building) add('w.building_id=?', params.building);
   if (params.asset) add('w.asset_id=?', params.asset);
   if (params.assignee === 'me') add('w.assignee_id=?', user.id);
@@ -217,6 +232,7 @@ export function setupOrders(app, db, env) {
           reserved.reservation_status,
         ],
       );
+      await assignTicketNumber(tx, id);
       await audit(
         tx,
         req.user,
