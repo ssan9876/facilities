@@ -12,7 +12,7 @@ export function compareVersions(a, b) {
   return 0;
 }
 export function setupReleases(app, env, db) {
-  const repository = env.RELEASE_REPOSITORY || 'ssan9876/go-fmx-clone';
+  const repository = env.RELEASE_REPOSITORY || 'ssan9876/facilities';
   let cache;
   app.get('/api/releases', async (req, res) => {
     if (!req.user.capabilities?.includes('admin'))
@@ -21,11 +21,19 @@ export function setupReleases(app, env, db) {
       return res.status(503).json({error: 'Release repository is invalid.'});
     if (cache && Date.now() - cache.at < 60000) return res.json(cache.body);
     try {
-      const response = await fetch(`https://api.github.com/repos/${repository}/releases/latest`, {
-        headers: {Accept: 'application/vnd.github+json', 'User-Agent': 'Facilities-release-check'},
-        signal: AbortSignal.timeout(8000),
-        redirect: 'error',
-      });
+      const get = url =>
+        fetch(url, {
+          headers: {Accept: 'application/vnd.github+json', 'User-Agent': 'Facilities-release-check'},
+          signal: AbortSignal.timeout(8000),
+          redirect: 'manual',
+        });
+      let response = await get(`https://api.github.com/repos/${repository}/releases/latest`);
+      // A renamed repository answers with a redirect; follow it once, and only within the GitHub API.
+      if ([301, 302, 307, 308].includes(response.status)) {
+        const next = new URL(response.headers.get('location') || '', 'https://api.github.com');
+        if (next.protocol !== 'https:' || next.host !== 'api.github.com') throw new Error('Unexpected redirect.');
+        response = await get(next.href);
+      }
       const base = {
         installed: installedVersion,
         repository,

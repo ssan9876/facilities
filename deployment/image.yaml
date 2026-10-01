@@ -2,7 +2,7 @@ services:
   app:
     image: ${FACILITIES_IMAGE:?Set FACILITIES_IMAGE}
     environment:
-      RELEASE_REPOSITORY: ${RELEASE_REPOSITORY:-ssan9876/go-fmx-clone}
+      RELEASE_REPOSITORY: ${RELEASE_REPOSITORY:-ssan9876/facilities}
       UPDATE_DIR: /updates
     # Shared with the host update agent: the app writes request.json and reads status.json.
     volumes:
