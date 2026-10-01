@@ -164,6 +164,10 @@ components:
     padding: "0 0 13px"
   settings-tab-selected:
     textColor: "{colors.green}"
+  settings-tab-mobile:
+    textColor: "{colors.muted}"
+    typography: "{typography.control}"
+    padding: "10px 0"
   type-summary:
     textColor: "{colors.green}"
     padding: "18px 21px"
@@ -268,9 +272,9 @@ At widths up to 1100px, the sidebar becomes 210px, content uses 28px 24px paddin
 
 Tables retain their columns and scroll horizontally rather than squeezing records into unreadable widths. The request extension sets table cell padding to 16px and heading padding to 13px 16px at all widths, overriding the earlier desktop and mobile cell padding. Request titles and secondary lines wrap within 360px; mobile titles retain a 230px minimum width. Form grids use an 18px gap.
 
-Request-type summaries share one divided strip that remains horizontal on mobile, using equal compact columns with 12px 8px padding and an 18px bottom margin. Mobile summaries hide decorative icons, arrows, and the extra word after active counts. Settings sheets have a 920px maximum width; settings rows use 25px 28px padding and a 24px gap. At the mobile breakpoint, sheet headings and settings rows use 22px 20px padding, the footer stacks, and its save action aligns left. Settings tabs and mobile request filters scroll horizontally without wrapping. Inbox rows use 22px 25px padding and a 16px gap, reducing to 20px 16px padding and an 11px gap on mobile.
+Request-type summaries share one divided strip that remains horizontal on mobile, using equal compact columns with 12px 8px padding and an 18px bottom margin. Mobile summaries hide decorative icons, arrows, and the extra word after active counts. Settings sheets have a 920px maximum width; settings rows use 25px 28px padding and a 24px gap. At the mobile breakpoint, sheet headings and settings rows use 22px 20px padding, the footer stacks, and its save action aligns left. Settings tabs wrap to expose every destination; mobile request filters retain horizontal scrolling without wrapping. Inbox rows use 22px 25px padding and a 16px gap, reducing to 20px 16px padding and an 11px gap on mobile.
 
-Administration forms use a single-column grid with a 16px gap, 24px padding, and a 720px maximum width, including within the wider settings sheet. Group membership fieldsets have 16px padding, a 12px row gap, and 24px side and bottom margins. These forms retain their padding on mobile; identity sheet headings inherit the existing 22px 20px mobile heading padding inside the form. The expanded settings destinations use the existing scrolling tab bar rather than a second navigation pattern.
+Administration forms use a single-column grid with a 16px gap, 24px padding, and a 720px maximum width, including within the wider settings sheet. Group membership fieldsets have 16px padding, a 12px row gap, and 24px side and bottom margins. These forms retain their padding on mobile; headings directly inside an administration form have no extra inner padding. Primary administration actions align to the start on desktop and stretch within the form at widths up to 700px. The expanded settings destinations wrap in the existing tab bar rather than creating a second navigation pattern.
 
 ## Elevation & Depth
 
@@ -327,7 +331,7 @@ Maintenance, Schedule, and Technology summaries use the same white divided sheet
 
 ### Settings tabs and switches
 
-Settings and notifications share a flat tab bar with 25px gaps (21px on mobile), 13px semibold text, and a two-pixel green underline for the selected tab. Settings rows place a 14px bold label and 13px description opposite a switch. Request-type rows additionally show 12px saved-record and visibility text.
+Settings and notifications share a flat wrapping tab bar with 25px gaps (21px between 701px and 760px), 13px semibold text, and a two-pixel green underline for the selected tab. At widths up to 700px, tab gaps become 4px vertically and 12px horizontally, with 10px vertical button padding. Every label stays visible instead of requiring a horizontal tab scroll. Settings rows place a 14px bold label and 13px description opposite a switch. Request-type rows additionally show 12px saved-record and visibility text.
 
 Switches use a real checkbox with switch semantics, a 44px by 26px track, and a white 20px thumb inset by 3px. Checked tracks turn green and the thumb translates 18px. Focus appears on the visible track using the standard two-pixel outline and 4px offset. Background and thumb transitions last 0.16s and respect reduced-motion preference. Changes are saved through the existing primary action.
 
@@ -337,9 +341,9 @@ The top-bar bell is a bordered compact action with a labeled unread count and an
 
 ### Administration forms
 
-Identity, People, Groups, and Provisioning extend the existing settings sheet. Administration inputs and selects use white paper, the shared line border, 11px padding, and a 6px radius. Labels sit 7px above fields. Native checkboxes are 18px squares with a green checked accent and 10px spacing to regular-weight text; they reuse the standard focus-visible outline. Forms retain the existing green primary save action and textual error feedback.
+Identity, People, Groups, and Provisioning extend the existing settings sheet. Administration inputs and selects use white paper, the shared line border, 11px padding, and a 6px radius. Labels sit 7px above fields. Native checkboxes are 18px squares with a green checked accent and 10px spacing to regular-weight text; they reuse the standard focus-visible outline. Forms retain the existing green primary action and textual error feedback; empty error elements are hidden. Creation actions explicitly say "Provision person", "Create group", or "Create token", while group edits say "Save group" and identity/account edits retain "Save changes".
 
-Identity edits the workspace name, welcome message, and a selected Building, Maintenance, Technology, or Calendar SVG icon. People cards separate account identity from editable non-administrator roles and account-enabled state. Protected administrator entries explicitly say "Administrator · Protected" and omit editing controls. Group sections combine labeled fields, automatic assignment checkboxes, and a bordered Members fieldset. Manual membership uses checkbox state; explanatory copy names automatic provisioning and later provider synchronization rather than inventing source-colored membership badges. Membership changes save immediately, while group details use the primary save action.
+Identity edits the workspace name, welcome message, and a selected Building, Maintenance, Technology, or Calendar SVG icon. Workspace names wrap within the brand and organization containers. People cards separate account identity from editable non-administrator roles and account-enabled state. Protected administrator entries explicitly say "Administrator · Protected" and omit editing controls. Group sections combine labeled fields, automatic assignment checkboxes, and a bordered fieldset whose legend says "Members · Changes save immediately". Manual membership uses checkbox state; explanatory copy names automatic provisioning and later provider synchronization rather than inventing source-colored membership badges. Membership changes save immediately, while group details use the primary save action.
 
 ### Technical blocks and provisioning states
 
@@ -361,4 +365,4 @@ Provisioning token rows state an expiry date or "Revoked" in words; active rows 
 - **Don't** apply overlay shadows to every register panel.
 - **Don't** promote the build's very small supporting text into a general type scale.
 
-Not canonized: inherited 10px comment timestamps and 11px metric/organization metadata remain pending legibility review. Administration's repeated checkbox/divider treatments and technical blocks are intentional shipped extensions; fixture workspace names, record counts, endpoint hosts, and token values are not design tokens. Blank error areas and nested heading padding visible in administration forms describe current markup rather than a new spacing doctrine. Other isolated legacy shades/sizes remain advisory pre-existing drift; this documentation pass does not repair UI. Roll quality boards were unavailable and no image comp was approved, so this records code and rendered evidence without claiming comp parity.
+Not canonized: inherited 10px comment timestamps and 11px metric/organization metadata remain pending legibility review. Administration's repeated checkbox/divider treatments and technical blocks are intentional shipped extensions; fixture workspace names, record counts, endpoint hosts, and token values are not design tokens. Final corrections hide blank error elements and remove nested identity heading padding; neither earlier defect becomes a spacing doctrine. Other isolated legacy shades/sizes remain advisory pre-existing drift; this documentation pass does not repair UI. Roll quality boards were unavailable and no image comp was approved, so this records code and rendered evidence without claiming comp parity.
