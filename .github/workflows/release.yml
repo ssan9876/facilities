@@ -25,6 +25,8 @@ jobs:
           node-version: '24'
           cache: npm
       - run: npm ci
+      - run: npm run lint
+      - run: npm run format:check
       - run: npm test
       - run: python3 -m unittest discover -s test -p 'test_hosting.py'
       - run: npx playwright install --with-deps chromium

@@ -1,0 +1,17 @@
+# Formatting covers JavaScript; prose, deployment files and vendored assets keep their own layout.
+*.md
+*.yaml
+*.yml
+*.json
+*.html
+*.css
+*.sh
+*.py
+*.conf
+node_modules/
+data/
+public/fonts/
+.impeccable/
+.npm-cache/
+deployment.local/
+test-results/

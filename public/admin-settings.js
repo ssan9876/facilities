@@ -1,23 +1,139 @@
-export function adminUI(state,e){
-  const a=state.admin;if(!a)return '<section class="settings-sheet"><div class="sheet-heading"><h2>Administration</h2><p>Load your organization’s people, groups and settings.</p><button class="primary" data-load-admin>Load administration</button></div></section>';
-  const field=(name,label,value='',type='text')=>`<label>${label}<input name="${name}" type="${type}" value="${e(value)}" required></label>`;
-  const action=label=>save.replace('Save changes',label);
-  const save='<p class="form-error" role="alert"></p><button class="primary" type="submit">Save changes</button>';
-  if(state.settingsTab==='branding')return `<form id="branding-form" class="settings-sheet admin-form"><div class="sheet-heading"><h2>Workspace identity</h2><p>Personalize the sign-in page, navigation and browser title.</p></div>${field('name','Workspace name',a.settings.name||state.me.organization)}${field('welcome','Welcome message',a.settings.welcome||'Your facilities. One connected workspace.')}<label>Workspace icon<select name="icon">${[['building','Building'],['work','Maintenance'],['technology','Technology'],['calendar','Calendar']].map(([v,l])=>`<option value="${v}" ${a.settings.icon===v?'selected':''}>${l}</option>`).join('')}</select></label><label class="admin-check"><input name="provisioned_only" type="checkbox" ${a.settings.provisioned_only?'checked':''}>Require users to be provisioned before SSO sign-in</label><p class="settings-copy">Your bootstrap administrator can always sign in. Groups organize people; account roles control access.</p>${save}</form>`;
-  if(state.settingsTab==='people')return `<section class="settings-sheet"><div class="sheet-heading"><h2>People and access</h2><p>Provision users using their immutable SSO subject. Disabling an account ends its sessions in this workspace.</p></div>${a.users.map(u=>`<form class="admin-user admin-form" data-user="${e(u.id)}"><strong>${e(u.name)}</strong><small>${e(u.email)} · ${u.managed?'Provisioned':'SSO managed'}</small>${u.role==='admin'?'<p>Administrator · Protected</p>':`${field('name','Display name',u.name)}<label>Email<input name="email" type="email" value="${e(u.email)}"></label><label>Role<select name="role">${['requester','technician','manager'].map(r=>`<option ${u.role===r?'selected':''}>${r}</option>`).join('')}</select></label><label class="admin-check"><input type="checkbox" name="active" ${u.active?'checked':''}>Account enabled</label>${save}`}</form>`).join('')}<form id="user-create" class="admin-form sheet-heading"><h2>Provision a person</h2>${field('oidc_subject','Immutable SSO subject')}${field('name','Display name')}<label>Email<input type="email" name="email"></label><p class="settings-copy">Use the identity provider’s user ID, never an email address or SCIM externalId.</p>${action('Provision person')}</form></section>`;
-  if(state.settingsTab==='groups')return `<section class="settings-sheet"><div class="sheet-heading"><h2>Groups</h2><p>Assign people by hand, through SCIM or automatically when they are first provisioned.</p></div>${a.groups.map(g=>`<section class="admin-group"><form class="admin-form" data-group="${e(g.id)}">${field('name','Group name',g.name)}<label>Description<input name="description" maxlength="300" value="${e(g.description)}"></label><label class="admin-check"><input name="auto_assign" type="checkbox" ${g.auto_assign?'checked':''}>Add newly provisioned users automatically</label>${action('Save group')}</form><fieldset><legend>Members · Changes save immediately</legend>${a.users.map(u=>`<label class="admin-check"><input type="checkbox" data-membership="${e(g.id)}" data-member="${e(u.id)}" ${a.members.some(m=>m.group_id===g.id&&m.user_id===u.id)?'checked':''}>${e(u.name)}</label>`).join('')}<small>Removing a member clears current assignments. A later provider sync may add them again.</small></fieldset></section>`).join('')||'<div class="sheet-heading"><p>No groups yet. Create your first team below.</p></div>'}<form id="group-create" class="admin-form sheet-heading"><h2>Create a group</h2>${field('name','Group name')}<label>Description<input name="description" maxlength="300"></label><label class="admin-check"><input type="checkbox" name="auto_assign">Add newly provisioned users automatically</label>${action('Create group')}</form></section>`;
-  return `<section class="settings-sheet"><div class="sheet-heading"><h2>Provisioning connections</h2><p>Use expiring bearer tokens for Syntra SCIM or your own REST integrations.</p><p>SCIM base URL</p><pre class="update-command">${e(location.origin)}/api/provisioning/v1/scim</pre><p>REST base URL</p><pre class="update-command">${e(location.origin)}/api/provisioning/v1</pre><p class="settings-copy">Map the immutable OIDC subject into the FMXIdentity SCIM extension. Tokens manage ordinary users and memberships; administrator accounts are protected.</p></div>${state.newKey?`<div class="sheet-heading notice"><strong>Copy this token now. It is shown once.</strong><pre class="update-command">${e(state.newKey)}</pre><button class="quiet-button" data-dismiss-key>I saved the token</button></div>`:''}<div class="sheet-heading">${a.keys.map(k=>`<div class="setting-row"><span><strong>${e(k.name)}</strong><small>${k.revoked?'Revoked':'Expires '+e(k.expires_at.slice(0,10))}</small></span>${k.revoked?'':`<button class="quiet-button" data-revoke-key="${e(k.id)}">Revoke</button>`}</div>`).join('')||'<p>No provisioning tokens yet.</p>'}</div><form id="key-create" class="admin-form sheet-heading"><h2>Create a token</h2>${field('name','Connection name')}${field('days','Expires in days','90','number')}${action('Create token')}</form></section>`;
+export function adminUI(state, e) {
+  const a = state.admin;
+  if (!a)
+    return '<section class="settings-sheet"><div class="sheet-heading"><h2>Administration</h2><p>Load your organization’s people, groups and settings.</p><button class="primary" data-load-admin>Load administration</button></div></section>';
+  const field = (name, label, value = '', type = 'text') =>
+    `<label>${label}<input name="${name}" type="${type}" value="${e(value)}" required></label>`;
+  const action = label => save.replace('Save changes', label);
+  const save = '<p class="form-error" role="alert"></p><button class="primary" type="submit">Save changes</button>';
+  if (state.settingsTab === 'branding')
+    return `<form id="branding-form" class="settings-sheet admin-form"><div class="sheet-heading"><h2>Workspace identity</h2><p>Personalize the sign-in page, navigation and browser title.</p></div>${field('name', 'Workspace name', a.settings.name || state.me.organization)}${field('welcome', 'Welcome message', a.settings.welcome || 'Your facilities. One connected workspace.')}<label>Workspace icon<select name="icon">${[
+      ['building', 'Building'],
+      ['work', 'Maintenance'],
+      ['technology', 'Technology'],
+      ['calendar', 'Calendar'],
+    ]
+      .map(([v, l]) => `<option value="${v}" ${a.settings.icon === v ? 'selected' : ''}>${l}</option>`)
+      .join(
+        '',
+      )}</select></label><label class="admin-check"><input name="provisioned_only" type="checkbox" ${a.settings.provisioned_only ? 'checked' : ''}>Require users to be provisioned before SSO sign-in</label><p class="settings-copy">Your bootstrap administrator can always sign in. Groups organize people; account roles control access.</p>${save}</form>`;
+  if (state.settingsTab === 'people')
+    return `<section class="settings-sheet"><div class="sheet-heading"><h2>People and access</h2><p>Provision users using their immutable SSO subject. Disabling an account ends its sessions in this workspace.</p></div>${a.users.map(u => `<form class="admin-user admin-form" data-user="${e(u.id)}"><strong>${e(u.name)}</strong><small>${e(u.email)} · ${u.managed ? 'Provisioned' : 'SSO managed'}</small>${u.role === 'admin' ? '<p>Administrator · Protected</p>' : `${field('name', 'Display name', u.name)}<label>Email<input name="email" type="email" value="${e(u.email)}"></label><label>Role<select name="role">${['requester', 'technician', 'manager'].map(r => `<option ${u.role === r ? 'selected' : ''}>${r}</option>`).join('')}</select></label><label class="admin-check"><input type="checkbox" name="active" ${u.active ? 'checked' : ''}>Account enabled</label>${save}`}</form>`).join('')}<form id="user-create" class="admin-form sheet-heading"><h2>Provision a person</h2>${field('oidc_subject', 'Immutable SSO subject')}${field('name', 'Display name')}<label>Email<input type="email" name="email"></label><p class="settings-copy">Use the identity provider’s user ID, never an email address or SCIM externalId.</p>${action('Provision person')}</form></section>`;
+  if (state.settingsTab === 'groups')
+    return `<section class="settings-sheet"><div class="sheet-heading"><h2>Groups</h2><p>Assign people by hand, through SCIM or automatically when they are first provisioned.</p></div>${a.groups.map(g => `<section class="admin-group"><form class="admin-form" data-group="${e(g.id)}">${field('name', 'Group name', g.name)}<label>Description<input name="description" maxlength="300" value="${e(g.description)}"></label><label class="admin-check"><input name="auto_assign" type="checkbox" ${g.auto_assign ? 'checked' : ''}>Add newly provisioned users automatically</label>${action('Save group')}</form><fieldset><legend>Members · Changes save immediately</legend>${a.users.map(u => `<label class="admin-check"><input type="checkbox" data-membership="${e(g.id)}" data-member="${e(u.id)}" ${a.members.some(m => m.group_id === g.id && m.user_id === u.id) ? 'checked' : ''}>${e(u.name)}</label>`).join('')}<small>Removing a member clears current assignments. A later provider sync may add them again.</small></fieldset></section>`).join('') || '<div class="sheet-heading"><p>No groups yet. Create your first team below.</p></div>'}<form id="group-create" class="admin-form sheet-heading"><h2>Create a group</h2>${field('name', 'Group name')}<label>Description<input name="description" maxlength="300"></label><label class="admin-check"><input type="checkbox" name="auto_assign">Add newly provisioned users automatically</label>${action('Create group')}</form></section>`;
+  return `<section class="settings-sheet"><div class="sheet-heading"><h2>Provisioning connections</h2><p>Use expiring bearer tokens for Syntra SCIM or your own REST integrations.</p><p>SCIM base URL</p><pre class="update-command">${e(location.origin)}/api/provisioning/v1/scim</pre><p>REST base URL</p><pre class="update-command">${e(location.origin)}/api/provisioning/v1</pre><p class="settings-copy">Map the immutable OIDC subject into the FMXIdentity SCIM extension. Tokens manage ordinary users and memberships; administrator accounts are protected.</p></div>${state.newKey ? `<div class="sheet-heading notice"><strong>Copy this token now. It is shown once.</strong><pre class="update-command">${e(state.newKey)}</pre><button class="quiet-button" data-dismiss-key>I saved the token</button></div>` : ''}<div class="sheet-heading">${a.keys.map(k => `<div class="setting-row"><span><strong>${e(k.name)}</strong><small>${k.revoked ? 'Revoked' : 'Expires ' + e(k.expires_at.slice(0, 10))}</small></span>${k.revoked ? '' : `<button class="quiet-button" data-revoke-key="${e(k.id)}">Revoke</button>`}</div>`).join('') || '<p>No provisioning tokens yet.</p>'}</div><form id="key-create" class="admin-form sheet-heading"><h2>Create a token</h2>${field('name', 'Connection name')}${field('days', 'Expires in days', '90', 'number')}${action('Create token')}</form></section>`;
 }
-export function bindAdmin(state,api,refresh,render,toast){
-  const load=async()=>{state.admin=await api('/admin');};
-  const button=document.querySelector('[data-load-admin]');if(button)button.onclick=async()=>{button.disabled=true;try{await load();render();}catch(err){toast(err.message);button.disabled=false;}};
-  const wire=(selector,endpoint,method,convert)=>document.querySelectorAll(selector).forEach(form=>form.onsubmit=async event=>{event.preventDefault();const b=form.querySelector('[type=submit]');b.disabled=true;try{const data=Object.fromEntries(new FormData(form));await api(typeof endpoint==='function'?endpoint(form):endpoint,{method,body:JSON.stringify(convert?convert(data,form):data)});await load();await refresh();toast('Administration settings saved.');}catch(err){form.querySelector('.form-error').textContent=err.message;b.disabled=false;}});
-  wire('#branding-form','/admin/workspace','PUT',(d,f)=>({...d,provisioned_only:f.provisioned_only.checked}));
-  wire('#group-create','/admin/groups','POST',(d,f)=>({...d,auto_assign:f.auto_assign.checked}));
-  wire('[data-group]',f=>'/admin/groups/'+f.dataset.group,'PATCH',(d,f)=>({...d,auto_assign:f.auto_assign.checked}));
-  wire('#user-create','/admin/users','POST');wire('[data-user]',f=>'/admin/users/'+f.dataset.user,'PATCH',(d,f)=>({...d,active:f.active.checked}));
-  const key=document.querySelector('#key-create');if(key)key.onsubmit=async event=>{event.preventDefault();const b=key.querySelector('button');b.disabled=true;try{const result=await api('/admin/keys',{method:'POST',body:JSON.stringify({name:key.elements.name.value,days:Number(key.elements.days.value)})});state.newKey=result.secret;await load();render();}catch(err){key.querySelector('.form-error').textContent=err.message;b.disabled=false;}};
-  document.querySelectorAll('[data-membership]').forEach(input=>input.onchange=async()=>{input.disabled=true;try{await api(`/admin/groups/${input.dataset.membership}/members/${input.dataset.member}`,{method:'PUT',body:JSON.stringify({member:input.checked})});await load();toast('Group membership saved.');}catch(err){input.checked=!input.checked;toast(err.message);}finally{input.disabled=false;}});
-  document.querySelectorAll('[data-revoke-key]').forEach(b=>b.onclick=async()=>{b.disabled=true;try{await api('/admin/keys/'+b.dataset.revokeKey,{method:'DELETE'});state.newKey=null;await load();render();toast('Token revoked.');}catch(err){toast(err.message);b.disabled=false;}});
-  const dismiss=document.querySelector('[data-dismiss-key]');if(dismiss)dismiss.onclick=()=>{state.newKey=null;render();};
+export function bindAdmin(state, api, refresh, render, toast) {
+  const load = async () => {
+    state.admin = await api('/admin');
+  };
+  const button = document.querySelector('[data-load-admin]');
+  if (button)
+    button.onclick = async () => {
+      button.disabled = true;
+      try {
+        await load();
+        render();
+      } catch (err) {
+        toast(err.message);
+        button.disabled = false;
+      }
+    };
+  const wire = (selector, endpoint, method, convert) =>
+    document.querySelectorAll(selector).forEach(
+      form =>
+        (form.onsubmit = async event => {
+          event.preventDefault();
+          const b = form.querySelector('[type=submit]');
+          b.disabled = true;
+          try {
+            const data = Object.fromEntries(new FormData(form));
+            await api(typeof endpoint === 'function' ? endpoint(form) : endpoint, {
+              method,
+              body: JSON.stringify(convert ? convert(data, form) : data),
+            });
+            await load();
+            await refresh();
+            toast('Administration settings saved.');
+          } catch (err) {
+            form.querySelector('.form-error').textContent = err.message;
+            b.disabled = false;
+          }
+        }),
+    );
+  wire('#branding-form', '/admin/workspace', 'PUT', (d, f) => ({...d, provisioned_only: f.provisioned_only.checked}));
+  wire('#group-create', '/admin/groups', 'POST', (d, f) => ({...d, auto_assign: f.auto_assign.checked}));
+  wire(
+    '[data-group]',
+    f => '/admin/groups/' + f.dataset.group,
+    'PATCH',
+    (d, f) => ({...d, auto_assign: f.auto_assign.checked}),
+  );
+  wire('#user-create', '/admin/users', 'POST');
+  wire(
+    '[data-user]',
+    f => '/admin/users/' + f.dataset.user,
+    'PATCH',
+    (d, f) => ({...d, active: f.active.checked}),
+  );
+  const key = document.querySelector('#key-create');
+  if (key)
+    key.onsubmit = async event => {
+      event.preventDefault();
+      const b = key.querySelector('button');
+      b.disabled = true;
+      try {
+        const result = await api('/admin/keys', {
+          method: 'POST',
+          body: JSON.stringify({name: key.elements.name.value, days: Number(key.elements.days.value)}),
+        });
+        state.newKey = result.secret;
+        await load();
+        render();
+      } catch (err) {
+        key.querySelector('.form-error').textContent = err.message;
+        b.disabled = false;
+      }
+    };
+  document.querySelectorAll('[data-membership]').forEach(
+    input =>
+      (input.onchange = async () => {
+        input.disabled = true;
+        try {
+          await api(`/admin/groups/${input.dataset.membership}/members/${input.dataset.member}`, {
+            method: 'PUT',
+            body: JSON.stringify({member: input.checked}),
+          });
+          await load();
+          toast('Group membership saved.');
+        } catch (err) {
+          input.checked = !input.checked;
+          toast(err.message);
+        } finally {
+          input.disabled = false;
+        }
+      }),
+  );
+  document.querySelectorAll('[data-revoke-key]').forEach(
+    b =>
+      (b.onclick = async () => {
+        b.disabled = true;
+        try {
+          await api('/admin/keys/' + b.dataset.revokeKey, {method: 'DELETE'});
+          state.newKey = null;
+          await load();
+          render();
+          toast('Token revoked.');
+        } catch (err) {
+          toast(err.message);
+          b.disabled = false;
+        }
+      }),
+  );
+  const dismiss = document.querySelector('[data-dismiss-key]');
+  if (dismiss)
+    dismiss.onclick = () => {
+      state.newKey = null;
+      render();
+    };
 }

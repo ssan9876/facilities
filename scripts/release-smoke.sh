@@ -27,7 +27,7 @@ for attempt in $(seq 1 30); do
   sleep 1
 done
 if [[ $healthy != 1 ]]; then docker logs "$name"; exit 1; fi
-for path in / /app.js /styles.css /request-settings.js /admin-settings.js /fonts/manrope-latin.woff2; do
+for path in / /app.js /ui.js /hooks.js /forms.js /order.js /records.js /inventory.js /reports.js /audit.js /styles.css /request-settings.js /admin-settings.js /fonts/manrope-latin.woff2; do
   curl -fsS -H 'Host: facilities.example.test' "http://127.0.0.1:3100$path" -o "$work/response"
   test -s "$work/response"
 done
