@@ -4,14 +4,18 @@ A working first version of an FMX-inspired facilities-management application, bu
 
 ## Included
 
-- Overview with live counts, search and status filters
-- Work orders: create, assign, change status, reopen, comment
+- Overview with live counts, search and status filters; the request register is paged and filtered on the server
+- Work orders: create, edit details, assign, change status, reopen, delete, comment (authors edit/delete their comments)
+- Photo and file attachments on requests (JPEG, PNG, GIF, WebP, HEIC, PDF, text, CSV, Word, Excel)
+- Activity history on every request and an organization-wide audit log with CSV export
 - Separate Maintenance, Schedule and Technology request queues
 - Admin-only request-type switches: hide disabled types and preserve their records
-- Schedule requests with start/end times in the organization's timezone (no conflict/reservation checks)
-- In-app notification inbox and personal event preferences; organization-wide delivery switch
-- Building and equipment registers
-- Recurring preventive-maintenance plans and work-order generation
+- Schedule requests with start/end times in the organization's timezone, optional space reservations, conflict checks and manager approval
+- In-app notification inbox, optional email delivery, and personal event and email preferences
+- Building, space and equipment registers with edit, archive/restore and delete
+- Recurring preventive-maintenance plans (edit, pause, resume, delete) and work-order generation
+- Spare-parts inventory with stock adjustments, usage on requests and low-stock alerts
+- Reports (workload, completion time, maintenance compliance, parts cost) and CSV exports
 - OpenID Connect SSO with PKCE, state and nonce validation
 - Requester, technician, manager and administrator permissions enforced by the API
 - Persistent server-side sessions; CSRF-protected writes
@@ -20,10 +24,12 @@ A working first version of an FMX-inspired facilities-management application, bu
 - Admin settings for workspace name, welcome message, icon and provisioned-only sign-in
 - People management, manual and automatic groups, expiring provisioning tokens
 - REST provisioning and a SCIM endpoint for Syntra user lifecycle and group memberships
+- OpenID Connect back-channel logout and Microsoft Graph lookup for Entra ID group overage
+- Versioned database migrations, structured JSON logs, Prometheus metrics and rate limiting
 
 See [provisioning setup](deployment/PROVISIONING.md) for endpoints and the required immutable SSO identity mapping.
 
-This is an initial application, not full FMX feature parity. Attachments, inventory, facility reservations, email notifications, editing/deleting buildings and assets, reporting exports and an audit history are not implemented yet.
+This is not full FMX feature parity. Purchasing, vendor management, mobile apps, push notifications, recurring reservations and custom request forms are not implemented.
 
 ## Local development
 
@@ -51,6 +57,36 @@ Administrators open **Settings → Request types** to enable or disable Maintena
 
 The inbox shows the most recent 100 notifications eligible for your access. Use **Mark all as read** to mark the displayed updates. The workspace checks for fresh data every 30 seconds while visible, except during forms, typing, or settings/preference screens. Reload those screens to fetch changes made elsewhere.
 
+## Records, attachments and inventory
+
+Managers edit buildings, spaces, assets and maintenance plans from their registers. Records with history (requests, plans, reservations or parts that refer to them) cannot be deleted; **Archive** hides them from new forms while keeping them on existing requests and in reports, and **Restore** brings them back. Delete is for records entered by mistake. Assets with requests or plans cannot move to another building. Paused maintenance plans are skipped by generation.
+
+Attachments are stored in the database, so the PostgreSQL backup below includes them. Each file is checked against its type's file signature; SVG and HTML are refused. Images open inline, other files download. Limits: `ATTACHMENT_MAX_MB` (default 10) per file and `ATTACHMENT_MAX_PER_REQUEST` (default 20). Keep the proxy's `client_max_body_size` above the file limit; the supplied nginx configurations allow 12 MB.
+
+**Inventory** lists parts with an optional building, storage location, reorder level and unit cost. Managers adjust stock with a reason; managers and the assigned technician record parts used on a request, which deducts stock atomically and refuses to go below zero. Returning a part restores the quantity. Parts at or below their reorder level are flagged on the overview and inventory pages. Administrators can turn inventory off under **Settings → Features**.
+
+## Reservations
+
+Managers add spaces (rooms or areas) to buildings under **Buildings → Spaces**, optionally requiring approval. A schedule request can reserve one space. Overlapping reservations for the same space are refused, including ones still awaiting approval; back-to-back bookings are allowed. Requests for approval-required spaces stay **Awaiting approval** until a manager approves or declines them; declined and cancelled reservations free the time. The request form shows the space's existing bookings for the chosen day; requesters see busy times without other people's titles.
+
+## Reports and audit log
+
+**Reports** (managers and administrators) summarizes a date range: requests opened and completed, average time to complete, open and overdue work, breakdowns by type, status, priority, building and assignee, preventive-maintenance compliance and parts cost. CSV exports cover requests (matching the register's current filters), assets, maintenance plans and parts. Cells that a spreadsheet would treat as formulas are neutralized.
+
+Every change to requests, comments, attachments, buildings, spaces, assets, plans, parts, people, groups, provisioning tokens and settings is written to an append-only audit log with the acting user or connection (for example `Provisioning · Syntra` or `Identity provider`), a summary and field-level before/after values. Sign-ins and sign-outs are recorded too. Each request shows its own history under **Activity**; administrators search and export the full log in **Settings → Audit log**.
+
+## Email notifications
+
+Email is optional and off by default. Configure SMTP with `SMTP_URL` (for example `smtps://user:password@mail.example.org:465`) or `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASSWORD`, plus `SMTP_FROM`. Port 465 uses implicit TLS; other ports require STARTTLS unless `SMTP_REQUIRE_TLS=false`. Then turn on **Settings → Notifications → Email notifications** and use **Send test email**. Each in-app notification is also emailed to recipients who keep **Also send by email** on in their preferences. Messages go through a database outbox and are retried after 1, 5, 30 and 120 minutes; the settings page shows sent, waiting and failed counts and the last error. Links in emails open the request at `APP_URL`.
+
+## Operations
+
+- **Migrations.** Schema changes are numbered migrations in `migrations.js`, applied once each at startup inside a transaction and recorded in `schema_migrations`. A PostgreSQL advisory lock prevents two starting containers from migrating at once. A failed migration rolls back and stops startup with its number and name. Installations from 0.2.0 adopt the versioned scheme automatically. `/health` reports the application version and schema number.
+- **Logs.** One JSON object per line on stdout (`docker compose logs app`), with a request ID (also returned as `X-Request-Id`), route, status, duration and user ID. Query strings are not logged. Set `LOG_LEVEL` to `debug`, `info`, `warn`, `error` or `silent`.
+- **Metrics.** Set `METRICS_TOKEN` and scrape `GET /metrics` with `Authorization: Bearer <token>` from the host (`127.0.0.1:3000`). It reports request counts and latency by route, open requests, the email outbox and process memory. The supplied nginx configurations block `/metrics` from outside.
+- **Rate limits.** Per minute: sign-in 30 per client address, provisioning 600 per address, writes 300 per account and uploads 30 per account. Adjust with `RATE_LIMIT_AUTH`, `RATE_LIMIT_PROVISIONING`, `RATE_LIMIT_WRITES` and `RATE_LIMIT_UPLOADS` (0 disables one). Limits are held in memory by the single application process.
+- **Sessions.** Expired sessions are removed hourly.
+
 ## Self hosting
 
 Choose **LAN**, **cloud VM**, or **Cloudflare Tunnel** access using the [hosting guide](deployment/HOSTING.md). All modes remain self hosted and single organization. The guide includes a server-side selector, certificate requirements, SSO callback changes, and a same-host Cloudflare connector for managed public HTTPS.
@@ -64,24 +100,39 @@ Docker Compose exposes the application only on loopback. The database has no pub
 
 ### Identity providers
 
-- Microsoft Entra ID: use the **tenant-specific** issuer `https://login.microsoftonline.com/YOUR_DIRECTORY_ID/v2.0`. Configure the app as single tenant; restrict enterprise application assignments. Use group **object IDs** in the role variables and configure group claims. Group-overage/Graph lookup is not implemented; use groups assigned to the app to keep the token claim within limits.
+- Microsoft Entra ID: use the **tenant-specific** issuer `https://login.microsoftonline.com/YOUR_DIRECTORY_ID/v2.0`. Configure the app as single tenant; restrict enterprise application assignments. Use group **object IDs** in the role variables and configure group claims. For users in many groups, set `OIDC_GROUPS_OVERAGE=graph` (see below) or assign groups to the app to keep the token claim within limits.
 - Keycloak / Authentik / Okta: use the provider's exact issuer and configure a groups claim mapper. Provider-specific deployment still needs a live sign-in test.
 - Google Workspace: an OIDC issuer can be configured, but Google ID tokens do not normally include group membership. Restrict access at the IdP or an identity broker, and use `OIDC_ADMIN_SUBJECT` for initial admin access. Workspace domain validation/group lookup is not implemented. For controlled group access, use an identity broker such as Keycloak or Authentik.
 - SAML is not implemented directly. A SAML-to-OIDC broker can supply the OIDC connection.
 
+### Group overage (Microsoft Entra ID)
+
+When a user belongs to too many groups, Entra ID leaves the `groups` claim out of the token. Set `OIDC_GROUPS_OVERAGE=graph` to read that user's memberships from Microsoft Graph (`/me/getMemberObjects`) at sign-in. This uses the delegated `User.Read` permission that the sign-in token already carries; no extra consent is required. The Graph endpoint is fixed, never taken from the token. Without the setting, an overage user signs in with no groups (a requester unless `OIDC_ADMIN_SUBJECT` applies, and refused when `OIDC_ALLOWED_GROUPS` is set), and the server logs a warning.
+
+### Back-channel logout
+
+Register `https://your-host/auth/backchannel-logout` as the client's back-channel logout URI. When a user signs out at the identity provider or is disabled there, the provider posts a signed logout token and Facilities ends the matching sessions immediately (by session ID, or every session for the subject). Tokens are verified against the provider's published keys, issuer and client ID; replays are refused. The provider must be able to reach this URL, so it works with cloud and tunnel hosting but not with a LAN-only installation that the provider cannot reach.
+
 Role variables: `OIDC_ADMIN_GROUP`, `OIDC_MANAGER_GROUP`, `OIDC_TECHNICIAN_GROUP`. Users with no role match become requesters. Optionally set `OIDC_ALLOWED_GROUPS` to a space-separated allowlist of exact group claim values; this applies even to administrators. `OIDC_ADMIN_SUBJECT` is an exact `sub` claim for administrator bootstrap. User identity is keyed by issuer plus subject, not by mutable email.
 
-Roles are synchronized on each login, not continuously while a session is active. Sessions last eight hours with activity. Sign out clears this application's session; it does not log out of the IdP. Provider access restrictions remain essential, especially when `OIDC_ALLOWED_GROUPS` is empty.
+Roles are synchronized on each login, not continuously while a session is active. Sessions last eight hours with activity. Sign out clears this application's session; it does not log out of the IdP. Signing out at the IdP ends Facilities sessions when back-channel logout is configured. Provider access restrictions remain essential, especially when `OIDC_ALLOWED_GROUPS` is empty.
 
 ### Permissions
 
 | Action | Requester | Technician | Manager / Admin |
 |---|---|---|---|
-| Create work orders | Yes | Yes | Yes |
+| Create work orders, attach files | Yes | Yes | Yes |
 | View / comment on orders | Own requests | All | All |
+| Edit request details | Own, while Open | Own, while Open | All |
 | Change order status | No | Assigned to self | All |
-| Assign work | No | No | Yes |
-| Create buildings / assets / PM plans | No | No | Yes |
+| Record parts on a request | No | Assigned to self | All |
+| Assign work, delete requests, approve reservations | No | No | Yes |
+| Create / edit / archive buildings, spaces, assets, PM plans, parts | No | No | Yes |
+| View inventory, export CSV | No | Yes | Yes |
+| Reports | No | No | Yes |
+| Settings, people, audit log | No | No | Administrator only |
+
+Users may edit and delete their own comments; managers may delete any comment. Uploaders and managers may remove attachments.
 
 ### Maintenance scheduling
 
@@ -99,7 +150,7 @@ For restore, first stop the application and restore into an empty `facilities` d
 docker compose exec -T db psql -U facilities facilities < facilities-backup.sql
 ```
 
-Verify restoration in a separate deployment before relying on backups. Store encrypted copies outside the host. Never run `docker compose down -v` unless intentionally deleting the database. For local SQLite backups, stop the server before copying the database file. Before updates, take a backup, then rebuild with `docker compose up -d --build`. This version adds request-type and schedule columns by checking existing schema metadata and creates settings/notification tables idempotently. Existing requests default to Maintenance. Future schema changes will need explicit migrations.
+Verify restoration in a separate deployment before relying on backups. Store encrypted copies outside the host. Never run `docker compose down -v` unless intentionally deleting the database. For local SQLite backups, stop the server before copying the database file. Before updates, take a backup, then rebuild with `docker compose up -d --build`. Version 0.3.0 introduces versioned migrations (see Operations); upgrading from 0.2.0 adds the audit log, attachments, email outbox, inventory, spaces and session identity tables and columns without changing existing records. Attachments make the database larger, so check backup storage.
 
 ## GitHub releases and updates
 
@@ -126,4 +177,4 @@ The current Syntra provider advertises standard profile/email claims but does no
 
 ## Verification status
 
-Ten automated tests cover persistence, legacy migration, organization dates, role mapping, production guards, core flows, CSRF, request-type visibility and enforcement, admin-only settings, personal notification preferences/delivery and maintenance idempotency. Browser checks pass for creating/completing/commenting on requests, schedule times, module switches, notification preferences, navigation, and mobile overflow. GitHub CI passes against PostgreSQL 17 and SQLite, browser checks, and a Docker image build. A Linux container deployment and release upgrade were verified on Proxmox. Live Syntra discovery, client registration, PKCE authorization and the login-page redirect were verified; completing the credentialed sign-in still requires a user login. The application does not yet provide production observability, IdP backchannel logout, or automated migration tooling.
+`npm test` runs 38 tests covering persistence, versioned and legacy migrations and transactions, organization dates, role mapping, production guards, the full role permission matrix, CSRF, session expiry and revocation, server-side paging/filtering/search, record lifecycle, request editing/deletion and comment ownership, attachments (type checks, limits, access), space conflicts and approval, inventory stock rules, reports and CSV safety, email outbox delivery and retries, SCIM discovery/paging/filters/patch paths/errors, audit attribution, Graph group overage, back-channel logout validation and replay, metrics, request IDs and rate limits. Two PostgreSQL tests run when `TEST_DATABASE_URL` is set. `npm run lint` and `npm run format:check` run ESLint and Prettier. Browser checks pass for creating/completing/commenting on requests, editing records and requests, reservations and conflicts, attachments, parts, inventory, reports, the audit log, schedule times, module switches, notification preferences, navigation, and mobile overflow. GitHub CI passes against PostgreSQL 17 and SQLite, browser checks, and a Docker image build. A Linux container deployment and release upgrade were verified on Proxmox. Live Syntra discovery, client registration, PKCE authorization and the login-page redirect were verified; completing the credentialed sign-in still requires a user login. Email delivery, Graph overage lookup and back-channel logout are verified with test doubles; confirm them against your mail server and identity provider after deployment.

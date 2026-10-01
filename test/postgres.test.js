@@ -1,35 +1,208 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {createApp,generateMaintenance} from '../server.js';
+import {createApp, generateMaintenance} from '../server.js';
 import {openDatabase} from '../db.js';
 
 // TEST_DATABASE_URL must name a disposable database, never the running workspace.
-test('PostgreSQL supports settings, schedule requests, sessions and maintenance generation',{skip:!process.env.TEST_DATABASE_URL},async()=>{
-  const db=await openDatabase(process.env.TEST_DATABASE_URL);
-  const {app}=await createApp({AUTH_MODE:'demo',SEED_DEMO:'true',SESSION_SECRET:'postgres-integration-test-secret',OIDC_ISSUER:'https://idp.example/oidc'},db);
-  const server=app.listen(0,'127.0.0.1');await new Promise(resolve=>server.once('listening',resolve));
-  const base=`http://127.0.0.1:${server.address().port}`;
-  let cookie='',csrf='';
-  const call=async(path,method='GET',body)=>{
-    const response=await fetch(base+path,{method,redirect:'manual',headers:{cookie,'Content-Type':'application/json','x-csrf-token':csrf},body:body?JSON.stringify(body):undefined});
-    if(response.headers.get('set-cookie'))cookie=response.headers.get('set-cookie').split(';')[0];
-    return {status:response.status,body:response.headers.get('content-type')?.includes('json')?await response.json():null};
-  };
-  try {
-    assert.equal((await call('/auth/login')).status,302);
-    csrf=(await call('/api/me')).body.csrf;
-    const created=await call('/api/orders','POST',{request_type:'schedule',title:'PostgreSQL schedule',building_id:'b1',starts_at:'2026-10-02T09:00',ends_at:'2026-10-02T10:00',priority:'Normal'});
-    assert.equal(created.status,201);
-    assert.equal((await call('/api/settings','PATCH',{schedule:false})).status,200);
-    assert.ok(!(await call('/api/data')).body.orders.some(x=>x.id===created.body.id));
-    assert.equal((await call('/api/settings','PATCH',{schedule:true})).status,200);
-    assert.ok((await call('/api/data')).body.orders.some(x=>x.id===created.body.id));
-    assert.equal((await call('/api/maintenance','POST',{title:'PostgreSQL recurring',building_id:'b1',interval_days:1,next_due:'2020-01-01'})).status,201);
-    assert.equal(await generateMaintenance(db),1);
-    assert.equal(await generateMaintenance(db),0);
-    const g=await call('/api/admin/groups','POST',{name:'PostgreSQL group',auto_assign:true});assert.equal(g.status,201);
-    const u=await call('/api/admin/users','POST',{oidc_subject:'postgres-subject',name:'PostgreSQL user'});assert.equal(u.status,201);
-    assert.ok((await call('/api/admin')).body.members.some(m=>m.group_id===g.body.id&&m.user_id===u.body.id));
-    assert.equal((await call('/api/admin/users/'+u.body.id,'PATCH',{active:false})).status,200);
-  } finally {await new Promise(resolve=>server.close(resolve));await db.close();}
-});
+test(
+  'PostgreSQL supports settings, schedule requests, sessions and maintenance generation',
+  {skip: !process.env.TEST_DATABASE_URL},
+  async () => {
+    const db = await openDatabase(process.env.TEST_DATABASE_URL);
+    const {app} = await createApp(
+      {
+        AUTH_MODE: 'demo',
+        SEED_DEMO: 'true',
+        SESSION_SECRET: 'postgres-integration-test-secret',
+        OIDC_ISSUER: 'https://idp.example/oidc',
+      },
+      db,
+    );
+    const server = app.listen(0, '127.0.0.1');
+    await new Promise(resolve => server.once('listening', resolve));
+    const base = `http://127.0.0.1:${server.address().port}`;
+    let cookie = '',
+      csrf = '';
+    const call = async (path, method = 'GET', body) => {
+      const response = await fetch(base + path, {
+        method,
+        redirect: 'manual',
+        headers: {cookie, 'Content-Type': 'application/json', 'x-csrf-token': csrf},
+        body: body ? JSON.stringify(body) : undefined,
+      });
+      if (response.headers.get('set-cookie')) cookie = response.headers.get('set-cookie').split(';')[0];
+      return {
+        status: response.status,
+        body: response.headers.get('content-type')?.includes('json') ? await response.json() : null,
+      };
+    };
+    try {
+      assert.equal((await call('/auth/login')).status, 302);
+      csrf = (await call('/api/me')).body.csrf;
+      const created = await call('/api/orders', 'POST', {
+        request_type: 'schedule',
+        title: 'PostgreSQL schedule',
+        building_id: 'b1',
+        starts_at: '2026-10-02T09:00',
+        ends_at: '2026-10-02T10:00',
+        priority: 'Normal',
+      });
+      assert.equal(created.status, 201);
+      assert.equal((await call('/api/settings', 'PATCH', {schedule: false})).status, 200);
+      assert.ok(!(await call('/api/orders')).body.orders.some(x => x.id === created.body.id));
+      assert.equal((await call('/api/settings', 'PATCH', {schedule: true})).status, 200);
+      assert.ok((await call('/api/orders')).body.orders.some(x => x.id === created.body.id));
+      assert.equal(
+        (
+          await call('/api/maintenance', 'POST', {
+            title: 'PostgreSQL recurring',
+            building_id: 'b1',
+            interval_days: 1,
+            next_due: '2020-01-01',
+          })
+        ).status,
+        201,
+      );
+      assert.equal(await generateMaintenance(db), 1);
+      assert.equal(await generateMaintenance(db), 0);
+      const g = await call('/api/admin/groups', 'POST', {name: 'PostgreSQL group', auto_assign: true});
+      assert.equal(g.status, 201);
+      const u = await call('/api/admin/users', 'POST', {oidc_subject: 'postgres-subject', name: 'PostgreSQL user'});
+      assert.equal(u.status, 201);
+      assert.ok((await call('/api/admin')).body.members.some(m => m.group_id === g.body.id && m.user_id === u.body.id));
+      assert.equal((await call('/api/admin/users/' + u.body.id, 'PATCH', {active: false})).status, 200);
+    } finally {
+      await new Promise(resolve => server.close(resolve));
+      await db.close();
+    }
+  },
+);
+
+test(
+  'PostgreSQL runs search, reports, attachments, reservations, inventory, audit and email SQL',
+  {skip: !process.env.TEST_DATABASE_URL},
+  async () => {
+    const db = await openDatabase(process.env.TEST_DATABASE_URL);
+    const sent = [];
+    const {app} = await createApp(
+      {
+        AUTH_MODE: 'demo',
+        SEED_DEMO: 'true',
+        SESSION_SECRET: 'postgres-integration-test-secret',
+        SMTP_FROM: 'f@example.test',
+        LOG_LEVEL: 'silent',
+      },
+      db,
+      {
+        transport: {
+          sendMail: async m => {
+            sent.push(m);
+          },
+        },
+      },
+    );
+    const server = app.listen(0, '127.0.0.1');
+    await new Promise(resolve => server.once('listening', resolve));
+    const base = `http://127.0.0.1:${server.address().port}`;
+    let cookie = '',
+      csrf = '';
+    const call = async (path, method = 'GET', body, headers = {}) => {
+      const raw = body instanceof Uint8Array;
+      const response = await fetch(base + path, {
+        method,
+        redirect: 'manual',
+        headers: {cookie, 'x-csrf-token': csrf, ...(raw ? {} : {'Content-Type': 'application/json'}), ...headers},
+        body: body === undefined ? undefined : raw ? body : JSON.stringify(body),
+      });
+      if (response.headers.get('set-cookie')) cookie = response.headers.get('set-cookie').split(';')[0];
+      const type = response.headers.get('content-type') || '';
+      return {
+        status: response.status,
+        body: type.includes('json') ? await response.json() : Buffer.from(await response.arrayBuffer()),
+      };
+    };
+    try {
+      await call('/auth/login');
+      csrf = (await call('/api/me')).body.csrf;
+      const marker = 'pg_' + Date.now();
+      const created = await call('/api/orders', 'POST', {
+        title: `${marker} 100% done`,
+        building_id: 'b1',
+        due_date: '2026-10-05',
+      });
+      assert.equal(created.status, 201);
+      assert.equal((await call('/api/orders?q=' + encodeURIComponent(marker + ' 100%'))).body.total, 1);
+      assert.equal(
+        (await call('/api/orders?q=' + encodeURIComponent('%' + marker))).body.total,
+        0,
+        'wildcards are literal',
+      );
+      assert.ok((await call('/api/summary')).body.active >= 1);
+      await call('/api/orders/' + created.body.id, 'PATCH', {status: 'Completed'});
+      const report = await call('/api/reports/summary');
+      assert.equal(report.status, 200);
+      assert.ok(report.body.completed >= 1);
+      assert.equal(typeof report.body.averageHoursToComplete, 'number');
+      const png = Buffer.from(
+        'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==',
+        'base64',
+      );
+      const file = await call(`/api/orders/${created.body.id}/attachments`, 'POST', new Uint8Array(png), {
+        'Content-Type': 'image/png',
+        'X-File-Name': 'p.png',
+      });
+      assert.equal(file.status, 201);
+      assert.deepEqual((await call('/api/attachments/' + file.body.id)).body, png, 'BYTEA round-trips exactly');
+      const space = (await call('/api/spaces', 'POST', {name: marker, building_id: 'b2'})).body.id;
+      const book = title =>
+        call('/api/orders', 'POST', {
+          request_type: 'schedule',
+          title,
+          building_id: 'b2',
+          space_id: space,
+          starts_at: '2027-01-05T09:00',
+          ends_at: '2027-01-05T10:00',
+        });
+      assert.equal((await book('first')).status, 201);
+      assert.equal((await book('second')).status, 409);
+      const part = (await call('/api/parts', 'POST', {name: marker, quantity: 3})).body.id;
+      assert.equal(
+        (await call(`/api/orders/${created.body.id}/parts`, 'POST', {part_id: part, quantity: 2})).body.remaining,
+        1,
+      );
+      assert.equal(
+        (await call(`/api/orders/${created.body.id}/parts`, 'POST', {part_id: part, quantity: 2})).status,
+        409,
+      );
+      assert.equal((await call(`/api/parts/${part}/adjust`, 'POST', {delta: -5})).status, 409);
+      const audit = (await call('/api/admin/audit?q=' + marker)).body;
+      assert.ok(audit.entries.length >= 2);
+      const older = (await call('/api/admin/audit?limit=1')).body;
+      assert.ok(older.next);
+      assert.equal((await call('/api/admin/audit?limit=1&before=' + encodeURIComponent(older.next))).status, 200);
+      assert.equal((await call('/api/settings', 'PATCH', {email: true})).status, 200);
+      await db.query("UPDATE users SET email='admin@example.test' WHERE id='demo-admin'");
+      await db.query(
+        "INSERT INTO users(id,subject,name,email,role) VALUES($1,$1,'PG tech','t@example.test','technician') ON CONFLICT DO NOTHING",
+        ['pg-tech'],
+      );
+      await call('/api/orders/demo-3', 'PATCH', {assignee_id: 'pg-tech'});
+      const {deliverEmails} = await import('../email.js');
+      await deliverEmails(
+        db,
+        {
+          sendMail: async m => {
+            sent.push(m);
+          },
+        },
+        {appUrl: 'https://x.example', from: 'f@example.test', organization: 'PG'},
+      );
+      assert.ok(sent.some(m => m.to === 't@example.test'));
+      await call('/api/settings', 'PATCH', {email: false});
+      assert.equal((await call('/api/orders/' + created.body.id, 'DELETE')).status, 200);
+    } finally {
+      await new Promise(resolve => server.close(resolve));
+      await db.close();
+    }
+  },
+);

@@ -88,3 +88,7 @@ Example create:
 New SCIM users receive requester access. Administrators can change their role in
 People; provisioned roles are retained on subsequent SSO logins. The connector
 must have the identity mapping configured before enabling a production sync.
+
+## Audit and limits
+
+Every user, membership and group change made through REST or SCIM is written to the audit log with the token's connection name as the actor (for example `Provisioning · Syntra`), so administrators can tell provider changes from manual ones in **Settings → Audit log**. Creating and revoking tokens is recorded too. Provisioning requests are limited to 600 per minute per client address (`RATE_LIMIT_PROVISIONING`); a limited request receives HTTP 429 with `Retry-After`.

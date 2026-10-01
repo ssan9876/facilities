@@ -351,6 +351,14 @@ Preformatted technical blocks are now reused for update commands, SCIM/REST conn
 
 Provisioning token rows state an expiry date or "Revoked" in words; active rows expose a quiet Revoke action. Newly created token values appear in a notice-colored sheet section with the explicit instruction "Copy this token now. It is shown once." and an "I saved the token" dismissal action. No persistent secret value or token-specific status color is established by this system. The token form uses the same administration fields for connection name and expiry days.
 
+### Records lifecycle, request detail and operations pages
+
+Registers gain a trailing quiet **Edit** action per row (with the record name in its accessible label) for managers, a **Show archived** checkbox when archived rows exist, and an **Export** secondary link where CSV exports apply. Archived rows keep their place in the register with a neutral written **Archived** tag; paused maintenance plans use the hold-amber **Paused** tag. Edit dialogs reuse the form grid; lifecycle actions (**Archive**/**Restore**, **Delete**) sit at the start of the dialog's action row, separated from **Cancel** and the primary save. Destructive actions use a rust-outlined secondary button and confirm in place: the first press changes the label to an explicit question and fills the button rust; the second press acts. No browser confirmation dialogs are used.
+
+The request dialog adds a toolbar (**Edit details**, **Activity**, **Delete request**), then optional reservation, status, activity, attachment, parts and conversation sections divided by sheet lines with 15px section titles. Reservation states are written tags (**Awaiting approval** amber, **Reserved** green, **Declined**/**Cancelled** neutral). Attachments list a 64px thumbnail or file symbol, a single accessible file link, size, uploader and time. Activity and the audit log share one history list: actor in bold, summary, 12px timestamp, and field changes as `before → after` lines.
+
+Inventory flags parts at or below their reorder level with the rust **Low stock** tag beside the quantity and a notice above the register; the overview adds a **Low stock** panel. Reports reuse the divided metrics sheet for period totals and a responsive grid of panels holding breakdown tables (count, share and completed columns) rather than charts. The audit log is a settings sheet with a four-column filter row that stacks on mobile.
+
 ## Do's and Don'ts
 
 ### Do:

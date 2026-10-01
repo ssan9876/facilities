@@ -64,6 +64,9 @@ server {{
   ssl_certificate_key /etc/nginx/tls/facilities.key;
   ssl_protocols TLSv1.2 TLSv1.3;
   if ($host != "{host}") {{ return 301 {url}$request_uri; }}
+  # Keep above ATTACHMENT_MAX_MB; metrics stay off the public interface.
+  client_max_body_size 12m;
+  location = /metrics {{ deny all; }}
   location / {{
     proxy_pass http://127.0.0.1:3000;
     proxy_set_header Host $host;
@@ -91,6 +94,8 @@ server {{
   server_name {host};
   allow {connector};
   deny all;
+  client_max_body_size 12m;
+  location = /metrics {{ deny all; }}
   location / {{
     proxy_pass http://127.0.0.1:3000;
     proxy_set_header Host {host};
